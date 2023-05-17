@@ -150,6 +150,7 @@ LIBBINDER_NDK33 { # introduced=33
     AIBinder_setMinSchedulerPolicy; # llndk
     AParcel_marshal;
     AParcel_unmarshal;
+    AServiceManager_addServiceWithFlag; # systemapi llndk
 };
 
 LIBBINDER_NDK_PLATFORM {

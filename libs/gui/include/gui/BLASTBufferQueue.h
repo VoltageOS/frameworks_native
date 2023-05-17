@@ -54,6 +54,8 @@ public:
                                nsecs_t dequeueReadyTime) REQUIRES(mMutex);
     void getConnectionEvents(uint64_t frameNumber, bool* needsDisconnect);
 
+    void resizeFrameEventHistory(size_t newSize);
+
 protected:
     void onSidebandStreamChanged() override REQUIRES(mMutex);
 
@@ -82,6 +84,13 @@ public:
     }
     sp<Surface> getSurface(bool includeSurfaceControlHandle);
     bool isSameSurfaceControl(const sp<SurfaceControl>& surfaceControl) const;
+
+    void setUndequeuedBufferCount(int count) {
+        mNumUndequeued = count;
+    }
+    int getUndequeuedBufferCount() const {
+        return mNumUndequeued;
+    }
 
     void onBufferFreed(const wp<GraphicBuffer>&/* graphicBuffer*/) override { /* TODO */ }
     void onFrameReplaced(const BufferItem& item) override;
@@ -129,12 +138,15 @@ public:
 
 private:
     friend class BLASTBufferQueueHelper;
+    friend class BBQBufferQueueProducer;
 
     // can't be copied
     BLASTBufferQueue& operator = (const BLASTBufferQueue& rhs);
     BLASTBufferQueue(const BLASTBufferQueue& rhs);
     void createBufferQueue(sp<IGraphicBufferProducer>* outProducer,
                            sp<IGraphicBufferConsumer>* outConsumer);
+
+    void resizeFrameEventHistory(size_t newSize);
 
     void acquireNextBufferLocked(
             const std::optional<SurfaceComposerClient::Transaction*> transaction) REQUIRES(mMutex);
@@ -167,6 +179,7 @@ private:
     // the max to be acquired
     int32_t mMaxAcquiredBuffers = 1;
 
+    int mNumUndequeued GUARDED_BY(mMutex) =0;
     int32_t mNumFrameAvailable GUARDED_BY(mMutex) = 0;
     int32_t mNumAcquired GUARDED_BY(mMutex) = 0;
 

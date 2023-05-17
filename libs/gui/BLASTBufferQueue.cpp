@@ -34,6 +34,9 @@
 
 #include <private/gui/ComposerService.h>
 
+#include <binder/IServiceManager.h>
+#include <pthread.h>
+#include <regex>
 #include <chrono>
 
 using namespace std::chrono_literals;
@@ -61,6 +64,45 @@ namespace android {
 #define BBQ_TRACE(x, ...)                                                                  \
     ATRACE_FORMAT("%s - %s(f:%u,a:%u)" x, __FUNCTION__, mName.c_str(), mNumFrameAvailable, \
                   mNumAcquired, ##__VA_ARGS__)
+
+static bool sIsGame = false;
+static std::string sLayerName = "";
+static pthread_once_t sCheckAppTypeOnce = PTHREAD_ONCE_INIT;
+static void initAppType() {
+    sp<IServiceManager> sm = defaultServiceManager();
+    sp<IBinder> perfservice = sm->checkService(String16("vendor.perfservice"));
+    if (perfservice == nullptr) {
+        ALOGE("Cannot find perfservice");
+        return;
+    }
+    String16 ifName = perfservice->getInterfaceDescriptor();
+    if (ifName.size() > 0) {
+        const std::regex re("(?:SurfaceView\\[)([^/]+).*");
+        std::smatch match;
+        if (!std::regex_match(sLayerName, match, re)) {
+            return;
+        }
+        String16 pkgName = String16(match[1].str().c_str());
+
+        Parcel data, reply;
+        int GAME_TYPE = 2;
+        int VENDOR_FEEDBACK_WORKLOAD_TYPE = 0x00001601;
+        int PERF_GET_FEEDBACK = IBinder::FIRST_CALL_TRANSACTION + 7;
+        int array[0];
+        data.markForBinder(perfservice);
+        data.writeInterfaceToken(ifName);
+        data.writeInt32(VENDOR_FEEDBACK_WORKLOAD_TYPE);
+        data.writeString16(pkgName);
+        data.writeInt32(getpid());
+        data.writeInt32Array(0, array);
+        perfservice->transact(PERF_GET_FEEDBACK, data, &reply);
+        reply.readExceptionCode();
+        int type = reply.readInt32();
+        if (type == GAME_TYPE) {
+            sIsGame = true;
+        }
+    }
+}
 
 void BLASTBufferItemConsumer::onDisconnect() {
     Mutex::Autolock lock(mMutex);
@@ -132,6 +174,11 @@ void BLASTBufferItemConsumer::onSidebandStreamChanged() {
     }
 }
 
+void BLASTBufferItemConsumer::resizeFrameEventHistory(size_t newSize) {
+    Mutex::Autolock lock(mMutex);
+    mFrameEventHistory.resize(newSize);
+}
+
 BLASTBufferQueue::BLASTBufferQueue(const std::string& name, bool updateDestinationFrame)
       : mSurfaceControl(nullptr),
         mSize(1, 1),
@@ -140,6 +187,10 @@ BLASTBufferQueue::BLASTBufferQueue(const std::string& name, bool updateDestinati
         mTransactionReadyCallback(nullptr),
         mSyncTransaction(nullptr),
         mUpdateDestinationFrame(updateDestinationFrame) {
+    if (name.find("SurfaceView") != std::string::npos) {
+        sLayerName = name;
+        pthread_once(&sCheckAppTypeOnce, initAppType);
+    }
     createBufferQueue(&mProducer, &mConsumer);
     // since the adapter is in the client process, set dequeue timeout
     // explicitly so that dequeueBuffer will block
@@ -429,8 +480,8 @@ void BLASTBufferQueue::releaseBufferCallbackLocked(
         mCurrentMaxAcquiredBufferCount = *currentMaxAcquiredBufferCount;
     }
 
-    const auto numPendingBuffersToHold =
-            isEGL ? std::max(0u, mMaxAcquiredBuffers - mCurrentMaxAcquiredBufferCount) : 0;
+    const uint32_t numPendingBuffersToHold =
+            isEGL ? std::max(0, mMaxAcquiredBuffers - (int32_t)mCurrentMaxAcquiredBufferCount) : 0;
 
     auto rb = ReleasedBuffer{id, releaseFence};
     if (std::find(mPendingRelease.begin(), mPendingRelease.end(), rb) == mPendingRelease.end()) {
@@ -471,6 +522,7 @@ void BLASTBufferQueue::releaseBuffer(const ReleaseCallbackId& callbackId,
         return;
     }
     mNumAcquired--;
+    mNumUndequeued++;
     BBQ_TRACE("frame=%" PRIu64, callbackId.framenumber);
     BQA_LOGV("released %s", callbackId.to_string().c_str());
     mBufferItemConsumer->releaseBuffer(it->second, releaseFence);
@@ -605,8 +657,12 @@ void BLASTBufferQueue::acquireNextBufferLocked(
 
     mergePendingTransactions(t, bufferItem.mFrameNumber);
     if (applyTransaction) {
-        // All transactions on our apply token are one-way. See comment on mAppliedLastTransaction
-        t->setApplyToken(mApplyToken).apply(false, true);
+        if (sIsGame) {
+            t->setApplyToken(mApplyToken).apply(false, false);
+        } else {
+            // All transactions on our apply token are one-way. See comment on mAppliedLastTransaction
+            t->setApplyToken(mApplyToken).apply(false, true);
+        }
         mAppliedLastTransaction = true;
         mLastAppliedFrameNumber = bufferItem.mFrameNumber;
     } else {
@@ -745,6 +801,7 @@ void BLASTBufferQueue::onFrameReplaced(const BufferItem& item) {
 void BLASTBufferQueue::onFrameDequeued(const uint64_t bufferId) {
     std::unique_lock _lock{mTimestampMutex};
     mDequeueTimestamps[bufferId] = systemTime();
+    mNumUndequeued--;
 };
 
 void BLASTBufferQueue::onFrameCancelled(const uint64_t bufferId) {
@@ -1039,8 +1096,9 @@ public:
 // can be non-blocking when the producer is in the client process.
 class BBQBufferQueueProducer : public BufferQueueProducer {
 public:
-    BBQBufferQueueProducer(const sp<BufferQueueCore>& core)
-          : BufferQueueProducer(core, false /* consumerIsSurfaceFlinger*/) {}
+    BBQBufferQueueProducer(const sp<BufferQueueCore>& core, wp<BLASTBufferQueue> bbq)
+          : BufferQueueProducer(core, false /* consumerIsSurfaceFlinger*/),
+            mBLASTBufferQueue(std::move(bbq)) {}
 
     status_t connect(const sp<IProducerListener>& listener, int api, bool producerControlledByApp,
                      QueueBufferOutput* output) override {
@@ -1052,6 +1110,26 @@ public:
                                             producerControlledByApp, output);
     }
 
+    // We want to resize the frame history when changing the size of the buffer queue
+    status_t setMaxDequeuedBufferCount(int maxDequeuedBufferCount) override {
+        int maxBufferCount;
+        status_t status = BufferQueueProducer::setMaxDequeuedBufferCount(maxDequeuedBufferCount,
+                                                                         &maxBufferCount);
+        // if we can't determine the max buffer count, then just skip growing the history size
+        if (status == OK) {
+            size_t newFrameHistorySize = maxBufferCount + 2; // +2 because triple buffer rendering
+            // optimize away resizing the frame history unless it will grow
+            if (newFrameHistorySize > FrameEventHistory::INITIAL_MAX_FRAME_HISTORY) {
+                sp<BLASTBufferQueue> bbq = mBLASTBufferQueue.promote();
+                if (bbq != nullptr) {
+                    ALOGV("increasing frame history size to %zu", newFrameHistorySize);
+                    bbq->resizeFrameEventHistory(newFrameHistorySize);
+                }
+            }
+        }
+        return status;
+    }
+
     int query(int what, int* value) override {
         if (what == NATIVE_WINDOW_QUEUES_TO_WINDOW_COMPOSER) {
             *value = 1;
@@ -1059,6 +1137,9 @@ public:
         }
         return BufferQueueProducer::query(what, value);
     }
+
+private:
+    const wp<BLASTBufferQueue> mBLASTBufferQueue;
 };
 
 // Similar to BufferQueue::createBufferQueue but creates an adapter specific bufferqueue producer.
@@ -1073,7 +1154,7 @@ void BLASTBufferQueue::createBufferQueue(sp<IGraphicBufferProducer>* outProducer
     sp<BufferQueueCore> core(new BufferQueueCore());
     LOG_ALWAYS_FATAL_IF(core == nullptr, "BLASTBufferQueue: failed to create BufferQueueCore");
 
-    sp<IGraphicBufferProducer> producer(new BBQBufferQueueProducer(core));
+    sp<IGraphicBufferProducer> producer(new BBQBufferQueueProducer(core, this));
     LOG_ALWAYS_FATAL_IF(producer == nullptr,
                         "BLASTBufferQueue: failed to create BBQBufferQueueProducer");
 
@@ -1084,6 +1165,16 @@ void BLASTBufferQueue::createBufferQueue(sp<IGraphicBufferProducer>* outProducer
 
     *outProducer = producer;
     *outConsumer = consumer;
+}
+
+void BLASTBufferQueue::resizeFrameEventHistory(size_t newSize) {
+    // This can be null during creation of the buffer queue, but resizing won't do anything at that
+    // point in time, so just ignore. This can go away once the class relationships and lifetimes of
+    // objects are cleaned up with a major refactor of BufferQueue as a whole.
+    if (mBufferItemConsumer != nullptr) {
+        std::unique_lock _lock{mMutex};
+        mBufferItemConsumer->resizeFrameEventHistory(newSize);
+    }
 }
 
 PixelFormat BLASTBufferQueue::convertBufferFormat(PixelFormat& format) {

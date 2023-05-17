@@ -180,9 +180,24 @@ status_t Surface::getDisplayRefreshCycleDuration(nsecs_t* outRefreshDuration) {
     ATRACE_CALL();
 
     gui::DisplayStatInfo stats;
+    ui::DynamicDisplayInfo info;
+    ui::DisplayMode mode;
     binder::Status status = composerServiceAIDL()->getDisplayStats(nullptr, &stats);
     if (!status.isOk()) {
-        return status.transactionError();
+        const sp<IBinder> display = ComposerServiceAIDL::getInstance().getInternalDisplayToken();
+        if (display == nullptr) {
+            return NAME_NOT_FOUND;
+        }
+        if (status_t err = composerService()->getDynamicDisplayInfo(display, &info);
+            err != NO_ERROR) {
+            return err;
+        }
+        if (const auto activeMode = info.getActiveDisplayMode()) {
+            mode = *activeMode;
+        }
+
+        *outRefreshDuration = (1.0/mode.refreshRate * 1000000000); // in neno second
+        return NO_ERROR;
     }
 
     *outRefreshDuration = stats.vsyncPeriod;
@@ -1280,6 +1295,10 @@ void Surface::querySupportedTimestampsLocked() const {
 int Surface::query(int what, int* value) const {
     ATRACE_CALL();
     ALOGV("Surface::query");
+    if ((what == NATIVE_WINDOW_WIDTH) || (what == NATIVE_WINDOW_HEIGHT)) {
+        return mGraphicBufferProducer->query(what, value);
+    }
+
     { // scope for the lock
         Mutex::Autolock lock(mMutex);
         switch (what) {
@@ -1950,6 +1969,7 @@ int Surface::disconnect(int api, IGraphicBufferProducer::DisconnectMode mode) {
         mReqHeight = 0;
         mReqUsage = 0;
         mCrop.clear();
+        mDataSpace = Dataspace::UNKNOWN;
         mScalingMode = NATIVE_WINDOW_SCALING_MODE_FREEZE;
         mTransform = 0;
         mStickyTransform = 0;
