@@ -53,6 +53,10 @@ VKAPI_ATTR VkResult GetSwapchainTimeDomainPropertiesEXT(VkDevice , VkSwapchainKH
 VKAPI_ATTR VkResult SetSwapchainPresentTimingQueueSizeEXT(VkDevice , VkSwapchainKHR , uint32_t );
 VKAPI_ATTR VkResult WaitForPresent2KHR(VkDevice , VkSwapchainKHR , const VkPresentWait2InfoKHR*);
 
+// Swapchain struct is private to swapchain.cpp so expose accessors to rest of libvulkan
+uint64_t GetSwapchainPreallocatedDataSlot(VkSwapchainKHR swapchain, int index);
+void SetSwapchainPreallocatedDataSlot(VkSwapchainKHR swapchain, int index, uint64_t value);
+
 // clang-format on
 
 }  // namespace driver

@@ -104,6 +104,8 @@ struct DeviceData {
 
     std::vector<PrivateDataSlot *> private_data_slots GUARDED_BY(private_data_mutex);
     std::mutex private_data_mutex;
+    uint32_t num_preallocated_private_data_slots = 0;
+    uint32_t next_preallocated_private_data_slot GUARDED_BY(private_data_mutex) = 0;
 };
 
 bool OpenHAL();

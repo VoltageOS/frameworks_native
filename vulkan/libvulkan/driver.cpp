@@ -1478,6 +1478,22 @@ VkResult CreateDevice(VkPhysicalDevice physicalDevice,
         return VK_ERROR_INCOMPATIBLE_DRIVER;
     }
 
+    if (flags::ext_private_data_swapchain()) {
+        // If loader handling of private data slots is supported,
+        // find how many preallocated private data slots the application wants.
+        //
+        // If this struct is not found, the number of preallocated private data slots is zero,
+        // and so any private data slots later used will be "slow" (map-based) instead.
+        for (auto const *pPrivateData = reinterpret_cast<VkDevicePrivateDataCreateInfo const *>(pCreateInfo->pNext);
+                pPrivateData;
+                pPrivateData = reinterpret_cast<VkDevicePrivateDataCreateInfo const *>(pPrivateData->pNext)) {
+            if (pPrivateData->sType == VK_STRUCTURE_TYPE_DEVICE_PRIVATE_DATA_CREATE_INFO) {
+                std::lock_guard lock(data->private_data_mutex);
+                data->num_preallocated_private_data_slots = pPrivateData->privateDataSlotRequestCount;
+            }
+        }
+    }
+
     if (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_CPU) {
         // Log that the app is hitting software Vulkan implementation
         android::GraphicsEnv::getInstance().setTargetStats(

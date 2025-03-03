@@ -57,6 +57,12 @@ VkResult CreatePrivateDataSlotInternal(
     {
         std::lock_guard lock(device_data.private_data_mutex);
         device_data.private_data_slots.push_back(slot);
+
+        // if we haven't exhausted all the preallocated slots, use one for this.
+        if (device_data.next_preallocated_private_data_slot <
+               device_data.num_preallocated_private_data_slots) {
+            slot->preallocated_slot = device_data.next_preallocated_private_data_slot++;
+        }
     }
 
     *pPrivateDataSlot = slot->as_handle();
@@ -99,7 +105,13 @@ VKAPI_ATTR void GetPrivateDataInternal(
 
     if (objectType == VK_OBJECT_TYPE_SWAPCHAIN_KHR) {
         // we handle swapchain objects directly instead of in the driver.
-        *pData = slot->get(objectHandle);
+
+        // if this is a preallocated slot, use the storage in the object itself.
+        // otherwise, fall back to the map with all its locking etc.
+        if (slot->preallocated_slot >= 0)
+            *pData = GetSwapchainPreallocatedDataSlot(VkSwapchainKHR(objectHandle), slot->preallocated_slot);
+        else
+            *pData = slot->get(objectHandle);
         return;
     }
 
@@ -127,7 +139,13 @@ VKAPI_ATTR VkResult SetPrivateDataInternal(
 
     if (objectType == VK_OBJECT_TYPE_SWAPCHAIN_KHR) {
         // we handle swapchain objects directly instead of in the driver.
-        slot->set(objectHandle, data);
+
+        // if this is a preallocated slot, use the storage in the object itself.
+        // otherwise, fall back to the map with all its locking etc.
+        if (slot->preallocated_slot >= 0)
+            SetSwapchainPreallocatedDataSlot(VkSwapchainKHR(objectHandle), slot->preallocated_slot, data);
+        else
+            slot->set(objectHandle, data);
         return VK_SUCCESS;
     }
 

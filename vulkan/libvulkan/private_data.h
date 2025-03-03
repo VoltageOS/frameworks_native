@@ -31,14 +31,14 @@ struct PrivateDataSlot {
     //   passed through to the underlying driver.
     // - There is provision in the spec for "more efficient" private data slots preallocated
     //   within the objects themselves. The number of such slots is specified at device creation time.
-    //   For now we're not bothering to implement that -- all private data slots for swapchain behave
-    //   as if not preallocated, and so have a bunch of locking. If this turns out to be a performance
-    //   problem then we can do something more complex, but is probably OK as swapchains are a tiny
-    //   minority of the vulkan objects.
+    //   If this particular private data slot corresponds to a "fast" slot, then preallocated_slot will
+    //   contain the index of the "fast" slot to use. Otherwise, preallocated_slot will remain -1,
+    //   and the map will be used.
 
     VkPrivateDataSlot driver_object;
     std::mutex mutex;   // callers are not required to externally synchronize access, so we do it.
     std::unordered_map<uint64_t, uint64_t> data GUARDED_BY(mutex);
+    int preallocated_slot = -1;
 
     VkPrivateDataSlot as_handle() {
         return VkPrivateDataSlot(reinterpret_cast<uint64_t>(this));
