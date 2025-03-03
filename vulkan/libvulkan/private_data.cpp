@@ -21,10 +21,13 @@
 #include <utils/Trace.h>
 
 #include <algorithm>
-#include <unordered_set>
 #include <vector>
 
 #include "driver.h"
+
+#include <com_android_graphics_libvulkan_flags.h>
+
+using namespace com::android::graphics::libvulkan;
 
 namespace vulkan {
 namespace driver {
@@ -33,15 +36,126 @@ namespace driver {
 // forward to the matching driver function for anything we're not
 // handling ourselves.
 
+namespace {
+
+VkResult CreatePrivateDataSlotInternal(
+        VkDevice device,
+        const VkPrivateDataSlotCreateInfo* pCreateInfo,
+        const VkAllocationCallbacks* pAllocator,
+        VkPrivateDataSlot* pPrivateDataSlot,
+        bool useExt)
+{
+    auto& device_data = GetData(device);
+    auto result = (useExt ? device_data.driver.CreatePrivateDataSlotEXT : device_data.driver.CreatePrivateDataSlot)(
+            device, pCreateInfo, pAllocator, pPrivateDataSlot);
+
+    if (result != VK_SUCCESS)
+        return result;
+
+    auto* slot = new PrivateDataSlot(*pPrivateDataSlot);
+
+    {
+        std::lock_guard lock(device_data.private_data_mutex);
+        device_data.private_data_slots.push_back(slot);
+    }
+
+    *pPrivateDataSlot = slot->as_handle();
+    return result;
+}
+
+void DestroyPrivateDataSlotInternal(
+        VkDevice device,
+        VkPrivateDataSlot privateDataSlot,
+        const VkAllocationCallbacks* pAllocator,
+        bool useExt) {
+
+    if (privateDataSlot == VK_NULL_HANDLE) {
+        return;
+    }
+
+    auto& device_data = GetData(device);
+    auto* slot = PrivateDataSlot::from_handle(privateDataSlot);
+    (useExt ? device_data.driver.DestroyPrivateDataSlotEXT : device_data.driver.DestroyPrivateDataSlot)(
+            device, slot->driver_object, pAllocator);
+
+    {
+        std::lock_guard lock(device_data.private_data_mutex);
+        std::erase(device_data.private_data_slots, slot);
+    }
+
+    delete slot;
+}
+
+VKAPI_ATTR void GetPrivateDataInternal(
+        VkDevice device,
+        VkObjectType objectType,
+        uint64_t objectHandle,
+        VkPrivateDataSlot privateDataSlot,
+        uint64_t* pData,
+        bool useExt) {
+
+    const auto& device_data = GetData(device);
+    auto* slot = PrivateDataSlot::from_handle(privateDataSlot);
+
+    if (objectType == VK_OBJECT_TYPE_SWAPCHAIN_KHR) {
+        // we handle swapchain objects directly instead of in the driver.
+        *pData = slot->get(objectHandle);
+        return;
+    }
+
+    if (objectType == VK_OBJECT_TYPE_PRIVATE_DATA_SLOT) {
+        // if the requested object is itself a private data slot,
+        // unwrap it so we ask the driver about an object _it_ knows about.
+        auto *o = PrivateDataSlot::from_handle(VkPrivateDataSlot(objectHandle));
+        objectHandle = reinterpret_cast<uint64_t>(o->driver_object);
+    }
+
+    (useExt ? device_data.driver.GetPrivateDataEXT : device_data.driver.GetPrivateData)(
+            device, objectType, objectHandle, slot->driver_object, pData);
+}
+
+VKAPI_ATTR VkResult SetPrivateDataInternal(
+        VkDevice device,
+        VkObjectType objectType,
+        uint64_t objectHandle,
+        VkPrivateDataSlot privateDataSlot,
+        uint64_t data,
+        bool useExt) {
+
+    const auto& device_data = GetData(device);
+    auto* slot = PrivateDataSlot::from_handle(privateDataSlot);
+
+    if (objectType == VK_OBJECT_TYPE_SWAPCHAIN_KHR) {
+        // we handle swapchain objects directly instead of in the driver.
+        slot->set(objectHandle, data);
+        return VK_SUCCESS;
+    }
+
+    if (objectType == VK_OBJECT_TYPE_PRIVATE_DATA_SLOT) {
+        // if the requested object is itself a private data slot,
+        // unwrap it so we ask the driver about an object _it_ knows about.
+        auto *o = PrivateDataSlot::from_handle(VkPrivateDataSlot(objectHandle));
+        objectHandle = reinterpret_cast<uint64_t>(o->driver_object);
+    }
+
+    return (useExt ? device_data.driver.SetPrivateDataEXT : device_data.driver.SetPrivateData)(
+            device, objectType, objectHandle, slot->driver_object, data);
+}
+
+} // namespace
+
 VKAPI_ATTR VkResult CreatePrivateDataSlotEXT(
         VkDevice device,
         const VkPrivateDataSlotCreateInfo* pCreateInfo,
         const VkAllocationCallbacks* pAllocator,
         VkPrivateDataSlot* pPrivateDataSlot) {
 
-    const auto& dispatch = GetData(device).driver;
-    return dispatch.CreatePrivateDataSlotEXT(
-            device, pCreateInfo, pAllocator, pPrivateDataSlot);
+    if (!flags::ext_private_data_swapchain()) {
+        auto& device_data = GetData(device);
+        return device_data.driver.CreatePrivateDataSlotEXT(device, pCreateInfo, pAllocator, pPrivateDataSlot);
+    }
+
+    return CreatePrivateDataSlotInternal(device, pCreateInfo, pAllocator, pPrivateDataSlot, true);
 }
 
 VKAPI_ATTR VkResult CreatePrivateDataSlot(
@@ -50,9 +164,12 @@ VKAPI_ATTR VkResult CreatePrivateDataSlot(
         const VkAllocationCallbacks* pAllocator,
         VkPrivateDataSlot* pPrivateDataSlot) {
 
-    const auto& dispatch = GetData(device).driver;
-    return dispatch.CreatePrivateDataSlot(
-            device, pCreateInfo, pAllocator, pPrivateDataSlot);
+    if (!flags::ext_private_data_swapchain()) {
+        auto& device_data = GetData(device);
+        return device_data.driver.CreatePrivateDataSlot(device, pCreateInfo, pAllocator, pPrivateDataSlot);
+    }
+
+    return CreatePrivateDataSlotInternal(device, pCreateInfo, pAllocator, pPrivateDataSlot, false);
 }
 
 VKAPI_ATTR void DestroyPrivateDataSlotEXT(
@@ -60,9 +177,13 @@ VKAPI_ATTR void DestroyPrivateDataSlotEXT(
         VkPrivateDataSlot privateDataSlot,
         const VkAllocationCallbacks* pAllocator) {
 
-    const auto& dispatch = GetData(device).driver;
-    dispatch.DestroyPrivateDataSlotEXT(
-            device, privateDataSlot, pAllocator);
+    if (!flags::ext_private_data_swapchain()) {
+        auto& device_data = GetData(device);
+        device_data.driver.DestroyPrivateDataSlotEXT(device, privateDataSlot, pAllocator);
+        return;
+    }
+
+    DestroyPrivateDataSlotInternal(device, privateDataSlot, pAllocator, true);
 }
 
 VKAPI_ATTR void DestroyPrivateDataSlot(
@@ -70,9 +191,13 @@ VKAPI_ATTR void DestroyPrivateDataSlot(
         VkPrivateDataSlot privateDataSlot,
         const VkAllocationCallbacks* pAllocator) {
 
-    const auto& dispatch = GetData(device).driver;
-    dispatch.DestroyPrivateDataSlot(
-            device, privateDataSlot, pAllocator);
+    if (!flags::ext_private_data_swapchain()) {
+        auto& device_data = GetData(device);
+        device_data.driver.DestroyPrivateDataSlot(device, privateDataSlot, pAllocator);
+        return;
+    }
+
+    DestroyPrivateDataSlotInternal(device, privateDataSlot, pAllocator, false);
 }
 
 VKAPI_ATTR void GetPrivateDataEXT(
@@ -82,9 +207,13 @@ VKAPI_ATTR void GetPrivateDataEXT(
         VkPrivateDataSlot privateDataSlot,
         uint64_t* pData) {
 
-    const auto& dispatch = GetData(device).driver;
-    dispatch.GetPrivateDataEXT(
-            device, objectType, objectHandle, privateDataSlot, pData);
+    if (!flags::ext_private_data_swapchain()) {
+        auto& device_data = GetData(device);
+        device_data.driver.GetPrivateDataEXT(device, objectType, objectHandle, privateDataSlot, pData);
+        return;
+    }
+
+    GetPrivateDataInternal(device, objectType, objectHandle, privateDataSlot, pData, true);
 }
 
 VKAPI_ATTR void GetPrivateData(
@@ -94,9 +223,13 @@ VKAPI_ATTR void GetPrivateData(
         VkPrivateDataSlot privateDataSlot,
         uint64_t* pData) {
 
-    const auto& dispatch = GetData(device).driver;
-    dispatch.GetPrivateData(
-            device, objectType, objectHandle, privateDataSlot, pData);
+    if (!flags::ext_private_data_swapchain()) {
+        auto& device_data = GetData(device);
+        device_data.driver.GetPrivateData(device, objectType, objectHandle, privateDataSlot, pData);
+        return;
+    }
+
+    GetPrivateDataInternal(device, objectType, objectHandle, privateDataSlot, pData, false);
 }
 
 VKAPI_ATTR VkResult SetPrivateDataEXT(
@@ -106,9 +239,12 @@ VKAPI_ATTR VkResult SetPrivateDataEXT(
         VkPrivateDataSlot privateDataSlot,
         uint64_t data) {
 
-    const auto& dispatch = GetData(device).driver;
-    return dispatch.SetPrivateDataEXT(
-            device, objectType, objectHandle, privateDataSlot, data);
+    if (!flags::ext_private_data_swapchain()) {
+        auto& device_data = GetData(device);
+        return device_data.driver.SetPrivateDataEXT(device, objectType, objectHandle, privateDataSlot, data);
+    }
+
+    return SetPrivateDataInternal(device, objectType, objectHandle, privateDataSlot, data, true);
 }
 
 VKAPI_ATTR VkResult SetPrivateData(
@@ -118,9 +254,12 @@ VKAPI_ATTR VkResult SetPrivateData(
         VkPrivateDataSlot privateDataSlot,
         uint64_t data) {
 
-    const auto& dispatch = GetData(device).driver;
-    return dispatch.SetPrivateData(
-            device, objectType, objectHandle, privateDataSlot, data);
+    if (!flags::ext_private_data_swapchain()) {
+        auto& device_data = GetData(device);
+        return device_data.driver.SetPrivateData(device, objectType, objectHandle, privateDataSlot, data);
+    }
+
+    return SetPrivateDataInternal(device, objectType, objectHandle, privateDataSlot, data, false);
 }
 
 

@@ -1570,6 +1570,16 @@ static void DestroySwapchainInternal(VkDevice device,
         allocator = &GetData(device).allocator;
     }
 
+    {
+        // remove from any private data slots
+        auto& device_data = GetData(device);
+        std::lock_guard lock(device_data.private_data_mutex);
+
+        for (auto slot : device_data.private_data_slots) {
+            slot->erase(reinterpret_cast<uint64_t>(swapchain_handle));
+        }
+    }
+
     swapchain->~Swapchain();
     allocator->pfnFree(allocator->pUserData, swapchain);
 }

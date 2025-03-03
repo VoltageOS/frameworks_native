@@ -101,6 +101,9 @@ struct DeviceData {
     VkDevice driver_device;
     DeviceDriverTable driver;
     VkPhysicalDevice driver_physical_device;
+
+    std::vector<PrivateDataSlot *> private_data_slots GUARDED_BY(private_data_mutex);
+    std::mutex private_data_mutex;
 };
 
 bool OpenHAL();
