@@ -686,6 +686,7 @@ void CreateInfoWrapper::FilterExtension(const char* name) {
             case ProcHook::KHR_swapchain:
             case ProcHook::KHR_swapchain_mutable_format:
             case ProcHook::EXT_hdr_metadata:
+            case ProcHook::EXT_private_data:
             case ProcHook::EXT_swapchain_maintenance1:
             case ProcHook::ANDROID_external_memory_android_hardware_buffer:
             case ProcHook::ANDROID_native_buffer:
@@ -741,6 +742,7 @@ void CreateInfoWrapper::FilterExtension(const char* name) {
                 ext_bit = ProcHook::KHR_external_fence_fd;
                 break;
             case ProcHook::EXT_hdr_metadata:
+            case ProcHook::EXT_private_data:
             case ProcHook::KHR_bind_memory2:
                 hook_extensions_.set(ext_bit);
                 break;
