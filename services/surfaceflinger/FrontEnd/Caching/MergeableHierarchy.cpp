@@ -15,6 +15,7 @@
  */
 
 #include <FrontEnd/LayerHierarchy.h>
+#include <iterator>
 #include "FrontEnd/LayerSnapshot.h"
 
 #include "MergeableHierarchy.h"
@@ -30,8 +31,47 @@ bool MergeableHierarchy::Accumulator::add(const LayerHierarchy* hierarchy) {
     return true;
 }
 
+void MergeableHierarchy::constructSnapshot(LayerSnapshotBuilder& builder,
+                                           const LayerSnapshotBuilder::Args& args) {
+    if (mSnapshot) {
+        return;
+    }
+
+    auto localArgs = args;
+    localArgs.forceUpdate = LayerSnapshotBuilder::ForceUpdateFlags::ALL;
+
+    std::vector<LayerSnapshot> snapshots;
+    constructSnapshotForHierarchy(builder, localArgs, mHierarchies.front().hierarchy,
+                                  localArgs.rootSnapshot, snapshots);
+
+    ALOGD("Constructed %zu snapshots!", snapshots.size());
+}
+
+void MergeableHierarchy::constructSnapshotForHierarchy(LayerSnapshotBuilder& builder,
+                                                       const LayerSnapshotBuilder::Args& args,
+                                                       const LayerHierarchy* hierarchy,
+                                                       const LayerSnapshot& parent,
+                                                       std::vector<LayerSnapshot>& outSnapshots) {
+    auto snapshot = !hierarchy->getLayer()
+            ? args.rootSnapshot
+            : LayerSnapshot(*hierarchy->getLayer(), LayerHierarchy::TraversalPath::ROOT);
+
+    if (hierarchy->getLayer()) {
+        builder.updateSnapshot(snapshot, args, *hierarchy->getLayer(), parent,
+                               LayerHierarchy::TraversalPath::ROOT);
+    }
+
+    std::vector<LayerSnapshot> children;
+    for (const auto& [child, _] : hierarchy->mChildren) {
+        constructSnapshotForHierarchy(builder, args, child, snapshot, children);
+    }
+
+    outSnapshots.emplace_back(std::move(snapshot));
+    std::move(children.begin(), children.end(), std::back_inserter(outSnapshots));
+}
+
 void MergeableHierarchy::dump(std::ostream& out) const {
-    out << "id = " << mId << ", hierarchies = {";
+    out << "id = " << getId() << ", hierarchies = {";
     for (const auto& hierarchy : mHierarchies) {
         out << hierarchy.layerId << ",";
     }

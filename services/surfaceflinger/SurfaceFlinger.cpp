@@ -2735,6 +2735,11 @@ bool SurfaceFlinger::updateLayerSnapshots(VsyncId vsyncId, nsecs_t frameTimeNs,
                              ? &mMergeableHierarchyManager
                              : nullptr};
         mLayerSnapshotBuilder.update(args);
+
+        if (FlagManager::getInstance().frontend_caching_v0()) {
+            SFTRACE_NAME("MergeableHierarchyManager::constructSnapshots");
+            mMergeableHierarchyManager.constructSnapshots(mLayerSnapshotBuilder, args);
+        }
     }
 
     if (mLayerLifecycleManager.getGlobalChanges().any(Changes::Geometry | Changes::Input |

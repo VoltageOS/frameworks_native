@@ -16,7 +16,6 @@
 
 #pragma once
 
-#include "FrontEnd/Caching/MergeableHierarchyManager.h"
 #include "FrontEnd/DisplayInfo.h"
 #include "FrontEnd/LayerLifecycleManager.h"
 #include "LayerHierarchy.h"
@@ -24,6 +23,13 @@
 #include "RequestedLayerState.h"
 
 namespace android::surfaceflinger::frontend {
+
+namespace caching {
+
+class MergeableHierarchyManager;
+class MergeableHierarchy;
+
+} // namespace caching
 
 // Walks through the layer hierarchy to build an ordered list
 // of LayerSnapshots that can be passed on to CompositionEngine.
@@ -104,6 +110,9 @@ public:
 
 private:
     friend class LayerSnapshotTest;
+
+    // For updateSnapshot
+    friend class caching::MergeableHierarchy;
 
     // return true if we were able to successfully update the snapshots via
     // the fast path.

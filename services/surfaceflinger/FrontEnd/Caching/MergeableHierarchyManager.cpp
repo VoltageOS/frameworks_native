@@ -25,9 +25,8 @@ void MergeableHierarchyManager::update(const LayerHierarchy& hierarchy) {
     update(&hierarchy, accumulator);
 
     if (accumulator.canBuild()) {
-        uint32_t id = hierarchy.getLayer() ? hierarchy.getLayer()->id : UNASSIGNED_LAYER_ID;
-        auto mergeableHierarchy = accumulator.build(id);
-        remove(id);
+        auto mergeableHierarchy = accumulator.build();
+        remove(mergeableHierarchy->getFirstLayer());
         add(std::move(mergeableHierarchy));
     }
 }
@@ -35,15 +34,21 @@ void MergeableHierarchyManager::update(const LayerHierarchy& hierarchy) {
 void MergeableHierarchyManager::update(const LayerHierarchy* hierarchy,
                                        MergeableHierarchy::Accumulator& accumulator) {
     if (!accumulator.add(hierarchy) && accumulator.canBuild()) {
-        uint32_t id = hierarchy->getLayer() ? hierarchy->getLayer()->id : UNASSIGNED_LAYER_ID;
-        auto mergeableHierarchy = accumulator.build(id);
-        remove(id);
+        auto mergeableHierarchy = accumulator.build();
+        remove(mergeableHierarchy->getFirstLayer());
         add(std::move(mergeableHierarchy));
         accumulator = MergeableHierarchy::Accumulator();
     }
 
     for (auto& [childHierarchy, _] : hierarchy->mChildren) {
         update(childHierarchy, accumulator);
+    }
+}
+
+void MergeableHierarchyManager::constructSnapshots(LayerSnapshotBuilder& builder,
+                                                   const LayerSnapshotBuilder::Args& args) {
+    for (const auto& hierarchy : mMergeableHierarchies) {
+        hierarchy->constructSnapshot(builder, args);
     }
 }
 

@@ -28,6 +28,8 @@ class MergeableHierarchyManager {
 public:
     void update(const LayerHierarchy& hierarchy);
 
+    void constructSnapshots(LayerSnapshotBuilder& builder, const LayerSnapshotBuilder::Args& args);
+
     // Dumps all tracked MergeableHiearchies to a string
     std::string dump() const {
         std::ostringstream os;
