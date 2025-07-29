@@ -15,6 +15,7 @@
  */
 
 #include <FrontEnd/LayerHierarchy.h>
+#include "FrontEnd/LayerSnapshot.h"
 
 #include "MergeableHierarchy.h"
 

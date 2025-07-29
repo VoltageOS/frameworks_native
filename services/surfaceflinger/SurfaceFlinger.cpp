@@ -2711,6 +2711,10 @@ bool SurfaceFlinger::updateLayerSnapshots(VsyncId vsyncId, nsecs_t frameTimeNs,
     bool mustComposite = false;
     mustComposite |= applyAndCommitDisplayTransactionStatesLocked(update.transactions);
 
+    if (FlagManager::getInstance().frontend_caching_v0()) {
+        SFTRACE_NAME("MergeableHierarchyManager::update");
+        mMergeableHierarchyManager.update(mLayerHierarchyBuilder.getHierarchy());
+    }
     {
         SFTRACE_NAME("LayerSnapshotBuilder:update");
         frontend::LayerSnapshotBuilder::Args

@@ -433,21 +433,13 @@ void LayerSnapshotBuilder::updateSnapshots(const Args& args) {
         }
     }
 
-    std::optional<caching::MergeableHierarchy::Accumulator> accumulator = std::nullopt;
-
-    if (args.mergeableHierarchyManager) {
-        accumulator = caching::MergeableHierarchy::Accumulator();
-        accumulator->add(&args.root);
-    }
-
     LayerHierarchy::TraversalPath root = LayerHierarchy::TraversalPath::ROOT;
     if (args.root.getLayer()) {
         // The hierarchy can have a root layer when used for screenshots otherwise, it will have
         // multiple children.
         LayerHierarchy::TraversalPath childPath =
                 root.makeChild(args.root.getLayer()->id, LayerHierarchy::Variant::Attached);
-        updateSnapshotsInHierarchy(args, args.root, childPath, rootSnapshot, /*depth=*/0,
-                                   accumulator);
+        updateSnapshotsInHierarchy(args, args.root, childPath, rootSnapshot, /*depth=*/0);
         if (FlagManager::getInstance().stop_layer()) {
             applyStopLayers(args.root, childPath);
         }
@@ -455,20 +447,10 @@ void LayerSnapshotBuilder::updateSnapshots(const Args& args) {
         for (auto& [childHierarchy, variant] : args.root.mChildren) {
             LayerHierarchy::TraversalPath childPath =
                     root.makeChild(childHierarchy->getLayer()->id, variant);
-            updateSnapshotsInHierarchy(args, *childHierarchy, childPath, rootSnapshot, /*depth=*/0,
-                                       accumulator);
+            updateSnapshotsInHierarchy(args, *childHierarchy, childPath, rootSnapshot, /*depth=*/0);
             if (FlagManager::getInstance().stop_layer()) {
                 applyStopLayers(*childHierarchy, childPath);
             }
-        }
-    }
-
-    if (accumulator) {
-        if (accumulator->canBuild()) {
-            uint32_t id = args.root.getLayer() ? args.root.getLayer()->id : UNASSIGNED_LAYER_ID;
-            auto mergeableHierarchy = accumulator->build(id);
-            args.mergeableHierarchyManager->remove(id);
-            args.mergeableHierarchyManager->add(std::move(mergeableHierarchy));
         }
     }
 
@@ -534,19 +516,10 @@ void LayerSnapshotBuilder::update(const Args& args) {
 const LayerSnapshot& LayerSnapshotBuilder::updateSnapshotsInHierarchy(
         const Args& args, const LayerHierarchy& hierarchy,
         const LayerHierarchy::TraversalPath& traversalPath, const LayerSnapshot& parentSnapshot,
-        int depth, std::optional<caching::MergeableHierarchy::Accumulator>& accumulator) {
+        int depth) {
     LLOG_ALWAYS_FATAL_WITH_TRACE_IF(depth > 50,
                                     "Cycle detected in LayerSnapshotBuilder. See "
                                     "builder_stack_overflow_transactions.winscope");
-
-    if (accumulator) {
-        if (!accumulator->add(&hierarchy) && accumulator->canBuild()) {
-            uint32_t id = args.root.getLayer() ? args.root.getLayer()->id : UNASSIGNED_LAYER_ID;
-            auto mergeableHierarchy = accumulator->build(id);
-            args.mergeableHierarchyManager->remove(id);
-            args.mergeableHierarchyManager->add(std::move(mergeableHierarchy));
-        }
-    }
 
     const RequestedLayerState* layer = hierarchy.getLayer();
     LayerSnapshot* snapshot = getSnapshot(traversalPath);
@@ -574,8 +547,7 @@ const LayerSnapshot& LayerSnapshotBuilder::updateSnapshotsInHierarchy(
         LayerHierarchy::TraversalPath childPath =
                 traversalPath.makeChild(childHierarchy->getLayer()->id, variant);
         const LayerSnapshot& childSnapshot =
-                updateSnapshotsInHierarchy(args, *childHierarchy, childPath, *snapshot, depth + 1,
-                                           accumulator);
+                updateSnapshotsInHierarchy(args, *childHierarchy, childPath, *snapshot, depth + 1);
         updateFrameRateFromChildSnapshot(*snapshot, childSnapshot, *childHierarchy->getLayer(),
                                          args, &childHasValidFrameRate);
     }
