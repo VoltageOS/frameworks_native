@@ -275,12 +275,18 @@ bool HidlComposer::isSupported(OptionalFeature feature) const {
         case OptionalFeature::DisplayBrightnessCommand:
         case OptionalFeature::KernelIdleTimer:
         case OptionalFeature::PhysicalDisplayOrientation:
+        case OptionalFeature::DisplayCommandModeset:
             return false;
     }
 }
 
 bool HidlComposer::isVrrSupported() const {
     // VRR is not supported on the HIDL composer.
+    return false;
+};
+
+bool HidlComposer::isDisplayCommandModesetSupported() const {
+    // DisplayCommand modeset is not supported on the HIDL composer.
     return false;
 };
 
@@ -1208,6 +1214,10 @@ Error HidlComposer::setDisplayBrightness(Display display, float brightness, floa
     }
     auto ret = mClient_2_3->setDisplayBrightness(display, brightness);
     return static_cast<Error>(unwrapRet(ret));
+}
+
+Error HidlComposer::setDisplayMode(Display, Config, bool) {
+    return Error::UNSUPPORTED;
 }
 
 // Composer HAL 2.4

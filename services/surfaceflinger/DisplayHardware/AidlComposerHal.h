@@ -60,8 +60,9 @@ public:
     explicit AidlComposer(const std::string& serviceName);
     ~AidlComposer() override;
 
-    bool isSupported(OptionalFeature) const;
-    bool isVrrSupported() const;
+    bool isSupported(OptionalFeature) const override;
+    bool isVrrSupported() const override;
+    bool isDisplayCommandModesetSupported() const override;
 
     std::vector<aidl::android::hardware::graphics::composer3::Capability> getCapabilities()
             override;
@@ -261,6 +262,8 @@ public:
                             int acquireFence) override;
     Error getReadbackBufferFence(Display display, int* outReleaseFence) override;
 
+    Error setDisplayMode(Display display, Config modeId, bool seamless) override;
+
 private:
     // Many public functions above simply write a command into the command
     // queue to batch the calls.  validateDisplay and presentDisplay will call
@@ -311,6 +314,7 @@ private:
     int32_t mComposerInterfaceVersion = 1;
     bool mLifecycleBatchCommandSupported = false;
     std::atomic<int64_t> mLayerID = 1;
+    std::vector<aidl::android::hardware::graphics::composer3::Capability> mCapabilities;
 
     // Buffer slots for layers are cleared by setting the slot buffer to this buffer.
     sp<GraphicBuffer> mClearSlotBuffer;

@@ -25,6 +25,7 @@
 #include <common/FlagManager.h>
 #include <common/trace.h>
 #include <fmt/core.h>
+#include <ftl/algorithm.h>
 #include <log/log.h>
 #include <ui/ScreenPartStatus.h>
 
@@ -263,7 +264,7 @@ AidlComposer::AidlComposer(const std::string& serviceName) {
     addReader(translate<Display>(kSingleReaderKey));
 
     // If unable to read interface version, then become backwards compatible.
-    const auto status = mAidlComposerClient->getInterfaceVersion(&mComposerInterfaceVersion);
+    auto status = mAidlComposerClient->getInterfaceVersion(&mComposerInterfaceVersion);
     if (!status.isOk()) {
         ALOGE("getInterfaceVersion for AidlComposer constructor failed %s",
               status.getDescription().c_str());
@@ -283,6 +284,12 @@ AidlComposer::AidlComposer(const std::string& serviceName) {
         }
     }
     mLifecycleBatchCommandSupported = getLayerLifecycleBatchCommand();
+
+    status = mAidlComposer->getCapabilities(&mCapabilities);
+    if (!status.isOk()) {
+        ALOGE("getCapabilities failed %s", status.getDescription().c_str());
+    }
+
     ALOGI("Loaded AIDL composer3 HAL service");
 }
 
@@ -296,6 +303,9 @@ bool AidlComposer::isSupported(OptionalFeature feature) const {
         case OptionalFeature::KernelIdleTimer:
         case OptionalFeature::PhysicalDisplayOrientation:
             return true;
+        case OptionalFeature::DisplayCommandModeset:
+            return mComposerInterfaceVersion >= 5 &&
+                    FlagManager::getInstance().display_command_modeset();
     }
 }
 
@@ -303,14 +313,13 @@ bool AidlComposer::isVrrSupported() const {
     return mComposerInterfaceVersion >= 3;
 }
 
+bool AidlComposer::isDisplayCommandModesetSupported() const {
+    return isSupported(OptionalFeature::DisplayCommandModeset) &&
+            ftl::contains(mCapabilities, Capability::DISPLAY_COMMAND_CONFIG_CHANGE);
+}
+
 std::vector<Capability> AidlComposer::getCapabilities() {
-    std::vector<Capability> capabilities;
-    const auto status = mAidlComposer->getCapabilities(&capabilities);
-    if (!status.isOk()) {
-        ALOGE("getCapabilities failed %s", status.getDescription().c_str());
-        return {};
-    }
-    return capabilities;
+    return mCapabilities;
 }
 
 std::string AidlComposer::dumpDebugInfo() {
@@ -651,10 +660,7 @@ Error AidlComposer::getHdrCapabilities(Display display, std::vector<Hdr>* outTyp
 }
 
 bool AidlComposer::getLayerLifecycleBatchCommand() {
-    std::vector<Capability> capabilities = getCapabilities();
-    bool hasCapability = std::find(capabilities.begin(), capabilities.end(),
-                                   Capability::LAYER_LIFECYCLE_BATCH_COMMAND) != capabilities.end();
-    return hasCapability;
+    return ftl::contains(mCapabilities, Capability::LAYER_LIFECYCLE_BATCH_COMMAND);
 }
 
 Error AidlComposer::getOverlaySupport(AidlOverlayProperties* outProperties) {
@@ -1200,7 +1206,8 @@ Error AidlComposer::execute(Display display) {
         }
 
         const auto& command = commands[index];
-        if (command.validateDisplay || command.presentDisplay || command.presentOrValidateDisplay) {
+        if (command.validateDisplay || command.presentDisplay || command.presentOrValidateDisplay ||
+            command.activeConfig) {
             error = translate<Error>(cmdErr.errorCode);
         } else {
             ALOGW("command '%s' generated error %" PRId32, command.toString().c_str(),
@@ -1384,6 +1391,21 @@ Error AidlComposer::setDisplayBrightness(Display display, float brightness, floa
             mMutex.unlock_shared();
             return error;
         }
+    } else {
+        error = Error::BAD_DISPLAY;
+    }
+    mMutex.unlock_shared();
+    return error;
+}
+
+Error AidlComposer::setDisplayMode(Display display, Config modeId, bool seamless) {
+    Error error = Error::NONE;
+    mMutex.lock_shared();
+    if (auto writer = getWriter(display)) {
+        writer->get().setActiveConfig(translate<int64_t>(display), translate<int32_t>(modeId),
+                                      seamless);
+
+        error = execute(display);
     } else {
         error = Error::BAD_DISPLAY;
     }
