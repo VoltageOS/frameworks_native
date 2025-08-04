@@ -2738,7 +2738,12 @@ bool SurfaceFlinger::updateLayerSnapshots(VsyncId vsyncId, nsecs_t frameTimeNs,
 
         if (FlagManager::getInstance().frontend_caching_v0()) {
             SFTRACE_NAME("MergeableHierarchyManager::constructSnapshots");
-            mMergeableHierarchyManager.constructSnapshots(mLayerSnapshotBuilder, args);
+            std::unique_ptr<compositionengine::CompositionEngine> compositionEngine =
+                    mFactory.createCompositionEngine();
+            compositionEngine->setRenderEngine(mRenderEngine.get());
+            compositionEngine->setHwComposer(mHWComposer.get());
+            mMergeableHierarchyManager.constructSnapshots(mLayerSnapshotBuilder, args,
+                                                          *compositionEngine);
         }
     }
 

@@ -18,6 +18,7 @@
 
 #include <memory>
 #include "FrontEnd/Caching/MergeableHierarchy.h"
+#include "compositionengine/CompositionEngine.h"
 
 namespace android::surfaceflinger::frontend {
 
@@ -28,7 +29,8 @@ class MergeableHierarchyManager {
 public:
     void update(const LayerHierarchy& hierarchy);
 
-    void constructSnapshots(LayerSnapshotBuilder& builder, const LayerSnapshotBuilder::Args& args);
+    void constructSnapshots(LayerSnapshotBuilder& builder, const LayerSnapshotBuilder::Args& args,
+                            compositionengine::CompositionEngine& compositionEngine);
 
     // Dumps all tracked MergeableHiearchies to a string
     std::string dump() const {

@@ -45,10 +45,11 @@ void MergeableHierarchyManager::update(const LayerHierarchy* hierarchy,
     }
 }
 
-void MergeableHierarchyManager::constructSnapshots(LayerSnapshotBuilder& builder,
-                                                   const LayerSnapshotBuilder::Args& args) {
+void MergeableHierarchyManager::constructSnapshots(
+        LayerSnapshotBuilder& builder, const LayerSnapshotBuilder::Args& args,
+        compositionengine::CompositionEngine& compositionEngine) {
     for (const auto& hierarchy : mMergeableHierarchies) {
-        hierarchy->constructSnapshot(builder, args);
+        hierarchy->constructSnapshot(builder, args, compositionEngine);
     }
 }
 

@@ -19,6 +19,7 @@
 #include <memory>
 #include <vector>
 #include "FrontEnd/LayerSnapshotBuilder.h"
+#include "compositionengine/CompositionEngine.h"
 
 namespace android::surfaceflinger::frontend {
 
@@ -71,17 +72,21 @@ public:
     uint32_t getFirstLayer() const { return mHierarchies.front().layerId; }
     uint32_t getLastLayer() const { return mHierarchies.back().layerId; }
 
-    void constructSnapshot(LayerSnapshotBuilder& builder, const LayerSnapshotBuilder::Args& args);
+    void constructSnapshot(LayerSnapshotBuilder& builder, const LayerSnapshotBuilder::Args& args,
+                           compositionengine::CompositionEngine& compositionEngine);
     void constructSnapshotForHierarchy(LayerSnapshotBuilder& builder,
                                        const LayerSnapshotBuilder::Args& args,
                                        const LayerHierarchy* hierarchy, const LayerSnapshot& parent,
-                                       std::vector<LayerSnapshot>& outSnapshots);
+                                       std::vector<std::unique_ptr<LayerSnapshot>>& outSnapshots);
+
+    void materializeSnapshot(std::vector<std::unique_ptr<LayerSnapshot>> snapshots,
+                             compositionengine::CompositionEngine& compositionEngine);
 
     void dump(std::ostream& out) const;
 
 private:
     std::vector<HierarchyState> mHierarchies;
-    std::unique_ptr<LayerSnapshot>* mSnapshot = nullptr;
+    std::unique_ptr<LayerSnapshot> mSnapshot = nullptr;
 };
 
 } // namespace caching
