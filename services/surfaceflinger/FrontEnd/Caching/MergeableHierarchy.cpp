@@ -38,6 +38,7 @@ bool MergeableHierarchy::Accumulator::add(const LayerHierarchy* hierarchy) {
 void MergeableHierarchy::constructSnapshot(
         LayerSnapshotBuilder& builder, const LayerSnapshotBuilder::Args& args,
         compositionengine::CompositionEngine& compositionEngine) {
+    SFTRACE_CALL();
     if (mSnapshot) {
         return;
     }
@@ -48,8 +49,6 @@ void MergeableHierarchy::constructSnapshot(
     std::vector<std::unique_ptr<LayerSnapshot>> snapshots;
     constructSnapshotForHierarchy(builder, localArgs, mHierarchies.front().hierarchy,
                                   localArgs.rootSnapshot, snapshots);
-
-    ALOGD("Constructed %zu snapshots!", snapshots.size());
 
     materializeSnapshot(std::move(snapshots), compositionEngine);
 }
@@ -64,9 +63,12 @@ void MergeableHierarchy::constructSnapshotForHierarchy(
         *snapshot = LayerSnapshot(*hierarchy->getLayer(), LayerHierarchy::TraversalPath::ROOT);
     } else {
         *snapshot = args.rootSnapshot;
+        snapshot->geomLayerBounds = FloatRect(0, 0, 3000, 3000);
     }
 
     if (hierarchy->getLayer()) {
+        snapshot->merge(*hierarchy->getLayer(), /*forceUpdate=*/true, /*displayChanges=*/true,
+                        args.forceFullDamage, 0u);
         builder.updateSnapshot(*snapshot, args, *hierarchy->getLayer(), parent,
                                LayerHierarchy::TraversalPath::ROOT);
     }
@@ -93,23 +95,15 @@ void MergeableHierarchy::materializeSnapshot(
                                           static_cast<uint64_t>(GRALLOC_USAGE_HW_COMPOSER |
                                                                 GRALLOC_USAGE_HW_RENDER |
                                                                 GRALLOC_USAGE_HW_TEXTURE),
-                                          "mergeableHierarchy");
+                                          std::format("flattenedHierarchy{}", getId()));
 
     ALOGE_IF(buffer->initCheck() != OK, "Failed to init buffer for EH: %d %" PRIu32 " %" PRIu32,
              buffer->initCheck(), width, height);
 
     auto texture = std::make_shared<
-            renderengine::impl::
-                    ExternalTexture>(sp<GraphicBuffer>::make(width, height, PIXEL_FORMAT_RGBA_8888,
-                                                             1u,
-
-                                                             static_cast<uint64_t>(
-                                                                     GRALLOC_USAGE_HW_COMPOSER |
-                                                                     GRALLOC_USAGE_HW_RENDER |
-                                                                     GRALLOC_USAGE_HW_TEXTURE),
-                                                             "screenshot"),
-                                     compositionEngine.getRenderEngine(),
-                                     renderengine::impl::ExternalTexture::Usage::WRITEABLE);
+            renderengine::impl::ExternalTexture>(buffer, compositionEngine.getRenderEngine(),
+                                                 renderengine::impl::ExternalTexture::Usage::
+                                                         WRITEABLE);
 
     std::shared_ptr<ScreenCaptureOutput> output = createScreenCaptureOutput(
             ScreenCaptureOutputArgs{.compositionEngine = compositionEngine,
@@ -133,6 +127,9 @@ void MergeableHierarchy::materializeSnapshot(
     std::vector<sp<compositionengine::LayerFE>> ceLayerFEs;
     std::vector<sp<LayerFE>> layerFEs;
     for (auto& snapshot : snapshots) {
+        if (!snapshot->hasSomethingToDraw()) {
+            continue;
+        }
         auto layerFE = sp<LayerFE>::make("Hierarchy");
         layerFE->mSnapshot = std::move(snapshot);
         layerFEs.emplace_back(layerFE);

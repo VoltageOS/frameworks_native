@@ -102,6 +102,10 @@ public:
     // Visit each snapshot
     void forEachSnapshot(const ConstVisitor& visitor) const;
 
+    void forEachMergedSnapshot(const ConstVisitor& visitor) const;
+
+    bool hasMergedSnapshots() const { return !mMergedSnapshots.empty(); }
+
     // Visit each snapshot interesting to input reverse z-order
     void forEachInputSnapshot(const ConstVisitor& visitor) const;
 
@@ -171,6 +175,7 @@ private:
     std::unordered_set<LayerHierarchy::TraversalPath, LayerHierarchy::TraversalPathHash>
             mNeedsTouchableRegionCrop;
     std::vector<std::unique_ptr<LayerSnapshot>> mSnapshots;
+    std::vector<std::unique_ptr<LayerSnapshot>> mMergedSnapshots;
     bool mResortSnapshots = false;
     int mNumInterestingSnapshots = 0;
 };

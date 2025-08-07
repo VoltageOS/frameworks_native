@@ -15,6 +15,7 @@
  */
 
 // #define LOG_NDEBUG 0
+#include "FrontEnd/LayerCreationArgs.h"
 #define ATRACE_TAG ATRACE_TAG_GRAPHICS
 #include "FrontEnd/LayerSnapshot.h"
 #include "ui/Transform.h"
@@ -433,6 +434,17 @@ void LayerSnapshotBuilder::updateSnapshots(const Args& args) {
         }
     }
 
+    mMergedSnapshots.clear();
+
+    if (args.mergeableHierarchyManager) {
+        const auto hierarchy =
+                args.mergeableHierarchyManager->getOwnedHierarchy(UNASSIGNED_LAYER_ID);
+        if (hierarchy) {
+            auto mergedSnapshot = hierarchy->getSnapshotCopy();
+            mMergedSnapshots.emplace_back(std::move(mergedSnapshot));
+        }
+    }
+
     LayerHierarchy::TraversalPath root = LayerHierarchy::TraversalPath::ROOT;
     if (args.root.getLayer()) {
         // The hierarchy can have a root layer when used for screenshots otherwise, it will have
@@ -540,6 +552,19 @@ const LayerSnapshot& LayerSnapshotBuilder::updateSnapshotsInHierarchy(
             resetRelativeState(*snapshot);
         }
         updateSnapshot(*snapshot, args, *layer, parentSnapshot, traversalPath);
+    }
+
+    if (args.mergeableHierarchyManager) {
+        const auto hierarchy = args.mergeableHierarchyManager->getOwnedHierarchy(layer->id);
+        if (hierarchy) {
+            auto mergedSnapshot = hierarchy->getSnapshotCopy();
+            updateSnapshot(*mergedSnapshot, args, *layer, parentSnapshot, traversalPath);
+            mMergedSnapshots.emplace_back(std::move(mergedSnapshot));
+        }
+
+        if (!args.mergeableHierarchyManager->isMemberOfAnyHierarchy(layer->id)) {
+            mMergedSnapshots.emplace_back(std::make_unique<LayerSnapshot>(*snapshot));
+        }
     }
 
     bool childHasValidFrameRate = false;
@@ -1409,6 +1434,12 @@ void LayerSnapshotBuilder::forEachNonNullSnapshot(const Visitor& visitor,
 
 void LayerSnapshotBuilder::forEachSnapshot(const ConstVisitor& visitor) const {
     for (auto& snapshot : mSnapshots) {
+        visitor(*snapshot);
+    }
+}
+
+void LayerSnapshotBuilder::forEachMergedSnapshot(const ConstVisitor& visitor) const {
+    for (auto& snapshot : mMergedSnapshots) {
         visitor(*snapshot);
     }
 }

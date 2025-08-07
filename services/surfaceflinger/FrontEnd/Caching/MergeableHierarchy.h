@@ -72,6 +72,11 @@ public:
     uint32_t getFirstLayer() const { return mHierarchies.front().layerId; }
     uint32_t getLastLayer() const { return mHierarchies.back().layerId; }
 
+    bool hasLayer(uint32_t id) const {
+        return std::any_of(mHierarchies.cbegin(), mHierarchies.cend(),
+                           [=](const auto& hierarchy) { return hierarchy.layerId == id; });
+    }
+
     void constructSnapshot(LayerSnapshotBuilder& builder, const LayerSnapshotBuilder::Args& args,
                            compositionengine::CompositionEngine& compositionEngine);
     void constructSnapshotForHierarchy(LayerSnapshotBuilder& builder,
@@ -81,6 +86,14 @@ public:
 
     void materializeSnapshot(std::vector<std::unique_ptr<LayerSnapshot>> snapshots,
                              compositionengine::CompositionEngine& compositionEngine);
+
+    std::unique_ptr<LayerSnapshot> getSnapshotCopy() {
+        if (!mSnapshot) {
+            return nullptr;
+        }
+
+        return std::make_unique<LayerSnapshot>(*mSnapshot);
+    };
 
     void dump(std::ostream& out) const;
 

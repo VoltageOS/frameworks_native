@@ -2711,32 +2711,31 @@ bool SurfaceFlinger::updateLayerSnapshots(VsyncId vsyncId, nsecs_t frameTimeNs,
     bool mustComposite = false;
     mustComposite |= applyAndCommitDisplayTransactionStatesLocked(update.transactions);
 
-    if (FlagManager::getInstance().frontend_caching_v0()) {
-        SFTRACE_NAME("MergeableHierarchyManager::update");
-        mMergeableHierarchyManager.update(mLayerHierarchyBuilder.getHierarchy());
-    }
-    {
-        SFTRACE_NAME("LayerSnapshotBuilder:update");
-        frontend::LayerSnapshotBuilder::Args
-                args{.root = mLayerHierarchyBuilder.getHierarchy(),
-                     .layerLifecycleManager = mLayerLifecycleManager,
-                     .includeMetadata = mCompositionEngine->getFeatureFlags().test(
-                             compositionengine::Feature::kSnapshotLayerMetadata),
-                     .displays = mFrontEndDisplayInfos,
-                     .displayChanges = mFrontEndDisplayInfosChanged,
-                     .globalShadowSettings = mDrawingState.globalShadowSettings,
-                     .supportsBlur = mSupportsBlur,
-                     .forceFullDamage = mForceFullDamage,
-                     .supportedLayerGenericMetadata =
-                             getHwComposer().getSupportedLayerGenericMetadata(),
-                     .genericLayerMetadataKeyMap = getGenericLayerMetadataKeyMap(),
-                     .skipRoundCornersWhenProtected = !getRenderEngine().supportsProtectedContent(),
-                     .mergeableHierarchyManager = FlagManager::getInstance().frontend_caching_v0()
-                             ? &mMergeableHierarchyManager
-                             : nullptr};
-        mLayerSnapshotBuilder.update(args);
+    frontend::LayerSnapshotBuilder::Args
+            args{.root = mLayerHierarchyBuilder.getHierarchy(),
+                 .layerLifecycleManager = mLayerLifecycleManager,
+                 .includeMetadata = mCompositionEngine->getFeatureFlags().test(
+                         compositionengine::Feature::kSnapshotLayerMetadata),
+                 .displays = mFrontEndDisplayInfos,
+                 .displayChanges = mFrontEndDisplayInfosChanged,
+                 .globalShadowSettings = mDrawingState.globalShadowSettings,
+                 .supportsBlur = mSupportsBlur,
+                 .forceFullDamage = mForceFullDamage,
+                 .supportedLayerGenericMetadata =
+                         getHwComposer().getSupportedLayerGenericMetadata(),
+                 .genericLayerMetadataKeyMap = getGenericLayerMetadataKeyMap(),
+                 .skipRoundCornersWhenProtected = !getRenderEngine().supportsProtectedContent(),
+                 .mergeableHierarchyManager = FlagManager::getInstance().frontend_caching_v0()
+                         ? &mMergeableHierarchyManager
+                         : nullptr};
 
-        if (FlagManager::getInstance().frontend_caching_v0()) {
+    if (FlagManager::getInstance().frontend_caching_v0()) {
+        {
+            SFTRACE_NAME("MergeableHierarchyManager::update");
+            mMergeableHierarchyManager.update(mLayerHierarchyBuilder.getHierarchy());
+        }
+
+        {
             SFTRACE_NAME("MergeableHierarchyManager::constructSnapshots");
             std::unique_ptr<compositionengine::CompositionEngine> compositionEngine =
                     mFactory.createCompositionEngine();
@@ -2745,6 +2744,10 @@ bool SurfaceFlinger::updateLayerSnapshots(VsyncId vsyncId, nsecs_t frameTimeNs,
             mMergeableHierarchyManager.constructSnapshots(mLayerSnapshotBuilder, args,
                                                           *compositionEngine);
         }
+    }
+    {
+        SFTRACE_NAME("LayerSnapshotBuilder:update");
+        mLayerSnapshotBuilder.update(args);
     }
 
     if (mLayerLifecycleManager.getGlobalChanges().any(Changes::Geometry | Changes::Input |
@@ -3186,9 +3189,10 @@ CompositeResultsPerDisplay SurfaceFlinger::composite(
             addOutputsToRefreshArgs(pacesetterId, refreshArgs, frameTargeters);
 
     constexpr bool kCursorOnly = false;
-    const auto layers = addLayerSnapshotsToCompositionArgs(mainThreadRefreshArgs, kCursorOnly);
-
-    prepareLayersForComposition(mainThreadRefreshArgs, kCursorOnly, layers);
+    const auto layers = mLayerSnapshotBuilder.hasMergedSnapshots()
+            ? copyMergedSnapshots(refreshArgs)
+            : addLayerSnapshotsToCompositionArgs(mainThreadRefreshArgs, kCursorOnly);
+    setVisibleRegionDirtyIfNeeded(mainThreadRefreshArgs);
 
     for (auto& [layer, layerFE] : layers) {
         validateForReadback(layerFE);
@@ -3344,7 +3348,9 @@ CompositeResultsPerDisplay SurfaceFlinger::composite(
         }
     }
 
-    moveSnapshotsFromCompositionArgs(mainThreadRefreshArgs, layers);
+    if (!mLayerSnapshotBuilder.hasMergedSnapshots()) {
+        moveSnapshotsFromCompositionArgs(refreshArgs, layers);
+    }
     if (optionalOffloadedRefreshArgs) {
         offloadedCompositionFuture->wait();
         moveSnapshotsFromCompositionArgs(*optionalOffloadedRefreshArgs, offloadedLayers);
@@ -9238,6 +9244,31 @@ std::vector<std::pair<Layer*, LayerFE*>> SurfaceFlinger::addLayerSnapshotsToComp
                 return snapshot.isVisible ||
                         (needsMetadata &&
                          snapshot.changes.test(frontend::RequestedLayerState::Changes::Metadata));
+            });
+    return layers;
+}
+
+std::vector<std::pair<Layer*, LayerFE*>> SurfaceFlinger::copyMergedSnapshots(
+        compositionengine::CompositionRefreshArgs& refreshArgs) {
+    std::vector<std::pair<Layer*, LayerFE*>> layers;
+    nsecs_t currentTime = systemTime();
+    const bool needsMetadata = mCompositionEngine->getFeatureFlags().test(
+            compositionengine::Feature::kSnapshotLayerMetadata);
+    mLayerSnapshotBuilder.forEachMergedSnapshot(
+            [&](const frontend::LayerSnapshot& snapshot) FTL_FAKE_GUARD(kMainThreadContext) {
+                if (!snapshot.hasSomethingToDraw()) {
+                    return;
+                }
+
+                auto it = mLegacyLayers.find(snapshot.sequence);
+                LLOG_ALWAYS_FATAL_WITH_TRACE_IF(it == mLegacyLayers.end(),
+                                                "Couldnt find layer object for %s",
+                                                snapshot.getDebugString().c_str());
+                auto& legacyLayer = it->second;
+                sp<LayerFE> layerFE = legacyLayer->getCompositionEngineLayerFE(snapshot.path);
+                layerFE->mSnapshot = std::make_unique<frontend::LayerSnapshot>(snapshot);
+                refreshArgs.layers.push_back(layerFE);
+                layers.emplace_back(legacyLayer.get(), layerFE.get());
             });
     return layers;
 }
