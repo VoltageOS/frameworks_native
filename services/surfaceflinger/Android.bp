@@ -365,6 +365,7 @@ cc_library {
     generated_headers: ["statslog_surfaceflinger_bootstrap.h"],
     export_generated_headers: ["statslog_surfaceflinger_bootstrap.h"],
     shared_libs: [
+        "android.os.statsbootstrap_aidl-cpp",
         "libbinder",
         "libstatsbootstrap",
         "libutils",
