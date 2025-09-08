@@ -47,7 +47,7 @@ namespace android {
 
 LegacyVirtualDisplaySurface::LegacyVirtualDisplaySurface(HWComposer& hwc,
                                                          VirtualDisplayIdVariant virtualIdVariant,
-                                                         const sp<IGraphicBufferProducer>& sink,
+                                                         const sp<Surface>& sink,
                                                          const std::string& name)
       : ConsumerBase(),
         mHwc(hwc),
@@ -68,7 +68,7 @@ LegacyVirtualDisplaySurface::LegacyVirtualDisplaySurface(HWComposer& hwc,
         mFbProducerSlot(BufferQueue::INVALID_BUFFER_SLOT),
         mOutputProducerSlot(BufferQueue::INVALID_BUFFER_SLOT),
         mForceHwcCopy(SurfaceFlinger::useHwcForRgbToYuv) {
-    mSource[SOURCE_SINK] = sink;
+    mSource[SOURCE_SINK] = sink->getIGraphicBufferProducer();
     mSource[SOURCE_SCRATCH] = mSurface->getIGraphicBufferProducer();
 
     resetPerFrameState();

@@ -55,6 +55,7 @@
 #include <gui/Surface.h>
 #include <gui/SurfaceComposerClient.h>
 #include <gui/WindowInfo.h>
+#include <gui/view/Surface.h>
 #include <private/gui/ParcelUtils.h>
 #include <ui/DisplayMode.h>
 #include <ui/DisplayState.h>
@@ -2408,7 +2409,7 @@ status_t SurfaceComposerClient::Transaction::setDisplaySurface(
         }
     }
     DisplayState& s(getDisplayState(token));
-    s.surface = bufferProducer;
+    s.surface.graphicBufferProducer = bufferProducer;
     s.what |= DisplayState::eSurfaceChanged;
     return NO_ERROR;
 }

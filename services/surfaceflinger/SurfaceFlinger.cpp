@@ -4308,8 +4308,7 @@ void SurfaceFlinger::processDisplayAdded(const wp<IBinder>& displayToken,
                                         // we weave this through the codebase.
             auto surface =
                     sp<VirtualDisplaySurface>::make(getHwComposer(), *virtualDisplayIdVariantOpt,
-                                                    state.displayName, creatorUid,
-                                                    sp<Surface>::make(state.surface));
+                                                    state.displayName, creatorUid, state.surface);
             displaySurface = surface;
             compositionSurface = surface->getCompositionSurface();
         } else {
@@ -4423,11 +4422,9 @@ void SurfaceFlinger::processDisplayRemoved(const wp<IBinder>& displayToken) {
 void SurfaceFlinger::processDisplayChanged(const wp<IBinder>& displayToken,
                                            const DisplayDeviceState& currentState,
                                            const DisplayDeviceState& drawingState) {
-    const sp<IBinder> currentBinder = IInterface::asBinder(currentState.surface);
-    const sp<IBinder> drawingBinder = IInterface::asBinder(drawingState.surface);
-
     // Recreate the DisplayDevice if the surface or sequence ID changed.
-    if (currentBinder != drawingBinder || currentState.sequenceId != drawingState.sequenceId) {
+    if (!Surface::areSurfacesEquivalent(currentState.surface, drawingState.surface) ||
+        currentState.sequenceId != drawingState.sequenceId) {
         if (const auto display = getDisplayDeviceLocked(displayToken)) {
             display->disconnect();
             if (const auto virtualDisplayIdVariant = display->getVirtualDisplayIdVariant()) {
@@ -5601,8 +5598,9 @@ uint32_t SurfaceFlinger::setDisplayStateLocked(const DisplayState& s) {
 
     const uint32_t what = s.what;
     if (what & DisplayState::eSurfaceChanged) {
-        if (IInterface::asBinder(state.surface) != IInterface::asBinder(s.surface)) {
-            state.surface = s.surface;
+        sp<Surface> sSurface = s.surface.toSurface();
+        if (!Surface::areSurfacesEquivalent(state.surface, sSurface)) {
+            state.surface = sSurface;
             flags |= eDisplayTransactionNeeded;
         }
     }
