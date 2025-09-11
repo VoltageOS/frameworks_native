@@ -8822,10 +8822,8 @@ status_t SurfaceFlinger::setGameModeFrameRateOverride(uid_t uid, float frameRate
 }
 
 status_t SurfaceFlinger::setGameDefaultFrameRateOverride(uid_t uid, float frameRate) {
-    if (FlagManager::getInstance().game_default_frame_rate()) {
-        mScheduler->setGameDefaultFrameRateForUid(
-                FrameRateOverride{static_cast<uid_t>(uid), frameRate});
-    }
+    mScheduler->setGameDefaultFrameRateForUid(
+            FrameRateOverride{static_cast<uid_t>(uid), frameRate});
     return NO_ERROR;
 }
 
