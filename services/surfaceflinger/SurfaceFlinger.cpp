@@ -8783,19 +8783,22 @@ gui::DisplayModeSpecs::RefreshRateRanges translate(const FpsRanges& ranges) {
 
 } // namespace
 
-status_t SurfaceFlinger::setDesiredDisplayModeSpecs(const sp<IBinder>& displayToken,
-                                                    const gui::DisplayModeSpecs& specs) {
+status_t SurfaceFlinger::setDesiredDisplayModeSpecs(
+        const std::vector<gui::DisplayModeSpecs>& perDisplaySpecs) {
     SFTRACE_CALL();
 
-    if (!displayToken) {
+    if (perDisplaySpecs.empty()) {
         return BAD_VALUE;
     }
 
+    // TODO: b/373900661 - Use `perDisplaySpecs`.
+    const auto specs = perDisplaySpecs[0];
+
     auto future = mScheduler->schedule([=, this]() FTL_FAKE_GUARD(kMainThreadContext) -> status_t {
-        const auto display = FTL_FAKE_GUARD(mStateLock, getDisplayDeviceLocked(displayToken));
+        const auto display = FTL_FAKE_GUARD(mStateLock, getDisplayDeviceLocked(specs.displayToken));
         if (!display) {
             ALOGE("Attempt to set desired display modes for invalid display token %p",
-                  displayToken.get());
+                  specs.displayToken.get());
             return NAME_NOT_FOUND;
         } else if (display->isVirtual()) {
             ALOGW("Attempt to set desired display modes for virtual display");
@@ -8833,6 +8836,8 @@ status_t SurfaceFlinger::getDesiredDisplayModeSpecs(const sp<IBinder>& displayTo
 
     scheduler::RefreshRateSelector::Policy policy =
             display->refreshRateSelector().getDisplayManagerPolicy();
+    outSpecs->displayToken = displayToken;
+    outSpecs->applyToken = nullptr;
     outSpecs->defaultMode = ftl::to_underlying(policy.defaultMode);
     outSpecs->allowGroupSwitching = policy.allowGroupSwitching;
     outSpecs->primaryRanges = translate(policy.primaryRanges);
@@ -10120,11 +10125,11 @@ binder::Status SurfaceComposerAIDL::removeTunnelModeEnabledListener(
     return binderStatusFromStatusT(status);
 }
 
-binder::Status SurfaceComposerAIDL::setDesiredDisplayModeSpecs(const sp<IBinder>& displayToken,
-                                                               const gui::DisplayModeSpecs& specs) {
+binder::Status SurfaceComposerAIDL::setDesiredDisplayModeSpecs(
+        const std::vector<gui::DisplayModeSpecs>& specs) {
     status_t status = checkAccessPermission();
     if (status == OK) {
-        status = mFlinger->setDesiredDisplayModeSpecs(displayToken, specs);
+        status = mFlinger->setDesiredDisplayModeSpecs(specs);
     }
     return binderStatusFromStatusT(status);
 }
