@@ -74,7 +74,6 @@ public:
     bool resync_on_tx() const;
     bool supported_refresh_rate_update() const;
     bool use_at_least_60_for_min_vote() const;
-    bool vsync_predictor_predicts_within_threshold() const;
 
     /// Trunk stable readonly flags ///
     /// IMPORTANT - please keep alphabetized to reduce merge conflicts

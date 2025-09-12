@@ -144,7 +144,6 @@ void FlagManager::dump(std::string& result) const {
     DUMP_ACONFIG_FLAG(resync_on_tx);
     DUMP_ACONFIG_FLAG(supported_refresh_rate_update);
     DUMP_ACONFIG_FLAG(use_at_least_60_for_min_vote);
-    DUMP_ACONFIG_FLAG(vsync_predictor_predicts_within_threshold);
 
     /// Trunk stable readonly flags ///
     /// IMPORTANT - please keep alphabetize to reduce merge conflicts
@@ -325,7 +324,6 @@ FLAG_MANAGER_ACONFIG_FLAG(reset_model_flushes_fence, "");
 FLAG_MANAGER_ACONFIG_FLAG(resync_on_tx, "");
 FLAG_MANAGER_ACONFIG_FLAG(supported_refresh_rate_update, "");
 FLAG_MANAGER_ACONFIG_FLAG(use_at_least_60_for_min_vote, "");
-FLAG_MANAGER_ACONFIG_FLAG(vsync_predictor_predicts_within_threshold, "");
 
 /// Trunk stable server (R/W) flags from outside SurfaceFlinger ///
 
