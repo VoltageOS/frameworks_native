@@ -451,7 +451,7 @@ TEST_F(DisplayTransactionCommitTest, processesVirtualDisplayAdded) {
     auto [consumer, surface] = BufferItemConsumer::create(0);
     ASSERT_EQ(OK, consumer->setDefaultBufferSize(Case::Display::WIDTH, Case::Display::HEIGHT));
     ASSERT_EQ(OK, consumer->setDefaultBufferFormat(DEFAULT_VIRTUAL_DISPLAY_SURFACE_FORMAT));
-    state.surface = surface;
+    state.getVirtual().surface = surface;
 
     mFlinger.mutableCurrentState().displays.emplace_or_replace(displayToken, state);
 

@@ -304,6 +304,7 @@ struct DisplayDeviceState {
 
     struct Virtual {
         uid_t ownerUid = static_cast<uid_t>(-1);
+        sp<Surface> surface;
 
         bool operator==(const Virtual&) const = default;
     };
@@ -324,7 +325,6 @@ struct DisplayDeviceState {
 
     int32_t sequenceId = sNextSequenceId++;
     std::variant<Physical, Virtual> physicalOrVirtual;
-    sp<Surface> surface;
     ui::LayerStack layerStack;
     uint32_t flags = 0;
     Rect layerStackSpaceRect;
