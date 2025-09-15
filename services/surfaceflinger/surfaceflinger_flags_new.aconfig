@@ -247,6 +247,16 @@ flag {
 } # local_tonemap_screenshots
 
 flag {
+  name: "md_degrade_hdr"
+  namespace: "core_graphics"
+  description: "Degrades displays from HDR to SDR during multidisplay mirroring"
+  bug: "443315364"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+} # md_degrade_hdr
+
+flag {
   name: "modeset_state_machine"
   namespace: "core_graphics"
   description: "Prevent data races causing modeset failures and deadlocks"
