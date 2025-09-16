@@ -223,6 +223,7 @@ cc_test {
     shared_libs: [
         "libbase",
         "libbinder",
+        "libbindernetlink",
         "liblog",
         "libprocessgroup",
         "libutils",
@@ -235,6 +236,7 @@ cc_test {
         "general-tests",
         "vts",
     ],
+    host_supported: false,
     require_root: true,
 }
 
