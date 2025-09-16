@@ -79,22 +79,6 @@ namespace {
 #endif
     }
 
-    bool fixRecursiveDoubleDerefs() {
-#if defined(LIBBINDER_FIX_RECURSIVE_DOUBLE_DEREFS)
-        return true;
-#else
-        return false;
-#endif
-    }
-
-    bool freezeUseFlushIfNeeded() {
-#if defined(LIBBINDER_FREEZE_USE_FLUSH_IF_NEEDED)
-        return true;
-#else
-        return false;
-#endif
-    }
-
     bool freezeUseFlushEagerly() {
 #if defined(LIBBINDER_FREEZE_USE_FLUSH_EAGERLY)
         return true;
@@ -815,10 +799,8 @@ void IPCThreadState::processPendingDerefs()
 
 void IPCThreadState::processPostWriteDerefs()
 {
-    if (fixRecursiveDoubleDerefs()) {
-        LOG_ALWAYS_FATAL_IF(mIsProcessingPostWriteDerefs,
-                            "processPostWriteDerefs is called recursively.");
-    }
+    LOG_ALWAYS_FATAL_IF(mIsProcessingPostWriteDerefs,
+                        "processPostWriteDerefs is called recursively.");
     mIsProcessingPostWriteDerefs = true;
 
     for (size_t i = 0; i < mPostWriteWeakDerefs.size(); i++) {
@@ -1081,12 +1063,6 @@ status_t IPCThreadState::addFrozenStateChangeCallback(int32_t handle, BpBinder* 
             }
         }
         return NO_ERROR;
-    } else if (freezeUseFlushIfNeeded()) {
-        status_t res;
-        if (flushIfNeeded(&res) && res != OK) {
-            LOG_ALWAYS_FATAL("flushIfNeeded failed. %s(%d): %s", __func__, handle,
-                             statusToString(res).c_str());
-        }
     } else if (status_t res = flushCommands(); res != OK) {
         LOG_ALWAYS_FATAL("%s(%d): %s", __func__, handle, statusToString(res).c_str());
     }
@@ -1111,12 +1087,6 @@ status_t IPCThreadState::removeFrozenStateChangeCallback(int32_t handle, BpBinde
             }
         }
         return NO_ERROR;
-    } else if (freezeUseFlushIfNeeded()) {
-        status_t res;
-        if (flushIfNeeded(&res) && res != OK) {
-            LOG_ALWAYS_FATAL("flushIfNeeded failed. %s(%d): %s", __func__, handle,
-                             statusToString(res).c_str());
-        }
     } else if (status_t res = flushCommands(); res != OK) {
         LOG_ALWAYS_FATAL("%s(%d): %s", __func__, handle, statusToString(res).c_str());
     }
