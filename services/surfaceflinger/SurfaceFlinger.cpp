@@ -5062,9 +5062,7 @@ void SurfaceFlinger::setTransactionFlags(uint32_t mask, TransactionSchedule sche
     SFTRACE_INT("mTransactionFlags", transactionFlags);
 
     if (const bool scheduled = transactionFlags & mask; !scheduled) {
-        if (FlagManager::getInstance().resync_on_tx()) {
-            mScheduler->resync(IEventThreadCallback::ResyncCaller::Transaction);
-        }
+        mScheduler->resync(IEventThreadCallback::ResyncCaller::Transaction);
         scheduleCommit(frameHint);
     } else if (frameHint == FrameHint::kActive) {
         // Even if the next frame is already scheduled, we should reset the idle timer
