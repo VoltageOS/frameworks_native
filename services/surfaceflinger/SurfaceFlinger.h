@@ -1064,9 +1064,6 @@ private:
     }
 
     sp<DisplayDevice> getPacesetterDisplayLocked() REQUIRES(mStateLock) {
-        if (!FlagManager::getInstance().pacesetter_selection()) {
-            return getFrontInternalDisplayLocked();
-        }
         return getDisplayDeviceLocked(mScheduler->getPacesetterDisplayId());
     }
 
@@ -1086,13 +1083,6 @@ private:
     sp<const DisplayDevice> getFrontInternalDisplay() const EXCLUDES(mStateLock) {
         Mutex::Autolock lock(mStateLock);
         return getFrontInternalDisplayLocked();
-    }
-
-    std::optional<PhysicalDisplayId> getDefaultPacesetterDisplay() const {
-        if (FlagManager::getInstance().pacesetter_selection()) {
-            return std::nullopt;
-        }
-        return mFrontInternalDisplayId;
     }
 
     using DisplayDeviceAndSnapshot = std::pair<sp<DisplayDevice>, display::DisplaySnapshotRef>;
