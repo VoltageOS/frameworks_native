@@ -36,12 +36,9 @@
 #include <log/log.h>
 #include <utils/Trace.h>
 
-#include <com_android_input_flags.h>
 #include <input/InputConsumer.h>
 #include <input/PrintTools.h>
 #include <input/TraceTools.h>
-
-namespace input_flags = com::android::input::flags;
 
 namespace android {
 
@@ -709,10 +706,8 @@ void InputConsumer::resampleTouchState(nsecs_t sampleTime, MotionEvent* event,
                                      lerp(currentCoords.getX(), otherCoords.getX(), alpha));
         resampledCoords.setAxisValue(AMOTION_EVENT_AXIS_Y,
                                      lerp(currentCoords.getY(), otherCoords.getY(), alpha));
-        if (input_flags::clear_relative_axes_in_resampled_coords()) {
-            for (int32_t axis : relativeAxesToClearOnResample) {
-                resampledCoords.setAxisValue(axis, 0);
-            }
+        for (int32_t axis : relativeAxesToClearOnResample) {
+            resampledCoords.setAxisValue(axis, 0);
         }
         ALOGD_IF(debugResampling(),
                  "[%d] - out (%0.3f, %0.3f), cur (%0.3f, %0.3f), "
