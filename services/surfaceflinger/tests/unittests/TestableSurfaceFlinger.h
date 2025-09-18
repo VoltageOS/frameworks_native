@@ -979,19 +979,19 @@ public:
         }
 
         DisplayDeviceState& mutableDrawingDisplayState() {
-            return mFlinger.mutableDrawingState().displays.editValueFor(mDisplayToken);
+            return mFlinger.mutableDrawingState().displays.get(mDisplayToken)->get();
         }
 
         DisplayDeviceState& mutableCurrentDisplayState() {
-            return mFlinger.mutableCurrentState().displays.editValueFor(mDisplayToken);
+            return mFlinger.mutableCurrentState().displays.get(mDisplayToken)->get();
         }
 
         const auto& getDrawingDisplayState() {
-            return mFlinger.mutableDrawingState().displays.valueFor(mDisplayToken);
+            return mFlinger.mutableDrawingState().displays.get(mDisplayToken)->get();
         }
 
         const auto& getCurrentDisplayState() {
-            return mFlinger.mutableCurrentState().displays.valueFor(mDisplayToken);
+            return mFlinger.mutableCurrentState().displays.get(mDisplayToken)->get();
         }
 
         const sp<DisplayDevice>& mutableDisplayDevice() {
@@ -1147,8 +1147,8 @@ public:
             sp<DisplayDevice> display = sp<DisplayDevice>::make(mCreationArgs);
             mFlinger.mutableDisplays().emplace_or_replace(mDisplayToken, display);
 
-            mFlinger.mutableCurrentState().displays.add(mDisplayToken, state);
-            mFlinger.mutableDrawingState().displays.add(mDisplayToken, state);
+            mFlinger.mutableCurrentState().displays.emplace_or_replace(mDisplayToken, state);
+            mFlinger.mutableDrawingState().displays.emplace_or_replace(mDisplayToken, state);
 
             return display;
         }

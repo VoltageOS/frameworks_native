@@ -39,6 +39,7 @@
 #include <ftl/algorithm.h>
 #include <ftl/future.h>
 #include <ftl/non_null.h>
+#include <ftl/small_map.h>
 #include <gui/BufferQueue.h>
 #include <gui/CompositorTiming.h>
 #include <gui/FrameTimestamps.h>
@@ -403,19 +404,7 @@ private:
 
         const LayerVector::StateSet stateSet = LayerVector::StateSet::Invalid;
 
-        // TODO(b/241285876): Replace deprecated DefaultKeyedVector with ftl::SmallMap.
-        DefaultKeyedVector<wp<IBinder>, DisplayDeviceState> displays;
-
-        std::optional<size_t> getDisplayIndex(PhysicalDisplayId displayId) const {
-            for (size_t i = 0; i < displays.size(); i++) {
-                const auto& state = displays.valueAt(i);
-                if (state.isPhysical() && state.getPhysical().id == displayId) {
-                    return i;
-                }
-            }
-
-            return {};
-        }
+        ui::DisplayMap<wp<IBinder>, DisplayDeviceState> displays;
 
         bool colorMatrixChanged = true;
         mat4 colorMatrix;

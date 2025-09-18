@@ -304,6 +304,8 @@ struct DisplayDeviceState {
 
     struct Virtual {
         uid_t ownerUid = static_cast<uid_t>(-1);
+
+        bool operator==(const Virtual&) const = default;
     };
 
     bool isPhysical() const { return std::holds_alternative<Physical>(physicalOrVirtual); }
@@ -335,6 +337,8 @@ struct DisplayDeviceState {
     Fps requestedRefreshRate;
     hardware::graphics::composer::hal::PowerMode initialPowerMode{
             hardware::graphics::composer::hal::PowerMode::OFF};
+
+    static int32_t getNextSequenceId() { return sNextSequenceId++; }
 
 private:
     static std::atomic<int32_t> sNextSequenceId;
