@@ -445,8 +445,7 @@ TEST_F(DisplayTransactionCommitTest, processesVirtualDisplayAdded) {
     // surface(producer)
     sp<BBinder> displayToken = sp<BBinder>::make();
 
-    DisplayDeviceState state;
-    state.physicalOrVirtual.emplace<DisplayDeviceState::Virtual>(kOwnerUid);
+    DisplayDeviceState state = DisplayDeviceState::createVirtual(kOwnerUid);
     state.isSecure = static_cast<bool>(Case::Display::SECURE);
 
     auto [consumer, surface] = BufferItemConsumer::create(0);
@@ -503,8 +502,7 @@ TEST_F(DisplayTransactionCommitTest, processesVirtualDisplayAddedWithNoSurface) 
     // surface.
     sp<BBinder> displayToken = sp<BBinder>::make();
 
-    DisplayDeviceState state;
-    state.physicalOrVirtual.emplace<DisplayDeviceState::Virtual>(kOwnerUid);
+    DisplayDeviceState state = DisplayDeviceState::createVirtual(kOwnerUid);
     state.isSecure = static_cast<bool>(Case::Display::SECURE);
 
     mFlinger.mutableCurrentState().displays.emplace_or_replace(displayToken, state);

@@ -646,8 +646,7 @@ sp<IBinder> SurfaceFlinger::createVirtualDisplay(
 
     Mutex::Autolock _l(mStateLock);
     // Display ID is assigned when virtual display is allocated by HWC.
-    DisplayDeviceState state;
-    state.physicalOrVirtual.emplace<DisplayDeviceState::Virtual>(ownerUid);
+    DisplayDeviceState state = DisplayDeviceState::createVirtual(ownerUid);
     state.isSecure = isSecure;
     // Set display as protected when marked as secure to ensure no behavior change
     // TODO (b/314820005): separate as a different arg when creating the display.
@@ -4146,8 +4145,7 @@ std::optional<DisplayModeId> SurfaceFlinger::processHotplugConnect(
                                   connectionType, std::move(displayModes), std::move(colorModes),
                                   std::move(info.deviceProductInfo));
 
-    DisplayDeviceState state;
-    state.physicalOrVirtual.emplace<DisplayDeviceState::Physical>(displayId, hwcDisplayId,
+    DisplayDeviceState state = DisplayDeviceState::createPhysical(displayId, hwcDisplayId,
                                                                   info.port, std::move(activeMode));
     // TODO: b/349703362 - Remove first condition when HDCP aidl APIs are enforced
     state.isSecure = !mDisplayModeController.supportsHdcp() ||

@@ -308,6 +308,12 @@ struct DisplayDeviceState {
         bool operator==(const Virtual&) const = default;
     };
 
+    static DisplayDeviceState createPhysical(
+            PhysicalDisplayId id, hardware::graphics::composer::hal::HWDisplayId hwcDisplayId,
+            uint8_t port, DisplayModePtr activeMode);
+
+    static DisplayDeviceState createVirtual(uid_t ownerUid);
+
     bool isPhysical() const { return std::holds_alternative<Physical>(physicalOrVirtual); }
     bool isVirtual() const { return std::holds_alternative<Virtual>(physicalOrVirtual); }
 
@@ -341,6 +347,9 @@ struct DisplayDeviceState {
     static int32_t getNextSequenceId() { return sNextSequenceId++; }
 
 private:
+    DisplayDeviceState(std::variant<Physical, Virtual>&& type)
+          : physicalOrVirtual(std::move(type)) {}
+
     static std::atomic<int32_t> sNextSequenceId;
 };
 

@@ -527,6 +527,16 @@ void DisplayDevice::adjustRefreshRate(Fps pacesetterDisplayRefreshRate) {
     mAdjustedRefreshRate = pacesetterDisplayRefreshRate / divisor;
 }
 
+DisplayDeviceState DisplayDeviceState::createPhysical(PhysicalDisplayId id,
+                                                      hal::HWDisplayId hwcDisplayId, uint8_t port,
+                                                      DisplayModePtr activeMode) {
+    return DisplayDeviceState(Physical{id, hwcDisplayId, port, std::move(activeMode)});
+}
+
+DisplayDeviceState DisplayDeviceState::createVirtual(uid_t ownerUid) {
+    return DisplayDeviceState(Virtual{ownerUid});
+}
+
 std::atomic<int32_t> DisplayDeviceState::sNextSequenceId(1);
 
 }  // namespace android
