@@ -15655,8 +15655,6 @@ TEST_P(InputDispatcherCrossDisplayGestureTestFixture, InputDispatcherCrossDispla
     // Topology values are defined in DP units.
     const bool isSourceDisplayRotated = sourceDisplayOrientation == ui::ROTATION_90 ||
             sourceDisplayOrientation == ui::ROTATION_270;
-    const int32_t sourceDisplayLogicalWidthDp =
-            pxToDp(isSourceDisplayRotated ? DISPLAY_HEIGHT : DISPLAY_WIDTH, sourceDisplayDensity);
     const int32_t sourceDisplayLogicalHeightDp =
             pxToDp(isSourceDisplayRotated ? DISPLAY_WIDTH : DISPLAY_HEIGHT, sourceDisplayDensity);
 
