@@ -2870,10 +2870,15 @@ bool SurfaceFlinger::commit(PhysicalDisplayId pacesetterId,
         return false;
     }
 
+    bool hasFrameTargetWithPowerModeOn = false;
     {
         Mutex::Autolock lock(mStateLock);
 
         for (const auto [displayId, _] : frameTargets) {
+            const auto display = getDisplayDeviceLocked(displayId);
+            if (display && display->getPowerMode() == hal::PowerMode::ON) {
+                hasFrameTargetWithPowerModeOn = true;
+            }
             if (mDisplayModeController.isModeSetPending(displayId)) {
                 if (!finalizeDisplayModeChange(displayId)) {
                     mScheduler->scheduleFrame();
@@ -2896,10 +2901,8 @@ bool SurfaceFlinger::commit(PhysicalDisplayId pacesetterId,
     const Period vsyncPeriod = mScheduler->getVsyncSchedule()->period();
 
     // Save this once per commit + composite to ensure consistency
-    // TODO: b/240619471 - Consider removing front internal display check once AOD is fixed
-    const auto frontInternalDisplay = FTL_FAKE_GUARD(mStateLock, getFrontInternalDisplayLocked());
-    mPowerHintSessionEnabled = mPowerAdvisor->usePowerHintSession() && frontInternalDisplay &&
-            frontInternalDisplay->getPowerMode() == hal::PowerMode::ON;
+    mPowerHintSessionEnabled =
+            mPowerAdvisor->usePowerHintSession() && hasFrameTargetWithPowerModeOn;
     if (mPowerHintSessionEnabled) {
         mPowerAdvisor->setCommitStart(pacesetterFrameTarget.frameBeginTime());
         mPowerAdvisor->setExpectedPresentTime(pacesetterFrameTarget.expectedPresentTime());
