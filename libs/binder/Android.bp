@@ -890,6 +890,25 @@ cc_library {
     ],
 }
 
+cc_library {
+    name: "libbindernetlink",
+    vendor_available: false,
+    shared_libs: [
+        "libbase",
+        "liblog",
+        "libnl",
+    ],
+    srcs: [
+        "BinderNetlink.cpp",
+    ],
+    export_include_dirs: [
+        "include",
+    ],
+    export_shared_lib_headers: [
+        "libnl",
+    ],
+}
+
 // For testing
 cc_library_static {
     name: "libbinder_tls_static",
