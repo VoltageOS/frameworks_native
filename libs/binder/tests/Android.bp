@@ -909,7 +909,10 @@ cc_test {
 cc_test {
     name: "binderAllocationLimits",
     defaults: ["binder_test_defaults"],
-    srcs: ["binderAllocationLimits.cpp"],
+    srcs: [
+        "binderAllocationLimits.cpp",
+        ":libbinder_observer_sources",
+    ],
     shared_libs: [
         "libbinder",
         "liblog",
@@ -917,6 +920,9 @@ cc_test {
         "libutils",
         "libutilscallstack",
         "libbase",
+    ],
+    header_libs: [
+        "jni_headers",
     ],
     test_suites: ["device-tests"],
     require_root: true,

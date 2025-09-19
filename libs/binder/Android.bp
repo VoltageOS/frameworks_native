@@ -591,8 +591,8 @@ cc_defaults {
         ":libbinder_aidl",
         ":libbinder_accessor_aidl",
         ":libbinder_device_interface_sources",
-        ":android-os-statsbootstrap-aidl",
         ":libbinder_observer_sources",
+        ":android-os-binderstatsconsumer-aidl",
     ],
     target: {
         vendor: {
