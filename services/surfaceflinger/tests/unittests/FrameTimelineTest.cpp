@@ -868,8 +868,6 @@ TEST_F(FrameTimelineTest, presentFenceSignaled_reportsAppBufferStuffing) {
 }
 
 TEST_F(FrameTimelineTest, presentFenceSignaled_reportsSFJankIfStartedLate) {
-    SET_FLAG_FOR_TEST(flags::buffer_stuffing_fix, true);
-
     Fps refreshRate = Fps::fromPeriodNsecs(32);
     EXPECT_CALL(*mTimeStats,
                 incrementJankyFrames(TimeStats::JankyFramesInfo{refreshRate, std::nullopt, sUidOne,

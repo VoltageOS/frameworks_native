@@ -55,7 +55,6 @@ public:
     bool add_first_vsync_to_tracker() const;
     bool adpf_gpu_sf() const;
     bool anchor_list() const;
-    bool buffer_stuffing_fix() const;
     bool connected_displays_cursor() const;
     bool correct_virtual_display_power_state() const;
     bool disable_transparent_region_hint() const;
