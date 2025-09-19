@@ -62,16 +62,6 @@ flag {
 } # begone_bright_hlg
 
 flag {
-  name: "buffer_stuffing_fix"
-  namespace: "core_graphics"
-  description: "bug fix for buffer stuffing classification"
-  bug: "417070677"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
-} # buffer_stuffing_fix
-
-flag {
   name: "connected_display_hdr_v2"
   namespace: "desktop_display"
   description: "enable connected display hdr selection"

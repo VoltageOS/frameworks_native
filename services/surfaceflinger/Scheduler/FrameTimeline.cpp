@@ -660,10 +660,9 @@ void SurfaceFrame::classifyJankLocked(int32_t displayFrameJankType, const Fps& r
     } else { // FramePresentMetadata::LatePresent
         const bool readyBeforePreviousLatch = mLastFrameTimestamps.latchTime != 0 &&
                 mPredictions.endTime <= mLastFrameTimestamps.latchTime;
-        const bool dueLastFrame = !FlagManager::getInstance().buffer_stuffing_fix() ||
-                (mLastFrameTimestamps.expectedPresentTime != 0 &&
-                 mPredictions.presentTime - presentThreshold <
-                         mLastFrameTimestamps.expectedPresentTime);
+        const bool dueLastFrame = (mLastFrameTimestamps.expectedPresentTime != 0 &&
+                                   mPredictions.presentTime - presentThreshold <
+                                           mLastFrameTimestamps.expectedPresentTime);
 
         if (readyBeforePreviousLatch && dueLastFrame) {
             // Buffer Stuffing.
