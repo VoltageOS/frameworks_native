@@ -84,6 +84,14 @@ flag {
 }
 
 flag {
+  name: "input_device_primary_directional_motion_axis_api"
+  is_exported: true
+  namespace: "input"
+  description: "Controls the API to provide the primary directional motion axis in InputDevice view behavior."
+  bug: "441964225"
+}
+
+flag {
   name: "enable_prediction_pruning_via_jerk_thresholding"
   namespace: "input"
   description: "Enable prediction pruning based on jerk thresholds."
