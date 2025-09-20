@@ -287,6 +287,16 @@ flag {
 } # parse_edid_version_and_input_type
 
 flag {
+  name: "re_check_fence"
+  namespace: "core_graphics"
+  description: "Check fence status before waiting for fence in RenderEngine"
+  bug: "446240423"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+} # re_check_fence
+
+flag {
   name: "readback_screenshot"
   namespace: "core_graphics"
   description: "Allows devices to use DPU readback for fullscreen screenshots"

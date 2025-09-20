@@ -66,6 +66,7 @@ public:
     bool md_degrade_hdr() const;
     bool monitor_buffer_fences() const;
     bool offload_gpu_composition() const;
+    bool re_check_fence() const;
     bool readback_screenshot() const;
     bool refresh_rate_overlay_on_external_display() const;
     bool reset_model_flushes_fence() const;
