@@ -160,7 +160,6 @@ void FlagManager::dump(std::string& result) const {
     DUMP_ACONFIG_FLAG(force_slower_follower_gpu_composition);
     DUMP_ACONFIG_FLAG(fp16_client_target);
     DUMP_ACONFIG_FLAG(frame_rate_category_mrr);
-    DUMP_ACONFIG_FLAG(game_default_frame_rate);
     DUMP_ACONFIG_FLAG(graphite_renderengine);
     DUMP_ACONFIG_FLAG(hdcp_level_hal);
     DUMP_ACONFIG_FLAG(hdcp_negotiation);
@@ -273,7 +272,6 @@ FLAG_MANAGER_ACONFIG_FLAG(force_slower_follower_gpu_composition,
                           "debug.sf.force_slower_follower_gpu_composition");
 FLAG_MANAGER_ACONFIG_FLAG(fp16_client_target, "debug.sf.fp16_client_target")
 FLAG_MANAGER_ACONFIG_FLAG(frame_rate_category_mrr, "debug.sf.frame_rate_category_mrr")
-FLAG_MANAGER_ACONFIG_FLAG(game_default_frame_rate, "")
 FLAG_MANAGER_ACONFIG_FLAG(graphite_renderengine, "debug.renderengine.graphite")
 FLAG_MANAGER_ACONFIG_FLAG(hdcp_level_hal, "")
 FLAG_MANAGER_ACONFIG_FLAG(hdcp_negotiation, "debug.sf.hdcp_negotiation");

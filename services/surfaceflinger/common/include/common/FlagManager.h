@@ -90,7 +90,6 @@ public:
     bool force_slower_follower_gpu_composition() const;
     bool fp16_client_target() const;
     bool frame_rate_category_mrr() const;
-    bool game_default_frame_rate() const;
     bool graphite_renderengine() const;
     bool hdcp_level_hal() const;
     bool hdcp_negotiation() const;
