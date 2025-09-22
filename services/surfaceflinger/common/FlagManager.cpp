@@ -138,7 +138,6 @@ void FlagManager::dump(std::string& result) const {
     DUMP_ACONFIG_FLAG(offload_gpu_composition);
     DUMP_ACONFIG_FLAG(readback_screenshot);
     DUMP_ACONFIG_FLAG(refresh_rate_overlay_on_external_display);
-    DUMP_ACONFIG_FLAG(reset_model_flushes_fence);
     DUMP_ACONFIG_FLAG(supported_refresh_rate_update);
     DUMP_ACONFIG_FLAG(use_at_least_60_for_min_vote);
 
@@ -315,7 +314,6 @@ FLAG_MANAGER_ACONFIG_FLAG(monitor_buffer_fences, "");
 FLAG_MANAGER_ACONFIG_FLAG(offload_gpu_composition, "");
 FLAG_MANAGER_ACONFIG_FLAG(readback_screenshot, "")
 FLAG_MANAGER_ACONFIG_FLAG(refresh_rate_overlay_on_external_display, "")
-FLAG_MANAGER_ACONFIG_FLAG(reset_model_flushes_fence, "");
 FLAG_MANAGER_ACONFIG_FLAG(supported_refresh_rate_update, "");
 FLAG_MANAGER_ACONFIG_FLAG(use_at_least_60_for_min_vote, "");
 

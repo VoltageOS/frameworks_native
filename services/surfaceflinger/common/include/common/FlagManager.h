@@ -68,7 +68,6 @@ public:
     bool offload_gpu_composition() const;
     bool readback_screenshot() const;
     bool refresh_rate_overlay_on_external_display() const;
-    bool reset_model_flushes_fence() const;
     bool supported_refresh_rate_update() const;
     bool use_at_least_60_for_min_vote() const;
 
