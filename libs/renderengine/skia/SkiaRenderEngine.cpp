@@ -780,6 +780,16 @@ private:
     AutoBackendTexture::CleanupManager& mMgr;
 };
 
+void SkiaRenderEngine::waitFence(SkiaGpuContext* context, base::borrowed_fd fenceFd) {
+    // If the fence is already signaled, we can skip waiting on it.
+    if (FlagManager::getInstance().re_check_fence() && fenceFd.get() >= 0) {
+        if (sync_wait(fenceFd.get(), 0) >= 0) {
+            return;
+        }
+    }
+    waitFenceImpl(context, fenceFd);
+}
+
 void SkiaRenderEngine::drawLayersInternal(
         const std::shared_ptr<std::promise<FenceResult>>&& resultPromise,
         const DisplaySettings& display, const std::vector<LayerSettings>& layers,
