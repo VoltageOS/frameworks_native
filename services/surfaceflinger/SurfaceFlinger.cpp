@@ -5017,8 +5017,10 @@ ui::Size SurfaceFlinger::findLargestFramebufferSizeLocked() const {
     ui::Size maxSize(0, 0);
     int64_t maxArea = 0;
     for (const auto& [_, display] : mDisplays) {
-        if (!display->isPoweredOn()) {
-            continue;
+        if (!FlagManager::getInstance().re_powered_off_displays_inform_cache_budgets()) {
+            if (!display->isPoweredOn()) {
+                continue;
+            }
         }
 
         const ui::Size size = display->getSize();

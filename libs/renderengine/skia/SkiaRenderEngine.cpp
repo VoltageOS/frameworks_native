@@ -1476,6 +1476,14 @@ void SkiaRenderEngine::onActiveDisplaySizeChanged(ui::Size size) {
     // conservative default based on that analysis.
     const float SURFACE_SIZE_MULTIPLIER = 3.5f * bytesPerPixel(mDefaultPixelFormat);
     const int maxResourceBytes = size.width * size.height * SURFACE_SIZE_MULTIPLIER;
+    if (FlagManager::getInstance().re_powered_off_displays_inform_cache_budgets()) {
+        LOG_ALWAYS_FATAL_IF(maxResourceBytes <= 0,
+                            "Invalid maxResourceBytes (size: %dx%d, bytesPerPixel(%d): %" PRIu32
+                            ")",
+                            size.getWidth(), size.getHeight(),
+                            static_cast<int>(mDefaultPixelFormat),
+                            bytesPerPixel(mDefaultPixelFormat));
+    }
 
     // start by resizing the current context
     getActiveContext()->setResourceCacheLimit(maxResourceBytes);
