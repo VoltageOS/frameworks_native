@@ -2264,14 +2264,18 @@ status_t SurfaceFlinger::getDisplayBrightnessSupport(const sp<IBinder>& displayT
 
 status_t SurfaceFlinger::setDisplayBrightness(const sp<IBinder>& displayToken,
                                               const gui::DisplayBrightness& brightness) {
+    const char* const whence = __func__;
+    SFTRACE_FORMAT("%s %s", whence, brightness.toString().c_str());
+
     if (!displayToken) {
         return BAD_VALUE;
     }
 
-    const char* const whence = __func__;
     return ftl::Future(mScheduler->schedule([=, this]() FTL_FAKE_GUARD(mStateLock) {
                // TODO(b/241285876): Validate that the display is physical instead of failing later.
                if (const auto display = getDisplayDeviceLocked(displayToken)) {
+                   SFTRACE_FORMAT("%s displayId=%s %s", whence, to_string(display->getId()).c_str(),
+                                  brightness.toString().c_str());
                    const bool supportsDisplayBrightnessCommand =
                            getHwComposer().getComposer()->isSupported(
                                    Hwc2::Composer::OptionalFeature::DisplayBrightnessCommand);
@@ -2321,6 +2325,9 @@ status_t SurfaceFlinger::setDisplayBrightness(const sp<IBinder>& displayToken,
                                                              .applyImmediately = true});
                    }
                } else {
+                   SFTRACE_FORMAT("%s (invalid display token) %s", whence,
+                                  to_string(display->getId()).c_str(),
+                                  brightness.toString().c_str());
                    ALOGE("%s: Invalid display token %p", whence, displayToken.get());
                    return ftl::yield<status_t>(NAME_NOT_FOUND);
                }
@@ -7077,6 +7084,7 @@ status_t SurfaceFlinger::onTransact(uint32_t code, const Parcel& data, Parcel* r
                   pid, uid);
             return PERMISSION_DENIED;
         }
+        SFTRACE_FORMAT("onTransact (backdoor) code %" PRId32, code);
         int n;
         switch (code) {
             case 1000: // Unused.
