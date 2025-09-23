@@ -19,17 +19,28 @@
 
 #include <cstdarg>
 
+#if defined(__ANDROID__)
 #include <perfetto/trace/android/protolog.pb.h>
+#endif
 
 namespace android {
 namespace protolog {
 
+#if defined(__ANDROID__)
+/**
+ * Initializes the C++ ProtoLog data source and registers it with Perfetto.
+ * This must be called once before any logging can occur, typically at process
+ * startup.
+ */
+void Initialize();
+
+/**
+ * This is exposed for testing purposes. And doesn't need to be used in real code.
+ */
+void Destroy();
+
 void Log(perfetto::protos::ProtoLogLevel level, const char* group, const char* format, ...)
         __attribute__((format(printf, 3, 4)));
-
-// Public API: Call these macros to log.
-#define PROTOLOG(level, group, format, ...) \
-    android::protolog::Log(level, group, format, ##__VA_ARGS__)
 
 #define PROTOLOG_D(group, format, ...) \
     PROTOLOG(perfetto::protos::ProtoLogLevel::PROTOLOG_LEVEL_DEBUG, group, format, ##__VA_ARGS__)
@@ -44,17 +55,22 @@ void Log(perfetto::protos::ProtoLogLevel level, const char* group, const char* f
 #define PROTOLOG_WTF(group, format, ...) \
     PROTOLOG(perfetto::protos::ProtoLogLevel::PROTOLOG_LEVEL_WTF, group, format, ##__VA_ARGS__)
 
-/**
- * Initializes the C++ ProtoLog data source and registers it with Perfetto.
- * This must be called once before any logging can occur, typically at process
- * startup.
- */
-void Initialize();
+#else
+// Stub out ProtoLog for host builds
+void Initialize() {}
+void Destroy() {}
 
-/**
- * This is exposed for testing purposes. And doesn't need to be used in real code.
- */
-void Destroy();
+#define PROTOLOG_D(...) (void)0
+#define PROTOLOG_V(...) (void)0
+#define PROTOLOG_I(...) (void)0
+#define PROTOLOG_W(...) (void)0
+#define PROTOLOG_E(...) (void)0
+#define PROTOLOG_WTF(...) (void)0
+#endif
+
+// Public API: Call these macros to log.
+#define PROTOLOG(level, group, format, ...) \
+    android::protolog::Log(level, group, format, ##__VA_ARGS__)
 
 } // namespace protolog
 } // namespace android
