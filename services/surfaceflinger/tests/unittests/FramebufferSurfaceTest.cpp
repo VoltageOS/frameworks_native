@@ -15,6 +15,8 @@
  */
 
 #include "DisplayHardware/FramebufferSurface.h"
+#include "DisplayHardware/LegacyFramebufferSurface.h"
+#include "common/FlagManager.h"
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -24,7 +26,11 @@ namespace android {
 class FramebufferSurfaceTest : public testing::Test {
 public:
     ui::Size limitSize(const ui::Size& size, const ui::Size maxSize) {
-        return FramebufferSurface::limitSizeInternal(size, maxSize);
+        if (FlagManager::getInstance().wb_framebuffersurface2()) {
+            return FramebufferSurface::limitSizeInternal(size, maxSize);
+        } else {
+            return LegacyFramebufferSurface::limitSizeInternal(size, maxSize);
+        }
     }
 };
 

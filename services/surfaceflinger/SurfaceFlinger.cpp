@@ -139,6 +139,7 @@
 #include "DisplayHardware/ComposerHal.h"
 #include "DisplayHardware/FramebufferSurface.h"
 #include "DisplayHardware/Hal.h"
+#include "DisplayHardware/LegacyFramebufferSurface.h"
 #include "DisplayHardware/VirtualDisplay/LegacyVirtualDisplaySurface.h"
 #include "DisplayHardware/VirtualDisplay/VirtualDisplaySurface.h"
 #include "Effects/Daltonizer.h"
@@ -4351,12 +4352,22 @@ void SurfaceFlinger::processDisplayAdded(const wp<IBinder>& displayToken,
         }
     } else {
         const auto& physical = state.getPhysical();
-        const auto frameBufferSurface =
-                sp<FramebufferSurface>::make(getHwComposer(), physical.id,
-                                             physical.activeMode->getResolution(),
-                                             ui::Size(maxGraphicsWidth, maxGraphicsHeight));
-        displaySurface = frameBufferSurface;
-        compositionSurface = frameBufferSurface->getSurface();
+        if (FlagManager::getInstance().wb_framebuffersurface2()) {
+            const auto frameBufferSurface =
+                    sp<FramebufferSurface>::make(getHwComposer(), physical.id,
+                                                 physical.activeMode->getResolution(),
+                                                 ui::Size(maxGraphicsWidth, maxGraphicsHeight));
+            displaySurface = frameBufferSurface;
+            compositionSurface = frameBufferSurface->getSurface();
+        } else {
+            const auto frameBufferSurface =
+                    sp<LegacyFramebufferSurface>::make(getHwComposer(), physical.id,
+                                                       physical.activeMode->getResolution(),
+                                                       ui::Size(maxGraphicsWidth,
+                                                                maxGraphicsHeight));
+            displaySurface = frameBufferSurface;
+            compositionSurface = frameBufferSurface->getSurface();
+        }
     }
 
     LOG_FATAL_IF(!displaySurface);
