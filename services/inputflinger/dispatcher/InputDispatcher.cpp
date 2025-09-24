@@ -56,7 +56,6 @@
 #include "InputDispatcher.h"
 #include "InputEventTimeline.h"
 #include "InputTracingThreadedBackend.h"
-#include "ProtoLog.h"
 #include "trace/InputTracer.h"
 
 #define INDENT "  "
@@ -944,7 +943,6 @@ status_t InputDispatcher::start() {
     if (mThread) {
         return ALREADY_EXISTS;
     }
-    protolog::Initialize();
     mThread = std::make_unique<InputThread>(
             "InputDispatcher", [this]() { dispatchOnce(); }, [this]() { mLooper->wake(); },
             /*isInCriticalPath=*/true, mJniEnv);
@@ -1697,9 +1695,6 @@ void InputDispatcher::dispatchFocusLocked(nsecs_t currentTime,
             connection->getInputChannelName();
     std::string reason = std::string("reason=").append(entry->reason);
     android_log_event_list(LOGTAG_INPUT_FOCUS) << message << reason << LOG_ID_EVENTS;
-    PROTOLOG_I("INPUT_FOCUS", "Focus %s '%s', reason=%s",
-               (entry->hasFocus ? "entering" : "leaving"),
-               connection->getInputChannelName().c_str(), entry->reason.c_str());
     dispatchEventLocked(currentTime, entry, {{connection}});
 }
 
