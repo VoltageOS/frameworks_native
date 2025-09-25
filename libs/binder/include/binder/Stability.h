@@ -129,8 +129,6 @@ private:
     // through Parcel)
     friend ::android::ProcessState;
 
-    friend ::android::BBinder;
-
     friend ::BinderStabilityIntegrationTest_ExpectedStabilityForItsPartition_Test;
 
     static void tryMarkCompilationUnit(IBinder* binder);

@@ -16,7 +16,6 @@
 #define LOG_TAG "libbinder.Binder"
 
 #include <binder/Binder.h>
-#include <binder/Stability.h>
 
 #include <atomic>
 #include <set>
@@ -49,14 +48,6 @@ namespace android {
 using android::binder::unique_fd;
 
 constexpr uid_t kUidRoot = 0;
-
-static const char* UNKNOWN_CODE = "name=?_code=";
-
-// Internal 2-bit codes that we will store in the flags
-static constexpr uintptr_t INTERNAL_STABILITY_UNDECLARED = 0;
-static constexpr uintptr_t INTERNAL_STABILITY_VENDOR = 1;
-static constexpr uintptr_t INTERNAL_STABILITY_SYSTEM = 2;
-static constexpr uintptr_t INTERNAL_STABILITY_VINTF = 3;
 
 // Service implementations inherit from BBinder and IBinder, and this is frozen
 // in prebuilts.
@@ -324,7 +315,7 @@ public:
 
 // ---------------------------------------------------------------------------
 
-BBinder::BBinder() : mExtras(nullptr) {}
+BBinder::BBinder() : mExtras(nullptr), mStability(0), mParceled(false) {}
 
 bool BBinder::isBinderAlive() const
 {
@@ -585,7 +576,7 @@ bool BBinder::isRequestingSid()
 
 void BBinder::setRequestingSid(bool requestingSid)
 {
-    LOG_ALWAYS_FATAL_IF(wasParceled(),
+    LOG_ALWAYS_FATAL_IF(mParceled,
                         "setRequestingSid() should not be called after a binder object "
                         "is parceled/sent to another process");
 
@@ -610,75 +601,9 @@ sp<IBinder> BBinder::getExtension() {
     return e->mExtension;
 }
 
-void BBinder::setTransactionCodeMap(const TransactionCodeData* data) {
-    mPackedData.setTransactionCodeMap(data);
-}
-
-std::string BBinder::getFunctionName(size_t code) {
-    const TransactionCodeData* transactionData = mPackedData.getTransactionCodeMap();
-    if (transactionData == nullptr) {
-        return UNKNOWN_CODE + std::to_string(code);
-    }
-
-    const uint32_t count = transactionData->count;
-    const char* const* functionNames = transactionData->names;
-    if (count == 0 || functionNames == nullptr) {
-        return UNKNOWN_CODE + std::to_string(code);
-    }
-
-    if (code < FIRST_CALL_TRANSACTION || (code - FIRST_CALL_TRANSACTION) >= count) {
-        return UNKNOWN_CODE + std::to_string(code);
-    }
-
-    const size_t index = code - FIRST_CALL_TRANSACTION;
-    const char* functionName = functionNames[index];
-    if (functionName == nullptr) {
-        return UNKNOWN_CODE + std::to_string(code);
-    }
-
-    return functionName;
-}
-
-void BBinder::setStability(int16_t level) {
-    // Map the public input value to our internal 2-bit code.
-    uintptr_t internalCode = INTERNAL_STABILITY_UNDECLARED;
-    switch (level) {
-        case android::internal::Stability::VENDOR:
-            internalCode = INTERNAL_STABILITY_VENDOR;
-            break;
-        case android::internal::Stability::SYSTEM:
-            internalCode = INTERNAL_STABILITY_SYSTEM;
-            break;
-        case android::internal::Stability::VINTF:
-            internalCode = INTERNAL_STABILITY_VINTF;
-            break;
-    }
-    mPackedData.setStability(internalCode);
-}
-
-/**
- * Retrieves the stability level by mapping the internal 2-bit code back to the public value.
- */
-int16_t BBinder::getStability() const {
-    // Get the internal 2-bit code.
-    uintptr_t internalCode = mPackedData.getStability();
-
-    // Map the internal code back to the public return value.
-    switch (internalCode) {
-        case INTERNAL_STABILITY_VENDOR:
-            return android::internal::Stability::VENDOR;
-        case INTERNAL_STABILITY_SYSTEM:
-            return android::internal::Stability::SYSTEM;
-        case INTERNAL_STABILITY_VINTF:
-            return android::internal::Stability::VINTF;
-        default:
-            return android::internal::Stability::UNDECLARED;
-    }
-}
-
 #ifdef __linux__
 void BBinder::setMinSchedulerPolicy(int policy, int priority) {
-    LOG_ALWAYS_FATAL_IF(wasParceled(),
+    LOG_ALWAYS_FATAL_IF(mParceled,
                         "setMinSchedulerPolicy() should not be called after a binder object "
                         "is parceled/sent to another process");
 
@@ -731,7 +656,7 @@ bool BBinder::isInheritRt() {
 }
 
 void BBinder::setInheritRt(bool inheritRt) {
-    LOG_ALWAYS_FATAL_IF(wasParceled(),
+    LOG_ALWAYS_FATAL_IF(mParceled,
                         "setInheritRt() should not be called after a binder object "
                         "is parceled/sent to another process");
 
@@ -750,7 +675,7 @@ void BBinder::setInheritRt(bool inheritRt) {
 }
 
 void BBinder::setMinRpcThreads(uint16_t min) {
-    LOG_ALWAYS_FATAL_IF(wasParceled(),
+    LOG_ALWAYS_FATAL_IF(mParceled,
                         "setMinRpcThreads() should not be called after a binder object "
                         "is parceled/sent to another process");
     Extras* e = mExtras.load(std::memory_order_acquire);
@@ -785,7 +710,7 @@ pid_t BBinder::getDebugPid() {
 }
 
 void BBinder::setExtension(const sp<IBinder>& extension) {
-    LOG_ALWAYS_FATAL_IF(wasParceled(),
+    LOG_ALWAYS_FATAL_IF(mParceled,
                         "setExtension() should not be called after a binder object "
                         "is parceled/sent to another process");
 
@@ -794,11 +719,11 @@ void BBinder::setExtension(const sp<IBinder>& extension) {
 }
 
 bool BBinder::wasParceled() {
-    return mPackedData.isParceled();
+    return mParceled;
 }
 
 void BBinder::setParceled() {
-    mPackedData.setParceled();
+    mParceled = true;
 }
 
 status_t BBinder::setRpcClientDebug(const Parcel& data) {
