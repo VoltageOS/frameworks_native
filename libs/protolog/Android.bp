@@ -40,6 +40,34 @@ cc_defaults {
     ],
 }
 
+cc_defaults {
+    name: "protolog_all_deps",
+    defaults: [
+        "protolog_proto_deps",
+    ],
+    header_libs: [
+        "protolog-cpp-headers",
+    ],
+    target: {
+        android: {
+            shared_libs: [
+                "libutilscallstack",
+            ],
+            static_libs: [
+                "protolog-cpp",
+                "android.tracing.flags_c_lib",
+                "libaconfig_storage_read_api_cc",
+            ],
+        },
+    },
+}
+
+cc_library_headers {
+    name: "protolog-cpp-headers",
+    host_supported: true,
+    export_include_dirs: ["."],
+}
+
 cc_library_static {
     name: "protolog-cpp",
     srcs: [
