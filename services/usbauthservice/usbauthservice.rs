@@ -85,7 +85,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let service =
         UsbAuthServiceImpl::new_binder(device_manager).expect("Failed to create binder service");
-    let service_name = "usb_auth_manager"; // Must match Context.USB_AUTH_MANAGER_SERVICE
+    let service_name = "usb_auth"; // Must match Context.USB_AUTH_MANAGER_SERVICE
     binder::add_service(service_name, service).expect("Failed to register usb_auth service");
     debug!("Successfully registered service '{}'", service_name);
     debug!("UsbAuth service is ready.");

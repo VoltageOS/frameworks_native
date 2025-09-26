@@ -37,7 +37,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Start the binder thread pool. This is necessary for the client to be a well-behaved binder citizen.
     ProcessState::start_thread_pool();
 
-    let service_name = "usb_auth_manager";
+    let service_name = "usb_auth";
     info!("Attempting to connect to service: {}", service_name);
 
     // Get a binder proxy for the UsbAuthManager service.
