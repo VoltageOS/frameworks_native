@@ -22,6 +22,7 @@
 namespace android::surfaceflinger::frontend {
 
 class LayerHierarchy;
+struct LayerSnapshot;
 
 namespace caching {
 
@@ -52,11 +53,13 @@ public:
 
         // Builds an MergeableHierarchy, and ascribes an owner for it.
         std::unique_ptr<MergeableHierarchy> build(uint32_t owner) {
+            mSnapshots.clear();
             return std::make_unique<MergeableHierarchy>(owner, std::move(mHierarchies));
         }
 
     private:
         std::vector<HierarchyState> mHierarchies;
+        std::vector<LayerSnapshot*> mSnapshots;
     };
 
     MergeableHierarchy(uint32_t owner, std::vector<HierarchyState>&& hierarchies)
@@ -65,6 +68,8 @@ public:
     uint32_t getId() const { return mId; }
 
     void dump(std::ostream& out) const;
+
+    const LayerSnapshot& resolveToSnapshot() const;
 
 private:
     std::vector<HierarchyState> mHierarchies;

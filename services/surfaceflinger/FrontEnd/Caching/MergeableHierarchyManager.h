@@ -18,24 +18,15 @@
 
 #include <memory>
 #include "FrontEnd/Caching/MergeableHierarchy.h"
-#include "ftl/small_map.h"
 
-namespace android::surfaceflinger::frontend::caching {
+namespace android::surfaceflinger::frontend {
+
+namespace caching {
 
 // Manages the lifecycle of MergeableHierarchies constructed from the layer graph
 class MergeableHierarchyManager {
 public:
-    // Adds a new MergeableHierarchy to be tracked by the manager
-    void add(std::unique_ptr<MergeableHierarchy>&& mergeableHierarchy) {
-        mMergeableHierarchies.emplace_back(std::move(mergeableHierarchy));
-    }
-
-    // Removes an MergeableHierarchy, if it exists, based on its owner ID
-    void remove(uint32_t id) {
-        std::erase_if(mMergeableHierarchies, [id](const auto& mergeableHierarchy) {
-            return mergeableHierarchy->getId() == id;
-        });
-    }
+    void update(const LayerHierarchy& hierarchy);
 
     // Dumps all tracked MergeableHiearchies to a string
     std::string dump() const {
@@ -55,9 +46,20 @@ public:
     }
 
 private:
+    void add(std::unique_ptr<MergeableHierarchy>&& mergeableHierarchy) {
+        mMergeableHierarchies.emplace_back(std::move(mergeableHierarchy));
+    }
+    void remove(uint32_t id) {
+        std::erase_if(mMergeableHierarchies, [id](const auto& mergeableHierarchy) {
+            return mergeableHierarchy->getId() == id;
+        });
+    }
+    void update(const LayerHierarchy* hierarchy, MergeableHierarchy::Accumulator& accumulator);
     // TODO: use a better data structure for this. Conceptually we want a set of sets
     // so that destroying a LayerHierarchy won't cause a linear time search.
     std::vector<std::unique_ptr<caching::MergeableHierarchy>> mMergeableHierarchies;
 };
 
-} // namespace android::surfaceflinger::frontend::caching
+} // namespace caching
+
+} // namespace android::surfaceflinger::frontend
