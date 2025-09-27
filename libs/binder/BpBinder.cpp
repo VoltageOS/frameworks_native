@@ -860,8 +860,9 @@ void BpBinder::onLastStrongRef(const void* /*id*/) {
     Vector<Obituary>* obits = mObituaries;
     if(obits != nullptr) {
         if (!obits->isEmpty()) {
-            ALOGI("onLastStrongRef automatically unlinking death recipients for descriptor: '%s'",
-                  BPBINDER_BEST_DESCRIPTOR_LOCKED);
+            ALOGI("onLastStrongRef automatically unlinking death recipients for binder (%p) with "
+                  "descriptor: '%s'",
+                  this, BPBINDER_BEST_DESCRIPTOR_LOCKED);
         }
 
         if (ipc) ipc->clearDeathNotification(binderHandle(), this);
