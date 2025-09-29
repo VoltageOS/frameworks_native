@@ -14808,7 +14808,6 @@ TEST_F(InputDispatcherTest, FocusedDisplayChangeIsNotified) {
 }
 
 TEST_F(InputDispatcherTest, DispatchSimultaneousActionOutsideAndHoverExit) {
-    SCOPED_FLAG_OVERRIDE(simultaneous_outside_and_hover_fix, true);
     SCOPED_FLAG_OVERRIDE(enable_multi_device_same_window_stream, true);
 
     std::shared_ptr<FakeApplicationHandle> application = std::make_shared<FakeApplicationHandle>();
