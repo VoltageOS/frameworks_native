@@ -24,10 +24,10 @@
 #include <cutils/compiler.h>
 #include <gui/BufferItem.h>
 #include <gui/BufferQueue.h>
-#include <surfacetexture/EGLConsumer.h>
-#include <surfacetexture/SurfaceTexture.h>
 #include <inttypes.h>
 #include <private/gui/SyncFeatures.h>
+#include <surfacetexture/LegacyEGLConsumer.h>
+#include <surfacetexture/LegacySurfaceTexture.h>
 #include <utils/Log.h>
 #include <utils/String8.h>
 #include <utils/Trace.h>
@@ -60,8 +60,8 @@ static const struct {
                 "_______________"
                 "_______________"};
 
-Mutex EGLConsumer::sStaticInitLock;
-sp<GraphicBuffer> EGLConsumer::sReleasedTexImageBuffer;
+Mutex LegacyEGLConsumer::sStaticInitLock;
+sp<GraphicBuffer> LegacyEGLConsumer::sReleasedTexImageBuffer;
 
 static bool hasEglProtectedContentImpl() {
     EGLDisplay dpy = eglGetDisplay(EGL_DEFAULT_DISPLAY);
@@ -83,9 +83,9 @@ static bool hasEglProtectedContent() {
     return hasIt;
 }
 
-EGLConsumer::EGLConsumer() : mEglDisplay(EGL_NO_DISPLAY), mEglContext(EGL_NO_CONTEXT) {}
+LegacyEGLConsumer::LegacyEGLConsumer() : mEglDisplay(EGL_NO_DISPLAY), mEglContext(EGL_NO_CONTEXT) {}
 
-status_t EGLConsumer::updateTexImage(SurfaceTexture& st) {
+status_t LegacyEGLConsumer::updateTexImage(LegacySurfaceTexture& st) {
     // Make sure the EGL state is the same as in previous calls.
     status_t err = checkAndUpdateEglStateLocked(st);
     if (err != NO_ERROR) {
@@ -122,26 +122,26 @@ status_t EGLConsumer::updateTexImage(SurfaceTexture& st) {
     return bindTextureImageLocked(st);
 }
 
-status_t EGLConsumer::releaseTexImage(SurfaceTexture& st) {
+status_t LegacyEGLConsumer::releaseTexImage(LegacySurfaceTexture& st) {
     // Make sure the EGL state is the same as in previous calls.
     status_t err = NO_ERROR;
 
     // if we're detached, no need to validate EGL's state -- we won't use it.
-    if (st.mOpMode == SurfaceTexture::OpMode::attachedToGL) {
+    if (st.mOpMode == LegacySurfaceTexture::OpMode::attachedToGL) {
         err = checkAndUpdateEglStateLocked(st, true);
         if (err != NO_ERROR) {
             return err;
         }
     }
 
-    // Update the EGLConsumer state.
+    // Update the LegacyEGLConsumer state.
     int buf = st.mCurrentTexture;
     if (buf != BufferQueue::INVALID_BUFFER_SLOT) {
         EGC_LOGV("releaseTexImage: (slot=%d, mOpMode=%d)", buf, (int)st.mOpMode);
 
         // if we're detached, we just use the fence that was created in
         // detachFromContext() so... basically, nothing more to do here.
-        if (st.mOpMode == SurfaceTexture::OpMode::attachedToGL) {
+        if (st.mOpMode == LegacySurfaceTexture::OpMode::attachedToGL) {
             // Do whatever sync ops we need to do before releasing the slot.
             err = syncForReleaseLocked(mEglDisplay, st);
             if (err != NO_ERROR) {
@@ -171,7 +171,7 @@ status_t EGLConsumer::releaseTexImage(SurfaceTexture& st) {
 
         // detached, don't touch the texture (and we may not even have an
         // EGLDisplay here.
-        if (st.mOpMode == SurfaceTexture::OpMode::attachedToGL) {
+        if (st.mOpMode == LegacySurfaceTexture::OpMode::attachedToGL) {
             // This binds a dummy buffer (mReleasedTexImage).
             status_t result = bindTextureImageLocked(st);
             if (result != NO_ERROR) {
@@ -183,7 +183,7 @@ status_t EGLConsumer::releaseTexImage(SurfaceTexture& st) {
     return NO_ERROR;
 }
 
-sp<GraphicBuffer> EGLConsumer::getDebugTexImageBuffer() {
+sp<GraphicBuffer> LegacyEGLConsumer::getDebugTexImageBuffer() {
     Mutex::Autolock _l(sStaticInitLock);
     if (CC_UNLIKELY(sReleasedTexImageBuffer == nullptr)) {
         // The first time, create the debug texture in case the application
@@ -191,7 +191,7 @@ sp<GraphicBuffer> EGLConsumer::getDebugTexImageBuffer() {
         sp<GraphicBuffer> buffer =
                 new GraphicBuffer(kDebugData.width, kDebugData.height, PIXEL_FORMAT_RGBA_8888,
                                   DEFAULT_USAGE_FLAGS | GraphicBuffer::USAGE_SW_WRITE_RARELY,
-                                  "[EGLConsumer debug texture]");
+                                  "[LegacyEGLConsumer debug texture]");
         uint32_t* bits;
         buffer->lock(GraphicBuffer::USAGE_SW_WRITE_RARELY, reinterpret_cast<void**>(&bits));
         uint32_t stride = buffer->getStride();
@@ -210,7 +210,7 @@ sp<GraphicBuffer> EGLConsumer::getDebugTexImageBuffer() {
     return sReleasedTexImageBuffer;
 }
 
-void EGLConsumer::onAcquireBufferLocked(BufferItem* item, SurfaceTexture& st) {
+void LegacyEGLConsumer::onAcquireBufferLocked(BufferItem* item, LegacySurfaceTexture& st) {
     // If item->mGraphicBuffer is not null, this buffer has not been acquired
     // before, so any prior EglImage created is using a stale buffer. This
     // replaces any old EglImage with a new one (using the new buffer).
@@ -220,7 +220,7 @@ void EGLConsumer::onAcquireBufferLocked(BufferItem* item, SurfaceTexture& st) {
     }
 }
 
-void EGLConsumer::onReleaseBufferLocked(int buf) {
+void LegacyEGLConsumer::onReleaseBufferLocked(int buf) {
 #if COM_ANDROID_GRAPHICS_LIBGUI_FLAGS(BQ_GL_FENCE_CLEANUP)
     (void)buf;
 #else
@@ -228,14 +228,15 @@ void EGLConsumer::onReleaseBufferLocked(int buf) {
 #endif
 }
 
-status_t EGLConsumer::updateAndReleaseLocked(const BufferItem& item, PendingRelease* pendingRelease,
-                                             SurfaceTexture& st) {
+status_t LegacyEGLConsumer::updateAndReleaseLocked(const BufferItem& item,
+                                                   PendingRelease* pendingRelease,
+                                                   LegacySurfaceTexture& st) {
     status_t err = NO_ERROR;
 
     int slot = item.mSlot;
 
-    if (st.mOpMode != SurfaceTexture::OpMode::attachedToGL) {
-        EGC_LOGE("updateAndRelease: EGLConsumer is not attached to an OpenGL "
+    if (st.mOpMode != LegacySurfaceTexture::OpMode::attachedToGL) {
+        EGC_LOGE("updateAndRelease: LegacyEGLConsumer is not attached to an OpenGL "
                  "ES context");
         st.releaseBufferLocked(slot, st.mSlots[slot].mGraphicBuffer);
         return INVALID_OPERATION;
@@ -309,7 +310,7 @@ status_t EGLConsumer::updateAndReleaseLocked(const BufferItem& item, PendingRele
         }
     }
 
-    // Update the EGLConsumer state.
+    // Update the LegacyEGLConsumer state.
     st.mCurrentTexture = slot;
     mCurrentTextureImage = nextTextureImage;
     st.mCurrentCrop = item.mCrop;
@@ -326,7 +327,7 @@ status_t EGLConsumer::updateAndReleaseLocked(const BufferItem& item, PendingRele
     return err;
 }
 
-status_t EGLConsumer::bindTextureImageLocked(SurfaceTexture& st) {
+status_t LegacyEGLConsumer::bindTextureImageLocked(LegacySurfaceTexture& st) {
     if (mEglDisplay == EGL_NO_DISPLAY) {
         ALOGE("bindTextureImage: invalid display");
         return INVALID_OPERATION;
@@ -374,7 +375,8 @@ status_t EGLConsumer::bindTextureImageLocked(SurfaceTexture& st) {
     return doGLFenceWaitLocked(st);
 }
 
-status_t EGLConsumer::checkAndUpdateEglStateLocked(SurfaceTexture& st, bool contextCheck) {
+status_t LegacyEGLConsumer::checkAndUpdateEglStateLocked(LegacySurfaceTexture& st,
+                                                         bool contextCheck) {
     EGLDisplay dpy = eglGetCurrentDisplay();
     EGLContext ctx = eglGetCurrentContext();
 
@@ -404,7 +406,7 @@ status_t EGLConsumer::checkAndUpdateEglStateLocked(SurfaceTexture& st, bool cont
     return NO_ERROR;
 }
 
-status_t EGLConsumer::detachFromContext(SurfaceTexture& st) {
+status_t LegacyEGLConsumer::detachFromContext(LegacySurfaceTexture& st) {
     EGLDisplay dpy = eglGetCurrentDisplay();
     EGLContext ctx = eglGetCurrentContext();
 
@@ -433,7 +435,7 @@ status_t EGLConsumer::detachFromContext(SurfaceTexture& st) {
     return OK;
 }
 
-status_t EGLConsumer::attachToContext(uint32_t tex, SurfaceTexture& st) {
+status_t LegacyEGLConsumer::attachToContext(uint32_t tex, LegacySurfaceTexture& st) {
     // Initialize mCurrentTextureImage if there is a current buffer from past
     // attached state.
     int slot = st.mCurrentTexture;
@@ -464,7 +466,7 @@ status_t EGLConsumer::attachToContext(uint32_t tex, SurfaceTexture& st) {
     mEglDisplay = dpy;
     mEglContext = ctx;
     st.mTexName = tex;
-    st.mOpMode = SurfaceTexture::OpMode::attachedToGL;
+    st.mOpMode = LegacySurfaceTexture::OpMode::attachedToGL;
 
     if (mCurrentTextureImage != nullptr) {
         // This may wait for a buffer a second time. This is likely required if
@@ -480,7 +482,7 @@ status_t EGLConsumer::attachToContext(uint32_t tex, SurfaceTexture& st) {
     return OK;
 }
 
-status_t EGLConsumer::syncForReleaseLocked(EGLDisplay dpy, SurfaceTexture& st) {
+status_t LegacyEGLConsumer::syncForReleaseLocked(EGLDisplay dpy, LegacySurfaceTexture& st) {
     EGC_LOGV("syncForReleaseLocked");
 
     if (st.mCurrentTexture != BufferQueue::INVALID_BUFFER_SLOT) {
@@ -550,7 +552,7 @@ status_t EGLConsumer::syncForReleaseLocked(EGLDisplay dpy, SurfaceTexture& st) {
     return OK;
 }
 
-status_t EGLConsumer::doGLFenceWaitLocked(SurfaceTexture& st) const {
+status_t LegacyEGLConsumer::doGLFenceWaitLocked(LegacySurfaceTexture& st) const {
     EGLDisplay dpy = eglGetCurrentDisplay();
     EGLContext ctx = eglGetCurrentContext();
 
@@ -592,7 +594,7 @@ status_t EGLConsumer::doGLFenceWaitLocked(SurfaceTexture& st) const {
                 return UNKNOWN_ERROR;
             }
         } else {
-            status_t err = st.mCurrentFence->waitForever("EGLConsumer::doGLFenceWaitLocked");
+            status_t err = st.mCurrentFence->waitForever("LegacyEGLConsumer::doGLFenceWaitLocked");
             if (err != NO_ERROR) {
                 EGC_LOGE("doGLFenceWait: error waiting for fence: %d", err);
                 return err;
@@ -603,7 +605,7 @@ status_t EGLConsumer::doGLFenceWaitLocked(SurfaceTexture& st) const {
     return NO_ERROR;
 }
 
-void EGLConsumer::onFreeBufferLocked(int slotIndex) {
+void LegacyEGLConsumer::onFreeBufferLocked(int slotIndex) {
     if (mEglSlots[slotIndex].mEglImage != nullptr &&
         mEglSlots[slotIndex].mEglImage == mCurrentTextureImage) {
         mCurrentTextureImage.clear();
@@ -611,14 +613,14 @@ void EGLConsumer::onFreeBufferLocked(int slotIndex) {
     mEglSlots[slotIndex].mEglImage.clear();
 }
 
-void EGLConsumer::onAbandonLocked() {
+void LegacyEGLConsumer::onAbandonLocked() {
     mCurrentTextureImage.clear();
 }
 
-EGLConsumer::EglImage::EglImage(sp<GraphicBuffer> graphicBuffer)
+LegacyEGLConsumer::EglImage::EglImage(sp<GraphicBuffer> graphicBuffer)
       : mGraphicBuffer(graphicBuffer), mEglImage(EGL_NO_IMAGE_KHR), mEglDisplay(EGL_NO_DISPLAY) {}
 
-EGLConsumer::EglImage::~EglImage() {
+LegacyEGLConsumer::EglImage::~EglImage() {
     if (mEglImage != EGL_NO_IMAGE_KHR) {
         if (!eglDestroyImageKHR(mEglDisplay, mEglImage)) {
             ALOGE("~EglImage: eglDestroyImageKHR failed");
@@ -627,7 +629,7 @@ EGLConsumer::EglImage::~EglImage() {
     }
 }
 
-status_t EGLConsumer::EglImage::createIfNeeded(EGLDisplay eglDisplay, bool forceCreation) {
+status_t LegacyEGLConsumer::EglImage::createIfNeeded(EGLDisplay eglDisplay, bool forceCreation) {
     // If there's an image and it's no longer valid, destroy it.
     bool haveImage = mEglImage != EGL_NO_IMAGE_KHR;
     bool displayInvalid = mEglDisplay != eglDisplay;
@@ -659,12 +661,12 @@ status_t EGLConsumer::EglImage::createIfNeeded(EGLDisplay eglDisplay, bool force
     return OK;
 }
 
-void EGLConsumer::EglImage::bindToTextureTarget(uint32_t texTarget) {
+void LegacyEGLConsumer::EglImage::bindToTextureTarget(uint32_t texTarget) {
     glEGLImageTargetTexture2DOES(texTarget, static_cast<GLeglImageOES>(mEglImage));
 }
 
-EGLImageKHR EGLConsumer::EglImage::createImage(EGLDisplay dpy,
-                                               const sp<GraphicBuffer>& graphicBuffer) {
+EGLImageKHR LegacyEGLConsumer::EglImage::createImage(EGLDisplay dpy,
+                                                     const sp<GraphicBuffer>& graphicBuffer) {
     EGLClientBuffer cbuf = static_cast<EGLClientBuffer>(graphicBuffer->getNativeBuffer());
     const bool createProtectedImage =
             (graphicBuffer->getUsage() & GRALLOC_USAGE_PROTECTED) && hasEglProtectedContent();
