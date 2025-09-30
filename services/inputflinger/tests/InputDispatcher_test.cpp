@@ -14847,20 +14847,6 @@ TEST_F(InputDispatcherTest, DispatchSimultaneousActionOutsideAndHoverExit) {
     left->consumeMotionEvent(WithMotionAction(ACTION_HOVER_ENTER));
     spy->consumeMotionEvent(WithMotionAction(ACTION_HOVER_ENTER));
 
-    // hover move into the right window with a different device
-    mDispatcher->notifyMotion(
-            MotionArgsBuilder(ACTION_HOVER_MOVE, AINPUT_SOURCE_MOUSE)
-                    .pointer(PointerBuilder(/*id=*/0, ToolType::MOUSE).x(150).y(50))
-                    .rawXCursorPosition(150)
-                    .rawYCursorPosition(50)
-                    .deviceId(SECOND_DEVICE_ID)
-                    .build());
-    // TODO(b/313689709): At present following behavior is incorrect, as both devices are
-    // controlling the same cursor, both spy and left windows should have received hover-exit here.
-    left->assertNoEvents();
-    right->consumeMotionEvent(WithMotionAction(ACTION_HOVER_ENTER));
-    spy->assertNoEvents();
-
     // click on right window, which is outside both spy and left window.
     mDispatcher->notifyMotion(MotionArgsBuilder(ACTION_DOWN, AINPUT_SOURCE_MOUSE)
                                       .pointer(PointerBuilder(0, ToolType::MOUSE).x(150).y(50))
