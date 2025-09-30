@@ -58,7 +58,7 @@ static const char* kNdkTrace = "AIDL::ndk::";
 static const char* kServerTrace = "::server";
 static const char* kClientTrace = "::client";
 static const char* kSeparator = "::";
-static const char* kUnknownCode = "name=?_code=";
+static const char* kUnknownCode = "#";
 static const char* kBackendType = "ndk";
 
 namespace ABBinderTag {
