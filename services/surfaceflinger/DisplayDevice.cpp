@@ -35,6 +35,7 @@
 #include <configstore/Utils.h>
 #include <ftl/concat.h>
 #include <log/log.h>
+#include <scheduler/Fps.h>
 #include <system/window.h>
 
 #include "DisplayDevice.h"

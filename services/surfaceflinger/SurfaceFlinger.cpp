@@ -634,7 +634,7 @@ sp<IBinder> SurfaceFlinger::createVirtualDisplay(
         virtual ~DisplayToken() {
             // no more references, this display must be terminated
             Mutex::Autolock _l(flinger->mStateLock);
-            flinger->mCurrentState.displays.removeItem(wp<IBinder>::fromExisting(this));
+            flinger->mCurrentState.displays.erase(wp<IBinder>::fromExisting(this));
             flinger->setTransactionFlags(eDisplayTransactionNeeded);
         }
 
@@ -658,20 +658,20 @@ sp<IBinder> SurfaceFlinger::createVirtualDisplay(
     state.displayName = displayName;
     state.uniqueId = uniqueId;
     state.requestedRefreshRate = Fps::fromValue(requestedRefreshRate);
-    mCurrentState.displays.add(token, state);
+    mCurrentState.displays.emplace_or_replace(token, state);
     return token;
 }
 
 status_t SurfaceFlinger::destroyVirtualDisplay(const sp<IBinder>& displayToken) {
     Mutex::Autolock lock(mStateLock);
 
-    const ssize_t index = mCurrentState.displays.indexOfKey(displayToken);
-    if (index < 0) {
+    const auto stateOpt = mCurrentState.displays.get(displayToken);
+    if (!stateOpt) {
         ALOGE("%s: Invalid display token %p", __func__, displayToken.get());
         return NAME_NOT_FOUND;
     }
 
-    const DisplayDeviceState& state = mCurrentState.displays.valueAt(index);
+    const DisplayDeviceState& state = *stateOpt;
     if (state.isPhysical()) {
         ALOGE("%s: Invalid operation on physical display", __func__);
         return INVALID_OPERATION;
@@ -679,7 +679,7 @@ status_t SurfaceFlinger::destroyVirtualDisplay(const sp<IBinder>& displayToken) 
 
     ALOGD("Destroying virtual display: %s", state.displayName.c_str());
 
-    mCurrentState.displays.removeItemsAt(index);
+    mCurrentState.displays.erase(displayToken);
     setTransactionFlags(eDisplayTransactionNeeded);
     return NO_ERROR;
 }
@@ -992,15 +992,16 @@ void SurfaceFlinger::init() FTL_FAKE_GUARD(kMainThreadContext) {
     mFrontInternalDisplayId = getPrimaryDisplayIdLocked();
 
     // Commit primary display.
+    const auto frontInternalDisplayOpt =
+            ftl::find_if(mCurrentState.displays, [&](const auto& pair) {
+                return pair.second.isPhysical() &&
+                        pair.second.getPhysical().id == mFrontInternalDisplayId;
+            });
     sp<const DisplayDevice> display;
-    if (const auto indexOpt = mCurrentState.getDisplayIndex(mFrontInternalDisplayId)) {
-        const auto& displays = mCurrentState.displays;
-
-        const auto& token = displays.keyAt(*indexOpt);
-        const auto& state = displays.valueAt(*indexOpt);
-
+    if (frontInternalDisplayOpt) {
+        const auto& [token, state] = frontInternalDisplayOpt->get();
         processDisplayAdded(token, state);
-        mDrawingState.displays.add(token, state);
+        mDrawingState.displays.emplace_or_replace(token, state);
 
         display = getFrontInternalDisplayLocked();
     }
@@ -1543,10 +1544,10 @@ bool SurfaceFlinger::finalizeDisplayModeChange(PhysicalDisplayId displayId) {
                     mDisplayModeController.getActiveMode(displayId).modePtr->getResolution();
             oldResolution != activeMode.modePtr->getResolution()) {
             auto& state =
-                    mCurrentState.displays.editValueFor(getPhysicalDisplayTokenLocked(displayId));
+                    mCurrentState.displays.get(getPhysicalDisplayTokenLocked(displayId))->get();
             // We need to generate new sequenceId in order to recreate the display (and this
             // way the framebuffer).
-            state.sequenceId = DisplayDeviceState{}.sequenceId;
+            state.sequenceId = DisplayDeviceState::getNextSequenceId();
             state.getPhysical().activeMode = activeMode.modePtr.get();
             processDisplayChangesLocked();
 
@@ -4126,8 +4127,8 @@ std::optional<DisplayModeId> SurfaceFlinger::processHotplugConnect(
                                               std::move(displayModes), std::move(colorModes),
                                               std::move(deviceProductInfo));
 
-        auto& state = mCurrentState.displays.editValueFor(it->second.token());
-        state.sequenceId = DisplayDeviceState{}.sequenceId; // Generate new sequenceId.
+        auto& state = mCurrentState.displays.get(it->second.token())->get();
+        state.sequenceId = DisplayDeviceState::getNextSequenceId();
         state.getPhysical().activeMode = std::move(activeMode);
         state.getPhysical().port = port;
         ALOGI("Reconnecting %s", displayString);
@@ -4153,7 +4154,7 @@ std::optional<DisplayModeId> SurfaceFlinger::processHotplugConnect(
             connectionType == ui::DisplayConnectionType::Internal;
     state.isProtected = true;
     state.displayName = std::move(info.name);
-    mCurrentState.displays.add(token, state);
+    mCurrentState.displays.emplace_or_replace(token, state);
     ALOGI("Connecting %s", displayString);
     return activeModeId;
 }
@@ -4166,10 +4167,7 @@ void SurfaceFlinger::processHotplugDisconnect(PhysicalDisplayId displayId,
     LOG_ALWAYS_FATAL_IF(!displayOpt);
     const auto& display = displayOpt->get();
 
-    if (const ssize_t index = mCurrentState.displays.indexOfKey(display.token()); index >= 0) {
-        mCurrentState.displays.removeItemsAt(index);
-    }
-
+    mCurrentState.displays.erase(display.token());
     mPhysicalDisplays.erase(displayId);
 }
 
@@ -4555,43 +4553,26 @@ void SurfaceFlinger::processDisplayChanged(const wp<IBinder>& displayToken,
 }
 
 void SurfaceFlinger::processDisplayChangesLocked() {
-    // here we take advantage of Vector's copy-on-write semantics to
-    // improve performance by skipping the transaction entirely when
-    // know that the lists are identical
-    const KeyedVector<wp<IBinder>, DisplayDeviceState>& curr(mCurrentState.displays);
-    const KeyedVector<wp<IBinder>, DisplayDeviceState>& draw(mDrawingState.displays);
-    if (!curr.isIdenticalTo(draw)) {
-        mVisibleRegionsDirty = true;
-        mUpdateInputInfo = true;
+    const auto& currentDisplays = mCurrentState.displays;
+    const auto& drawingDisplays = mDrawingState.displays;
 
-        // Apply the current color matrix to any added or changed display.
-        mCurrentState.colorMatrixChanged = true;
+    mVisibleRegionsDirty = true;
+    mUpdateInputInfo = true;
 
-        // find the displays that were removed
-        // (ie: in drawing state but not in current state)
-        // also handle displays that changed
-        // (ie: displays that are in both lists)
-        for (size_t i = 0; i < draw.size(); i++) {
-            const wp<IBinder>& displayToken = draw.keyAt(i);
-            const ssize_t j = curr.indexOfKey(displayToken);
-            if (j < 0) {
-                // in drawing state but not in current state
-                processDisplayRemoved(displayToken);
-            } else {
-                // this display is in both lists. see if something changed.
-                const DisplayDeviceState& currentState = curr[j];
-                const DisplayDeviceState& drawingState = draw[i];
-                processDisplayChanged(displayToken, currentState, drawingState);
-            }
+    // Apply the current color matrix to any added or changed display.
+    mCurrentState.colorMatrixChanged = true;
+
+    for (const auto& [displayToken, drawingState] : drawingDisplays) {
+        if (const auto currentState = currentDisplays.get(displayToken)) {
+            processDisplayChanged(displayToken, *currentState, drawingState);
+        } else {
+            processDisplayRemoved(displayToken);
         }
+    }
 
-        // find displays that were added
-        // (ie: in current state but not in drawing state)
-        for (size_t i = 0; i < curr.size(); i++) {
-            const wp<IBinder>& displayToken = curr.keyAt(i);
-            if (draw.indexOfKey(displayToken) < 0) {
-                processDisplayAdded(displayToken, curr[i]);
-            }
+    for (const auto& [displayToken, currState] : currentDisplays) {
+        if (!drawingDisplays.contains(displayToken)) {
+            processDisplayAdded(displayToken, currState);
         }
     }
 
@@ -5626,11 +5607,11 @@ bool SurfaceFlinger::applyAndCommitDisplayTransactionStatesLocked(
 }
 
 uint32_t SurfaceFlinger::setDisplayStateLocked(const DisplayState& s) {
-    const ssize_t index = mCurrentState.displays.indexOfKey(s.token);
-    if (index < 0) return 0;
+    const auto stateOpt = mCurrentState.displays.get(s.token);
+    if (!stateOpt) return 0;
 
     uint32_t flags = 0;
-    DisplayDeviceState& state = mCurrentState.displays.editValueAt(index);
+    DisplayDeviceState& state = *stateOpt;
 
     const uint32_t what = s.what;
     if (what & DisplayState::eSurfaceChanged) {
@@ -6288,9 +6269,8 @@ void SurfaceFlinger::setPowerMode(const sp<IBinder>& displayToken, int mode) {
         const auto display = FTL_FAKE_GUARD(mStateLock, getDisplayDeviceLocked(displayToken));
         if (!display) {
             Mutex::Autolock lock(mStateLock);
-            const ssize_t index = mCurrentState.displays.indexOfKey(displayToken);
-            if (index >= 0) {
-                auto& state = mCurrentState.displays.editValueFor(displayToken);
+            if (auto stateOpt = mCurrentState.displays.get(displayToken)) {
+                DisplayDeviceState& state = *stateOpt;
                 if (state.isVirtual()) {
                     ALOGD("Setting power mode %d for a dormant virtual display with token %p", mode,
                           displayToken.get());
