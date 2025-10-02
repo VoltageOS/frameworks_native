@@ -25,15 +25,15 @@
 
 namespace android {
 
-class SurfaceTexture;
+class LegacySurfaceTexture;
 
 /*
- * EGLConsumer implements the parts of SurfaceTexture that deal with
+ * LegacyEGLConsumer implements the parts of LegacySurfaceTexture that deal with
  * textures attached to an GL context.
  */
-class EGLConsumer {
+class LegacyEGLConsumer {
 public:
-    EGLConsumer();
+    LegacyEGLConsumer();
 
     /**
      * updateTexImage acquires the most recently queued buffer, and sets the
@@ -44,7 +44,7 @@ public:
      *
      * This calls doGLFenceWait to ensure proper synchronization.
      */
-    status_t updateTexImage(SurfaceTexture& st);
+    status_t updateTexImage(LegacySurfaceTexture& st);
 
     /*
      * releaseTexImage releases the texture acquired in updateTexImage().
@@ -53,29 +53,29 @@ public:
      * This call may only be made while the OpenGL ES context to which the
      * target texture belongs is bound to the calling thread.
      */
-    status_t releaseTexImage(SurfaceTexture& st);
+    status_t releaseTexImage(LegacySurfaceTexture& st);
 
     /**
-     * detachFromContext detaches the EGLConsumer from the calling thread's
+     * detachFromContext detaches the LegacyEGLConsumer from the calling thread's
      * current OpenGL ES context.  This context must be the same as the context
      * that was current for previous calls to updateTexImage.
      *
-     * Detaching a EGLConsumer from an OpenGL ES context will result in the
+     * Detaching a LegacyEGLConsumer from an OpenGL ES context will result in the
      * deletion of the OpenGL ES texture object into which the images were being
-     * streamed.  After a EGLConsumer has been detached from the OpenGL ES
+     * streamed.  After a LegacyEGLConsumer has been detached from the OpenGL ES
      * context calls to updateTexImage will fail returning INVALID_OPERATION
-     * until the EGLConsumer is attached to a new OpenGL ES context using the
+     * until the LegacyEGLConsumer is attached to a new OpenGL ES context using the
      * attachToContext method.
      */
-    status_t detachFromContext(SurfaceTexture& st);
+    status_t detachFromContext(LegacySurfaceTexture& st);
 
     /**
-     * attachToContext attaches a EGLConsumer that is currently in the
-     * 'detached' state to the current OpenGL ES context.  A EGLConsumer is
+     * attachToContext attaches a LegacyEGLConsumer that is currently in the
+     * 'detached' state to the current OpenGL ES context.  A LegacyEGLConsumer is
      * in the 'detached' state iff detachFromContext has successfully been
      * called and no calls to attachToContext have succeeded since the last
      * detachFromContext call.  Calls to attachToContext made on a
-     * EGLConsumer that is not in the 'detached' state will result in an
+     * LegacyEGLConsumer that is not in the 'detached' state will result in an
      * INVALID_OPERATION error.
      *
      * The tex argument specifies the OpenGL ES texture object name in the
@@ -84,13 +84,13 @@ public:
      * the texture target and populated with the image contents that were
      * current at the time of the last call to detachFromContext.
      */
-    status_t attachToContext(uint32_t tex, SurfaceTexture& st);
+    status_t attachToContext(uint32_t tex, LegacySurfaceTexture& st);
 
     /**
      * onAcquireBufferLocked amends the ConsumerBase method to update the
      * mEglSlots array in addition to the ConsumerBase behavior.
      */
-    void onAcquireBufferLocked(BufferItem* item, SurfaceTexture& st);
+    void onAcquireBufferLocked(BufferItem* item, LegacySurfaceTexture& st);
 
     /**
      * onReleaseBufferLocked amends the ConsumerBase method to update the
@@ -129,14 +129,14 @@ protected:
      * it may call releaseBufferLocked itself later.
      */
     status_t updateAndReleaseLocked(const BufferItem& item, PendingRelease* pendingRelease,
-                                    SurfaceTexture& st);
+                                    LegacySurfaceTexture& st);
 
     /**
      * Binds mTexName and the current buffer to mTexTarget.  Uses
      * mCurrentTexture if it's set, mCurrentTextureImage if not.  If the
      * bind succeeds, this calls doGLFenceWait.
      */
-    status_t bindTextureImageLocked(SurfaceTexture& st);
+    status_t bindTextureImageLocked(LegacySurfaceTexture& st);
 
     /**
      * Gets the current EGLDisplay and EGLContext values, and compares them
@@ -146,7 +146,7 @@ protected:
      * The contextCheck argument is used to ensure that a GL context is
      * properly set; when set to false, the check is not performed.
      */
-    status_t checkAndUpdateEglStateLocked(SurfaceTexture& st, bool contextCheck = false);
+    status_t checkAndUpdateEglStateLocked(LegacySurfaceTexture& st, bool contextCheck = false);
 
     /**
      * EglImage is a utility class for tracking and creating EGLImageKHRs. There
@@ -208,7 +208,7 @@ protected:
      * stream to ensure that it is safe for future OpenGL ES commands to
      * access the current texture buffer.
      */
-    status_t doGLFenceWaitLocked(SurfaceTexture& st) const;
+    status_t doGLFenceWaitLocked(LegacySurfaceTexture& st) const;
 
     /**
      * syncForReleaseLocked performs the synchronization needed to release the
@@ -216,7 +216,7 @@ protected:
      * current slot's fence to guard against a producer accessing the buffer
      * before the outstanding accesses have completed.
      */
-    status_t syncForReleaseLocked(EGLDisplay dpy, SurfaceTexture& st);
+    status_t syncForReleaseLocked(EGLDisplay dpy, LegacySurfaceTexture& st);
 
     /**
      * returns a graphic buffer used when the texture image has been released
@@ -224,9 +224,9 @@ protected:
     static sp<GraphicBuffer> getDebugTexImageBuffer();
 
     /**
-     * The default consumer usage flags that EGLConsumer always sets on its
+     * The default consumer usage flags that LegacyEGLConsumer always sets on its
      * BufferQueue instance; these will be OR:d with any additional flags passed
-     * from the EGLConsumer user. In particular, EGLConsumer will always
+     * from the LegacyEGLConsumer user. In particular, LegacyEGLConsumer will always
      * consume buffers as hardware textures.
      */
     static const uint64_t DEFAULT_USAGE_FLAGS = GraphicBuffer::USAGE_HW_TEXTURE;
