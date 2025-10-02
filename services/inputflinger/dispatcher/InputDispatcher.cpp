@@ -6397,8 +6397,8 @@ InputDispatcher::DispatcherTouchState::pilferPointers(
     auto touchStateWindowAndDisplay = findTouchStateWindowAndDisplay(token);
     if (!touchStateWindowAndDisplay.has_value()) {
         LOG(WARNING)
-                << "Attempted to pilfer points from a channel without any on-going pointer streams."
-                   " Ignoring.";
+                << "Attempted to pilfer pointers from a channel without any on-going pointer "
+                   "streams. Ignoring.";
         return Error(BAD_VALUE);
     }
 
