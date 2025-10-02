@@ -340,6 +340,11 @@ filegroup {
     ],
 }
 
+filegroup {
+    name: "rendercommandbuffer_sources",
+    srcs: ["RenderCommandBuffer.cpp"],
+}
+
 cc_defaults {
     name: "libgui-defaults",
     defaults: ["libgui_bufferqueue-defaults"],
