@@ -216,9 +216,10 @@ public:
     // Sets the actual present time, appropriate metadata and classifies the jank.
     // displayRefreshRate, displayDeadlineDelta, and displayPresentDelta are propagated from the
     // display frame.
-    void onPresent(nsecs_t presentTime, int32_t displayFrameJankType, Fps refreshRate,
+    void onPresent(nsecs_t presentTime, int32_t displayFrameJankTypeLegacy,
+                   int32_t displayFrameJankTypeExperimental, Fps refreshRate,
                    Fps displayFrameRenderRate, nsecs_t displayDeadlineDelta,
-                   nsecs_t displayPresentDelta);
+                   nsecs_t displayPresentJitter);
     // Sets the frame as none janky as there was no real display frame.
     void onCommitNotComposited(Fps refreshRate, Fps displayFrameRenderRate);
     // All the timestamps are dumped relative to the baseTime
@@ -279,10 +280,11 @@ private:
                           bool filterFramesBeforeTraceStarts) const;
     void traceActuals(int64_t displayFrameToken, nsecs_t monoBootOffset,
                       bool filterFramesBeforeTraceStarts) const;
-    void classifyJankLocked(int32_t displayFrameJankType, const Fps& refreshRate,
+    void classifyJankLocked(int32_t displayFrameJankTypeLegacy,
+                            int32_t displayFrameJankTypeExperimental, const Fps& refreshRate,
                             Fps displayFrameRenderRate, nsecs_t* outDeadlineDelta,
                             nsecs_t* outPresentDelay) REQUIRES(mMutex);
-    void classifyJankLegacyLocked(int32_t displayFrameJankType, const Fps& refreshRate,
+    void classifyJankLegacyLocked(int32_t displayFrameJankTypeLegacy, const Fps& refreshRate,
                                   Fps displayFrameRenderRate, nsecs_t* outDeadlineDelta,
                                   nsecs_t* outPresentDelay) REQUIRES(mMutex);
 
@@ -334,6 +336,15 @@ private:
     GameMode mGameMode = GameMode::Unsupported;
 
     std::weak_ptr<SurfaceFrame> mPreviousSurfaceFrame GUARDED_BY(mMutex);
+
+    // Alternative jank classification, Experimental for now.
+    int32_t mJankTypeExperimental GUARDED_BY(mMutex) = JankType::None;
+    float mJankSeverityScore GUARDED_BY(mMutex) = 0.0f;
+    FramePresentMetadata mFramePresentMetadataExperimental GUARDED_BY(mMutex) =
+            FramePresentMetadata::UnknownPresent;
+    FrameReadyMetadata mFrameReadyMetadataExperimental GUARDED_BY(mMutex) =
+            FrameReadyMetadata::UnknownFinish;
+    nsecs_t mPresentDelay GUARDED_BY(mMutex) = 0;
 };
 
 /*
@@ -457,7 +468,8 @@ public:
         void onSfWakeUp(int64_t token, Fps refreshRate, Fps renderRate,
                         std::optional<TimelineItem> predictions, nsecs_t wakeUpTime);
         // Sets the appropriate metadata and classifies the jank.
-        void onPresent(nsecs_t signalTime, nsecs_t previousPresentTime);
+        void onPresent(nsecs_t signalTime, nsecs_t previousPredictedPresentTime,
+                       nsecs_t previousActualPresentTime);
         // Flushes all the surface frames as those were not generating any actual display frames.
         void onCommitNotComposited();
         // Adds the provided SurfaceFrame to the current display frame.
@@ -496,9 +508,8 @@ public:
                              nsecs_t previousActualPresentTime,
                              bool filterFramesBeforeTraceStarts) const;
         void classifyJank(nsecs_t& deadlineDelta, nsecs_t& deltaToVsync,
-                          nsecs_t previousPresentTime);
-        void classifyJankLegacy(nsecs_t presentDelay, nsecs_t deltaToVsync,
-                                nsecs_t previousPresentTime);
+                          nsecs_t previousPredictedPresentTime, nsecs_t previousActualPresentTime);
+        void classifyJankLegacy(nsecs_t presentDelay, nsecs_t previousActualPresentTime);
 
         int64_t mToken = FrameTimelineInfo::INVALID_VSYNC_ID;
 
@@ -537,6 +548,13 @@ public:
         // Using a reference here because the counter is owned by FrameTimeline, which outlives
         // DisplayFrame.
         TraceCookieCounter& mTraceCookieCounter;
+
+        // Alternative jank classification, Experimental for now.
+        int32_t mJankTypeExperimental = JankType::None;
+        FramePresentMetadata mFramePresentMetadataExperimental =
+                FramePresentMetadata::UnknownPresent;
+        nsecs_t mPresentDelay = 0;
+        float mJankSeverityScore = 0.0f;
     };
 
     FrameTimeline(std::shared_ptr<TimeStats> timeStats, pid_t surfaceFlingerPid,
@@ -567,6 +585,9 @@ public:
     void registerDataSource();
 
     static constexpr char kFrameTimelineDataSource[] = "android.surfaceflinger.frametimeline";
+
+    static constexpr Fps kThresholdFpsForAnimation = 20_Hz;
+    static constexpr float kDeltaFramesRatioThreshold = 0.33f;
 
 private:
     // Friend class for testing

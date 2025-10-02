@@ -343,6 +343,19 @@ bool shouldTraceForDataSource(const FrameTimelineDataSource::TraceContext& ctx, 
     return true;
 }
 
+nsecs_t calculateDisplayPresentJitter(nsecs_t presentDelay, Fps refreshRate) {
+    if (refreshRate.getPeriodNsecs() > 0) {
+        return std::abs(presentDelay) % refreshRate.getPeriodNsecs();
+    }
+    return 0;
+}
+
+bool delayMatchVsyncCadence(nsecs_t presentDelay, Fps refreshRate, nsecs_t presentThreshold) {
+    const nsecs_t deltaToVsync = calculateDisplayPresentJitter(presentDelay, refreshRate);
+    return deltaToVsync < presentThreshold ||
+            deltaToVsync >= refreshRate.getPeriodNsecs() - presentThreshold;
+}
+
 } // namespace
 
 int64_t TraceCookieCounter::getCookieForTracing() {
@@ -613,9 +626,6 @@ void SurfaceFrame::classifyJankLegacyLocked(int32_t displayFrameJankType, const 
                                             nsecs_t* outPresentDelay) {
     const nsecs_t presentDelay = mActuals.presentTime - mPredictions.presentTime;
 
-    const nsecs_t deltaToVsync = refreshRate.getPeriodNsecs() > 0
-            ? std::abs(presentDelay) % refreshRate.getPeriodNsecs()
-            : 0;
     if (outPresentDelay) {
         *outPresentDelay = presentDelay;
     }
@@ -652,8 +662,7 @@ void SurfaceFrame::classifyJankLegacyLocked(int32_t displayFrameJankType, const 
     } else if (mFramePresentMetadataLegacy == FramePresentMetadata::EarlyPresent) {
         if (mFrameReadyMetadataLegacy == FrameReadyMetadata::OnTimeFinish) {
             // Finish on time, Present early
-            if (deltaToVsync < presentThreshold ||
-                deltaToVsync >= refreshRate.getPeriodNsecs() - presentThreshold) {
+            if (delayMatchVsyncCadence(presentDelay, refreshRate, presentThreshold)) {
                 // Delta factor of vsync
                 mJankTypeLegacy = JankType::SurfaceFlingerScheduling;
             } else {
@@ -702,8 +711,7 @@ void SurfaceFrame::classifyJankLegacyLocked(int32_t displayFrameJankType, const 
                 if (!(mJankTypeLegacy & JankType::BufferStuffing)) {
                     // In a stuffed state, if the app finishes on time and there is no display frame
                     // jank, only buffer stuffing is the root cause of the jank.
-                    if (deltaToVsync < presentThreshold ||
-                        deltaToVsync >= refreshRate.getPeriodNsecs() - presentThreshold) {
+                    if (delayMatchVsyncCadence(presentDelay, refreshRate, presentThreshold)) {
                         // Delta factor of vsync
                         mJankTypeLegacy |= JankType::SurfaceFlingerScheduling;
                     } else {
@@ -721,12 +729,14 @@ void SurfaceFrame::classifyJankLegacyLocked(int32_t displayFrameJankType, const 
     }
 }
 
-void SurfaceFrame::classifyJankLocked(int32_t displayFrameJankType, const Fps& refreshRate,
-                                      Fps displayFrameRenderRate, nsecs_t* outDeadlineDelta,
-                                      nsecs_t* outPresentDelay) {
+void SurfaceFrame::classifyJankLocked(int32_t displayFrameJankTypeLegacy,
+                                      int32_t displayFrameJankTypeExperimental,
+                                      const Fps& refreshRate, Fps displayFrameRenderRate,
+                                      nsecs_t* outDeadlineDelta, nsecs_t* outPresentDelay) {
     if (mActuals.presentTime == Fence::SIGNAL_TIME_INVALID) {
         // Cannot do any classification for invalid present time.
         mJankTypeLegacy = JankType::Unknown;
+        mJankTypeExperimental = mJankTypeLegacy;
         mJankSeverityTypeLegacy = JankSeverityType::Unknown;
         if (outDeadlineDelta) {
             *outDeadlineDelta = -1;
@@ -743,6 +753,7 @@ void SurfaceFrame::classifyJankLocked(int32_t displayFrameJankType, const Fps& r
         // reasonable app, so prediction expire would mean a huge scheduling delay.
         mJankTypeLegacy = mPresentState != PresentState::Presented ? JankType::Dropped
                                                                    : JankType::AppDeadlineMissed;
+        mJankTypeExperimental = mJankTypeLegacy;
         mJankSeverityTypeLegacy = JankSeverityType::Unknown;
         if (outDeadlineDelta) {
             *outDeadlineDelta = -1;
@@ -758,41 +769,191 @@ void SurfaceFrame::classifyJankLocked(int32_t displayFrameJankType, const Fps& r
         return;
     }
 
-    classifyJankLegacyLocked(displayFrameJankType, refreshRate, displayFrameRenderRate,
+    classifyJankLegacyLocked(displayFrameJankTypeLegacy, refreshRate, displayFrameRenderRate,
                              outDeadlineDelta, outPresentDelay);
+    if (!FlagManager::getInstance().jank_classification_v2()) {
+        if (mPresentState != PresentState::Presented) {
+            mJankTypeLegacy = JankType::Dropped;
+            // Since frame was not presented, lets drop any present value
+            mActuals.presentTime = 0;
+            mJankSeverityTypeLegacy = JankSeverityType::Unknown;
+        }
+
+        mJankTypeExperimental = mJankTypeLegacy;
+        mFramePresentMetadataExperimental = mFramePresentMetadataLegacy;
+        mFrameReadyMetadataExperimental = mFrameReadyMetadataLegacy;
+        return;
+    }
+
+    const auto previousFrameData = previousFrameDataLocked();
+
+    mPresentDelay = mActuals.presentTime - mPredictions.presentTime;
+    if (outPresentDelay) {
+        *outPresentDelay = mPresentDelay;
+    }
+
+    const nsecs_t deadlineDelta = mActuals.endTime - mPredictions.endTime;
+    if (outDeadlineDelta) {
+        *outDeadlineDelta = deadlineDelta;
+    }
+
+    if (deadlineDelta > mJankClassificationThresholds.deadlineThreshold) {
+        mFrameReadyMetadataExperimental = FrameReadyMetadata::LateFinish;
+    } else {
+        mFrameReadyMetadataExperimental = FrameReadyMetadata::OnTimeFinish;
+    }
+
+    const nsecs_t presentThreshold =
+            FlagManager::getInstance().increase_missed_frame_jank_threshold()
+            ? mJankClassificationThresholds.presentThresholdExtended
+            : mJankClassificationThresholds.presentThresholdLegacy;
+
+    if (std::abs(mPresentDelay) <= presentThreshold) {
+        mFramePresentMetadataExperimental = FramePresentMetadata::OnTimePresent;
+    } else {
+        if (mPresentDelay > impl::FrameTimeline::kThresholdFpsForAnimation.getPeriodNsecs()) {
+            // The frame is significantly delayed, so we have to mark it as late.
+            mFramePresentMetadataExperimental = FramePresentMetadata::LatePresent;
+        } else {
+            switch (previousFrameData.status) {
+                case PreviousFrameData::Status::Unknown:
+                    // We can't do any classification if the previous frame is unknown
+                    mFramePresentMetadataExperimental = FramePresentMetadata::UnknownPresent;
+                    break;
+                case PreviousFrameData::Status::OutOfOrder:
+                    // This can happen if the frame is significantly delayed on the UI thread,
+                    // and RT is updating meanwhile.
+                    mFramePresentMetadataExperimental = FramePresentMetadata::LatePresent;
+                    break;
+                case PreviousFrameData::Status::Valid: {
+                    const nsecs_t actualPresentDelta =
+                            mActuals.presentTime - previousFrameData.actuals.presentTime;
+                    const nsecs_t expectedPresentDelta =
+                            mPredictions.presentTime - previousFrameData.predictions.presentTime;
+                    const nsecs_t presentationConsistencyDelay =
+                            actualPresentDelta - expectedPresentDelta;
+                    const float deltaFrameRatio = expectedPresentDelta == 0
+                            ? 0
+                            : abs(static_cast<float>(presentationConsistencyDelay) /
+                                  static_cast<float>(expectedPresentDelta));
+                    const bool smooth =
+                            expectedPresentDelta < impl::FrameTimeline::kThresholdFpsForAnimation
+                                                           .getPeriodNsecs() &&
+                            deltaFrameRatio <= impl::FrameTimeline::kDeltaFramesRatioThreshold;
+                    if (smooth) {
+                        mJankSeverityScore = deltaFrameRatio;
+                        mFramePresentMetadataExperimental = FramePresentMetadata::OnTimePresent;
+                    } else {
+                        mJankSeverityScore = static_cast<float>(mPresentDelay) /
+                                static_cast<float>(expectedPresentDelta);
+                        if (mJankSeverityScore > impl::FrameTimeline::kDeltaFramesRatioThreshold) {
+                            mFramePresentMetadataExperimental = (presentationConsistencyDelay > 0)
+                                    ? FramePresentMetadata::LatePresent
+                                    : FramePresentMetadata::EarlyPresent;
+                        } else {
+                            // frame is delayed, it doesn't match the frame pacing but it also
+                            // pretty far from the previous frame. In that case, mark it as non
+                            // animation.
+                            mFramePresentMetadataExperimental =
+                                    FramePresentMetadata::UnknownPresent;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (mFramePresentMetadataExperimental == FramePresentMetadata::OnTimePresent) {
+        // Frames presented on time are not janky, but might be buffer stuffed.
+        if (mPresentDelay <= presentThreshold) {
+            mJankTypeExperimental = JankType::None;
+        } else {
+            mJankTypeExperimental = JankType::BufferStuffing;
+            // fixup the app deadline based on the present delay.
+            nsecs_t adjustedDeadline = mPredictions.endTime + mPresentDelay;
+            if (adjustedDeadline > mActuals.endTime) {
+                mFrameReadyMetadataExperimental = FrameReadyMetadata::OnTimeFinish;
+            }
+        }
+    } else if (mFramePresentMetadataExperimental == FramePresentMetadata::EarlyPresent) {
+        //  Finish on time, Present early
+        if (delayMatchVsyncCadence(mPresentDelay, refreshRate, presentThreshold)) {
+            // Delta factor of vsync
+            mJankTypeExperimental = JankType::SurfaceFlingerScheduling;
+        } else {
+            // Delta not a factor of vsync
+            mJankTypeExperimental = JankType::PredictionError;
+        }
+    } else if (mFramePresentMetadataExperimental == FramePresentMetadata::LatePresent) {
+        if (mFrameReadyMetadataExperimental == FrameReadyMetadata::OnTimeFinish) {
+            // Finish on time, Present late
+            if (displayFrameJankTypeExperimental != JankType::None) {
+                // Propagate displayFrame's jank if it exists
+                mJankTypeExperimental |= displayFrameJankTypeExperimental;
+            } else {
+                if (!(mJankTypeExperimental & JankType::BufferStuffing)) {
+                    // In a stuffed state, if the app finishes on time and there is no display frame
+                    // jank, only buffer stuffing is the root cause of the jank.
+                    if (delayMatchVsyncCadence(mPresentDelay, refreshRate, presentThreshold)) {
+                        // Delta factor of vsync
+                        mJankTypeExperimental |= JankType::SurfaceFlingerScheduling;
+                    } else {
+                        // Delta not a factor of vsync
+                        mJankTypeExperimental |= JankType::PredictionError;
+                    }
+                }
+            }
+        } else if (mFrameReadyMetadataExperimental == FrameReadyMetadata::LateFinish) {
+            // Finish late, Present late
+            mJankTypeExperimental |= JankType::AppDeadlineMissed;
+            // Propagate DisplayFrame's jankType if it is janky
+            mJankTypeExperimental |= displayFrameJankTypeExperimental;
+        }
+    } else { // mFramePresentMetadataExperimental == FramePresentMetadata::UnknownPresent
+        mJankTypeExperimental |= JankType::NonAnimating;
+    }
+
     if (mPresentState != PresentState::Presented) {
         mJankTypeLegacy = JankType::Dropped;
+        mJankTypeExperimental = mJankTypeLegacy;
         // Since frame was not presented, lets drop any present value
         mActuals.presentTime = 0;
         mJankSeverityTypeLegacy = JankSeverityType::Unknown;
     }
+
+    if (mVsyncResyncedJitter > 0) {
+        // the app adjusted the vsync time due to a delay on the main thread - mark is as
+        // AppDeadlineMissed
+        mJankTypeExperimental |= JankType::AppResyncedJitter;
+    }
 }
 
-void SurfaceFrame::onPresent(nsecs_t presentTime, int32_t displayFrameJankType, Fps refreshRate,
+void SurfaceFrame::onPresent(nsecs_t presentTime, int32_t displayFrameJankTypeLegacy,
+                             int32_t displayFrameJankTypeExperimental, Fps refreshRate,
                              Fps displayFrameRenderRate, nsecs_t displayDeadlineDelta,
-                             nsecs_t displayPresentDelta) {
+                             nsecs_t displayPresentJitter) {
     std::scoped_lock lock(mMutex);
 
     mDisplayFrameRenderRate = displayFrameRenderRate;
     mActuals.presentTime = presentTime;
     nsecs_t deadlineDelta = 0;
-    nsecs_t presentDelta = 0;
+    nsecs_t presentDelay = 0;
 
-    classifyJankLocked(displayFrameJankType, refreshRate, displayFrameRenderRate, &deadlineDelta,
-                       &presentDelta);
+    classifyJankLocked(displayFrameJankTypeLegacy, displayFrameJankTypeExperimental, refreshRate,
+                       displayFrameRenderRate, &deadlineDelta, &presentDelay);
 
     if (mPredictionState != PredictionState::None) {
         // Only update janky frames if the app used vsync predictions
         mTimeStats->incrementJankyFrames({refreshRate, mRenderRate, mOwnerUid, mLayerName,
                                           mGameMode, mJankTypeLegacy, displayDeadlineDelta,
-                                          displayPresentDelta, deadlineDelta});
+                                          displayPresentJitter, deadlineDelta});
 
         gui::JankData jd;
         jd.frameVsyncId = mToken;
         jd.jankType = mJankTypeLegacy;
         jd.frameIntervalNs =
                 (mRenderRate ? *mRenderRate : mDisplayFrameRenderRate).getPeriodNsecs();
-        jd.presentDelayNs = presentDelta;
+        jd.presentDelayNs = presentDelay;
 
         if (mPredictionState == PredictionState::Valid) {
             jd.scheduledAppFrameTimeNs = mPredictions.endTime - mPredictions.startTime;
@@ -819,7 +980,8 @@ void SurfaceFrame::onCommitNotComposited(Fps refreshRate, Fps displayFrameRender
 
     mDisplayFrameRenderRate = displayFrameRenderRate;
     mActuals.presentTime = mPredictions.presentTime;
-    classifyJankLocked(JankType::None, refreshRate, displayFrameRenderRate, nullptr, nullptr);
+    classifyJankLocked(JankType::None, JankType::None, refreshRate, displayFrameRenderRate, nullptr,
+                       nullptr);
 }
 
 void SurfaceFrame::tracePredictions(int64_t displayFrameToken, nsecs_t monoBootOffset,
@@ -915,10 +1077,22 @@ void SurfaceFrame::traceActuals(int64_t displayFrameToken, nsecs_t monoBootOffse
 
         if (mPresentState == PresentState::Dropped) {
             actualSurfaceFrameStartEvent->set_present_type(FrameTimelineEvent::PRESENT_DROPPED);
+            if (FlagManager::getInstance().jank_classification_v2()) {
+                actualSurfaceFrameStartEvent->set_present_type_experimental(
+                        FrameTimelineEvent::PRESENT_DROPPED);
+            }
         } else if (mPresentState == PresentState::Unknown) {
             actualSurfaceFrameStartEvent->set_present_type(FrameTimelineEvent::PRESENT_UNSPECIFIED);
+            if (FlagManager::getInstance().jank_classification_v2()) {
+                actualSurfaceFrameStartEvent->set_present_type_experimental(
+                        FrameTimelineEvent::PRESENT_UNSPECIFIED);
+            }
         } else {
             actualSurfaceFrameStartEvent->set_present_type(toProto(mFramePresentMetadataLegacy));
+            if (FlagManager::getInstance().jank_classification_v2()) {
+                actualSurfaceFrameStartEvent->set_present_type_experimental(
+                        toProto(mFramePresentMetadataExperimental));
+            }
         }
         actualSurfaceFrameStartEvent->set_on_time_finish(mFrameReadyMetadataLegacy ==
                                                          FrameReadyMetadata::OnTimeFinish);
@@ -927,6 +1101,14 @@ void SurfaceFrame::traceActuals(int64_t displayFrameToken, nsecs_t monoBootOffse
         actualSurfaceFrameStartEvent->set_prediction_type(toProto(mPredictionState));
         actualSurfaceFrameStartEvent->set_is_buffer(mIsBuffer);
         actualSurfaceFrameStartEvent->set_jank_severity_type(toProto(mJankSeverityTypeLegacy));
+        if (FlagManager::getInstance().jank_classification_v2()) {
+            actualSurfaceFrameStartEvent->set_present_delay_millis(mPresentDelay / 1e6f);
+            actualSurfaceFrameStartEvent->set_jank_type_experimental(
+                    jankTypeBitmaskToProto(mJankTypeExperimental));
+            actualSurfaceFrameStartEvent->set_jank_severity_score(mJankSeverityScore);
+            actualSurfaceFrameStartEvent->set_vsync_resynced_jitter_millis(mVsyncResyncedJitter /
+                                                                           1e6f);
+        }
     });
 
     if (traced) {
@@ -1135,7 +1317,7 @@ void FrameTimeline::DisplayFrame::setGpuFence(const std::shared_ptr<FenceTime>& 
     mGpuFence = gpuFence;
 }
 
-void FrameTimeline::DisplayFrame::classifyJankLegacy(nsecs_t presentDelay, nsecs_t deltaToVsync,
+void FrameTimeline::DisplayFrame::classifyJankLegacy(nsecs_t presentDelay,
                                                      nsecs_t previousPresentTime) {
     nsecs_t presentThreshold = FlagManager::getInstance().increase_missed_frame_jank_threshold()
             ? mJankClassificationThresholds.presentThresholdExtended
@@ -1158,8 +1340,7 @@ void FrameTimeline::DisplayFrame::classifyJankLegacy(nsecs_t presentDelay, nsecs
         if (mFramePresentMetadataLegacy == FramePresentMetadata::EarlyPresent) {
             if (mFrameReadyMetadata == FrameReadyMetadata::OnTimeFinish) {
                 // Finish on time, Present early
-                if (deltaToVsync < presentThreshold ||
-                    deltaToVsync >= (mRefreshRate.getPeriodNsecs() - presentThreshold)) {
+                if (delayMatchVsyncCadence(presentDelay, mRefreshRate, presentThreshold)) {
                     // Delta is a factor of vsync if its within the presentTheshold on either side
                     // of the vsyncPeriod. Example: 0-2ms and 9-11ms are both within the threshold
                     // of the vsyncPeriod if the threshold was 2ms and the vsyncPeriod was 11ms.
@@ -1186,8 +1367,7 @@ void FrameTimeline::DisplayFrame::classifyJankLegacy(nsecs_t presentDelay, nsecs
             if (mFrameReadyMetadata == FrameReadyMetadata::OnTimeFinish &&
                 !(mJankTypeLegacy & JankType::SurfaceFlingerStuffing)) {
                 // Finish on time, Present late
-                if (deltaToVsync < presentThreshold ||
-                    deltaToVsync >= (mRefreshRate.getPeriodNsecs() - presentThreshold)) {
+                if (delayMatchVsyncCadence(presentDelay, mRefreshRate, presentThreshold)) {
                     // Delta is a factor of vsync if its within the presentTheshold on either side
                     // of the vsyncPeriod. Example: 0-2ms and 9-11ms are both within the threshold
                     // of the vsyncPeriod if the threshold was 2ms and the vsyncPeriod was 11ms.
@@ -1220,8 +1400,10 @@ void FrameTimeline::DisplayFrame::classifyJankLegacy(nsecs_t presentDelay, nsecs
     }
 }
 
-void FrameTimeline::DisplayFrame::classifyJank(nsecs_t& deadlineDelta, nsecs_t& deltaToVsync,
-                                               nsecs_t previousPresentTime) {
+void FrameTimeline::DisplayFrame::classifyJank(nsecs_t& deadlineDelta,
+                                               nsecs_t& displayPresentJitter,
+                                               nsecs_t previousPredictedPresentTime,
+                                               nsecs_t previousActualPresentTime) {
     const bool presentTimeValid =
             mSurfaceFlingerActuals.presentTime >= mSurfaceFlingerActuals.startTime;
     if (mPredictionState == PredictionState::Expired || !presentTimeValid) {
@@ -1230,12 +1412,13 @@ void FrameTimeline::DisplayFrame::classifyJank(nsecs_t& deadlineDelta, nsecs_t& 
         mJankTypeLegacy = JankType::Unknown;
         mJankSeverityTypeLegacy = JankSeverityType::Unknown;
         deadlineDelta = 0;
-        deltaToVsync = 0;
+        displayPresentJitter = 0;
         if (!presentTimeValid) {
             mSurfaceFlingerActuals.presentTime = mSurfaceFlingerActuals.endTime;
             mJankTypeLegacy |= JankType::DisplayHAL;
         }
 
+        mJankTypeExperimental = mJankTypeLegacy;
         return;
     }
 
@@ -1259,9 +1442,7 @@ void FrameTimeline::DisplayFrame::classifyJank(nsecs_t& deadlineDelta, nsecs_t& 
 
     // How far off was the presentDelay when compared to the vsyncPeriod. Used in checking if there
     // was a prediction error or not.
-    deltaToVsync = mRefreshRate.getPeriodNsecs() > 0
-            ? std::abs(presentDelay) % mRefreshRate.getPeriodNsecs()
-            : 0;
+    displayPresentJitter = calculateDisplayPresentJitter(presentDelay, mRefreshRate);
 
     if (std::abs(mSurfaceFlingerActuals.startTime - mSurfaceFlingerPredictions.startTime) >
         mJankClassificationThresholds.startThreshold) {
@@ -1271,18 +1452,127 @@ void FrameTimeline::DisplayFrame::classifyJank(nsecs_t& deadlineDelta, nsecs_t& 
                 : FrameStartMetadata::EarlyStart;
     }
 
-    classifyJankLegacy(presentDelay, deltaToVsync, previousPresentTime);
+    classifyJankLegacy(presentDelay, previousActualPresentTime);
+
+    if (!FlagManager::getInstance().jank_classification_v2()) {
+        mJankTypeExperimental = mJankTypeLegacy;
+        mFramePresentMetadataExperimental = mFramePresentMetadataLegacy;
+        return;
+    }
+
+    mPresentDelay = presentDelay;
+
+    nsecs_t presentThreshold = FlagManager::getInstance().increase_missed_frame_jank_threshold()
+            ? mJankClassificationThresholds.presentThresholdExtended
+            : mJankClassificationThresholds.presentThresholdLegacy;
+
+    if (std::abs(presentDelay) <= presentThreshold) {
+        mFramePresentMetadataExperimental = FramePresentMetadata::OnTimePresent;
+    } else {
+        const nsecs_t actualPresentDelta =
+                mSurfaceFlingerActuals.presentTime - previousActualPresentTime;
+        const nsecs_t expectedPresentDelta =
+                mSurfaceFlingerPredictions.presentTime - previousPredictedPresentTime;
+        const nsecs_t presentationConsistencyDelay = actualPresentDelta - expectedPresentDelta;
+        const float deltaFramesRatio = expectedPresentDelta == 0
+                ? 0
+                : abs(static_cast<float>(presentationConsistencyDelay) /
+                      static_cast<float>(expectedPresentDelta));
+        const bool smoothAnimation =
+                expectedPresentDelta < kThresholdFpsForAnimation.getPeriodNsecs() &&
+                deltaFramesRatio <= kDeltaFramesRatioThreshold;
+        if (smoothAnimation) {
+            mJankSeverityScore = deltaFramesRatio;
+            mFramePresentMetadataExperimental = FramePresentMetadata::OnTimePresent;
+        } else {
+            mJankSeverityScore =
+                    static_cast<float>(presentDelay) / static_cast<float>(expectedPresentDelta);
+            if (mJankSeverityScore > kDeltaFramesRatioThreshold) {
+                mFramePresentMetadataExperimental = (presentationConsistencyDelay > 0)
+                        ? FramePresentMetadata::LatePresent
+                        : FramePresentMetadata::EarlyPresent;
+            } else {
+                // frame is delayed, it doesn't match the frame pacing but it also pretty far from
+                // the previous frame. In that case, mark it as non animation.
+                mFramePresentMetadataExperimental = FramePresentMetadata::UnknownPresent;
+            }
+        }
+    }
+
+    if (mFramePresentMetadataExperimental == FramePresentMetadata::OnTimePresent) {
+        // Frames presented on time are not janky, but might be buffer stuffed.
+        if (presentDelay <= presentThreshold) {
+            mJankTypeExperimental = JankType::None;
+        } else {
+            mJankTypeExperimental = JankType::SurfaceFlingerStuffing;
+        }
+    } else if (mFramePresentMetadataExperimental == FramePresentMetadata::EarlyPresent) {
+        if (mFrameReadyMetadata == FrameReadyMetadata::OnTimeFinish) {
+            // Finish on time, Present early
+            if (delayMatchVsyncCadence(presentDelay, mRefreshRate, presentThreshold)) {
+                // Delta is a factor of vsync if its within the presentTheshold on either side
+                // of the vsyncPeriod. Example: 0-2ms and 9-11ms are both within the threshold
+                // of the vsyncPeriod if the threshold was 2ms and the vsyncPeriod was 11ms.
+                mJankTypeExperimental = JankType::SurfaceFlingerScheduling;
+            } else {
+                // Delta is not a factor of vsync,
+                mJankTypeExperimental = JankType::PredictionError;
+            }
+        } else if (mFrameReadyMetadata == FrameReadyMetadata::LateFinish) {
+            // Finish late, Present early
+            mJankTypeExperimental = JankType::SurfaceFlingerScheduling;
+        } else {
+            // Finish time unknown
+            mJankTypeExperimental = JankType::Unknown;
+        }
+    } else if (mFramePresentMetadataExperimental == FramePresentMetadata::LatePresent) {
+        if (mFrameReadyMetadata == FrameReadyMetadata::OnTimeFinish &&
+            !(mJankTypeExperimental & JankType::SurfaceFlingerStuffing)) {
+            // Finish on time, Present late
+            if (delayMatchVsyncCadence(presentDelay, mRefreshRate, presentThreshold)) {
+                // Delta is a factor of vsync if its within the presentTheshold on either side
+                // of the vsyncPeriod. Example: 0-2ms and 9-11ms are both within the threshold
+                // of the vsyncPeriod if the threshold was 2ms and the vsyncPeriod was 11ms.
+                mJankTypeExperimental = JankType::DisplayHAL;
+            } else {
+                // Delta is not a factor of vsync
+                mJankTypeExperimental = JankType::PredictionError;
+            }
+        } else if (mFrameReadyMetadata == FrameReadyMetadata::LateFinish) {
+            if (!(mJankTypeExperimental & JankType::SurfaceFlingerStuffing) ||
+                mSurfaceFlingerActuals.presentTime - previousActualPresentTime >
+                        mRefreshRate.getPeriodNsecs() + presentThreshold) {
+                // Classify CPU vs GPU if SF wasn't stuffed or if SF was stuffed but this frame
+                // was presented more than a vsync late.
+                if (mGpuFence != FenceTime::NO_FENCE) {
+                    // If SF was in GPU composition, classify it as GPU deadline missed.
+                    mJankTypeExperimental = JankType::SurfaceFlingerGpuDeadlineMissed;
+                } else {
+                    mJankTypeExperimental = JankType::SurfaceFlingerCpuDeadlineMissed;
+                }
+            }
+        } else {
+            // Finish time unknown
+            mJankTypeExperimental = JankType::Unknown;
+        }
+    } else {
+        // present time unknown, mark the first as none animating
+        mJankTypeExperimental = JankType::NonAnimating;
+    }
 }
 
-void FrameTimeline::DisplayFrame::onPresent(nsecs_t signalTime, nsecs_t previousPresentTime) {
+void FrameTimeline::DisplayFrame::onPresent(nsecs_t signalTime,
+                                            nsecs_t previousPredictedPresentTime,
+                                            nsecs_t previousActualPresentTime) {
     mSurfaceFlingerActuals.presentTime = signalTime;
     nsecs_t deadlineDelta = 0;
-    nsecs_t deltaToVsync = 0;
-    classifyJank(deadlineDelta, deltaToVsync, previousPresentTime);
+    nsecs_t displayPresentJitter = 0;
+    classifyJank(deadlineDelta, displayPresentJitter, previousPredictedPresentTime,
+                 previousActualPresentTime);
 
     for (auto& surfaceFrame : mSurfaceFrames) {
-        surfaceFrame->onPresent(signalTime, mJankTypeLegacy, mRefreshRate, mRenderRate,
-                                deadlineDelta, deltaToVsync);
+        surfaceFrame->onPresent(signalTime, mJankTypeLegacy, mJankTypeExperimental, mRefreshRate,
+                                mRenderRate, deadlineDelta, displayPresentJitter);
     }
 }
 
@@ -1392,6 +1682,12 @@ void FrameTimeline::DisplayFrame::addSkippedFrame(pid_t surfaceFlingerPid, nsecs
             actualDisplayFrameStartEvent->set_present_type(FrameTimelineEvent::PRESENT_DROPPED);
             actualDisplayFrameStartEvent->set_jank_type(jankTypeBitmaskToProto(JankType::Dropped));
             actualDisplayFrameStartEvent->set_jank_severity_type(toProto(JankSeverityType::None));
+            if (FlagManager::getInstance().jank_classification_v2()) {
+                actualDisplayFrameStartEvent->set_jank_type_experimental(
+                        jankTypeBitmaskToProto(JankType::Dropped));
+                actualDisplayFrameStartEvent->set_present_type_experimental(
+                        FrameTimelineEvent::PRESENT_DROPPED);
+            }
         });
 
         if (traced) {
@@ -1443,6 +1739,14 @@ void FrameTimeline::DisplayFrame::traceActuals(pid_t surfaceFlingerPid, nsecs_t 
         actualDisplayFrameStartEvent->set_jank_type(jankTypeBitmaskToProto(mJankTypeLegacy));
         actualDisplayFrameStartEvent->set_prediction_type(toProto(mPredictionState));
         actualDisplayFrameStartEvent->set_jank_severity_type(toProto(mJankSeverityTypeLegacy));
+        if (FlagManager::getInstance().jank_classification_v2()) {
+            actualDisplayFrameStartEvent->set_present_type_experimental(
+                    toProto(mFramePresentMetadataExperimental));
+            actualDisplayFrameStartEvent->set_jank_type_experimental(
+                    jankTypeBitmaskToProto(mJankTypeExperimental));
+            actualDisplayFrameStartEvent->set_present_delay_millis(mPresentDelay / 1e6f);
+            actualDisplayFrameStartEvent->set_jank_severity_score(mJankSeverityScore);
+        }
     });
 
     if (traced) {
@@ -1604,7 +1908,8 @@ void FrameTimeline::flushPendingPresentFences() {
         const auto& pendingPresentFence = *mPendingPresentFences.begin();
         const nsecs_t signalTime = Fence::SIGNAL_TIME_INVALID;
         auto& displayFrame = pendingPresentFence.second;
-        displayFrame->onPresent(signalTime, mPreviousActualPresentTime);
+        displayFrame->onPresent(signalTime, mPreviousPredictionPresentTime,
+                                mPreviousActualPresentTime);
         mPreviousPredictionPresentTime =
                 displayFrame->trace(mSurfaceFlingerPid, monoBootOffset,
                                     mPreviousPredictionPresentTime, mFilterFramesBeforeTraceStarts);
@@ -1622,7 +1927,8 @@ void FrameTimeline::flushPendingPresentFences() {
         }
 
         auto& displayFrame = pendingPresentFence.second;
-        displayFrame->onPresent(signalTime, mPreviousActualPresentTime);
+        displayFrame->onPresent(signalTime, mPreviousPredictionPresentTime,
+                                mPreviousActualPresentTime);
 
         mPreviousPredictionPresentTime =
                 displayFrame->trace(mSurfaceFlingerPid, monoBootOffset,
