@@ -646,8 +646,7 @@ sp<IBinder> SurfaceFlinger::createVirtualDisplay(
 
     Mutex::Autolock _l(mStateLock);
     // Display ID is assigned when virtual display is allocated by HWC.
-    DisplayDeviceState state;
-    state.physicalOrVirtual.emplace<DisplayDeviceState::Virtual>(ownerUid);
+    DisplayDeviceState state = DisplayDeviceState::createVirtual(ownerUid);
     state.isSecure = isSecure;
     // Set display as protected when marked as secure to ensure no behavior change
     // TODO (b/314820005): separate as a different arg when creating the display.
@@ -4146,8 +4145,7 @@ std::optional<DisplayModeId> SurfaceFlinger::processHotplugConnect(
                                   connectionType, std::move(displayModes), std::move(colorModes),
                                   std::move(info.deviceProductInfo));
 
-    DisplayDeviceState state;
-    state.physicalOrVirtual.emplace<DisplayDeviceState::Physical>(displayId, hwcDisplayId,
+    DisplayDeviceState state = DisplayDeviceState::createPhysical(displayId, hwcDisplayId,
                                                                   info.port, std::move(activeMode));
     // TODO: b/349703362 - Remove first condition when HDCP aidl APIs are enforced
     state.isSecure = !mDisplayModeController.supportsHdcp() ||
@@ -4292,13 +4290,14 @@ void SurfaceFlinger::processDisplayAdded(const wp<IBinder>& displayToken,
     if (state.isPhysical()) {
         resolution = state.getPhysical().activeMode->getResolution();
         pixelFormat = static_cast<ui::PixelFormat>(PIXEL_FORMAT_RGBA_8888);
-    } else if (state.surface != nullptr) {
-        int status = state.surface->query(NATIVE_WINDOW_WIDTH, &resolution.width);
+    } else if (state.isVirtual() && state.getVirtual().surface != nullptr) {
+        const sp<Surface>& surface = state.getVirtual().surface;
+        int status = surface->query(NATIVE_WINDOW_WIDTH, &resolution.width);
         ALOGE_IF(status != NO_ERROR, "Unable to query width (%d)", status);
-        status = state.surface->query(NATIVE_WINDOW_HEIGHT, &resolution.height);
+        status = surface->query(NATIVE_WINDOW_HEIGHT, &resolution.height);
         ALOGE_IF(status != NO_ERROR, "Unable to query height (%d)", status);
         int format;
-        status = state.surface->query(NATIVE_WINDOW_FORMAT, &format);
+        status = surface->query(NATIVE_WINDOW_FORMAT, &format);
         ALOGE_IF(status != NO_ERROR, "Unable to query format (%d)", status);
         pixelFormat = static_cast<ui::PixelFormat>(format);
     } else {
@@ -4339,21 +4338,18 @@ void SurfaceFlinger::processDisplayAdded(const wp<IBinder>& displayToken,
             auto surface =
                     sp<VirtualDisplaySurface>::make(getHwComposer(), *virtualDisplayIdVariantOpt,
                                                     state.displayName, virtualState.ownerUid,
-                                                    state.surface);
+                                                    virtualState.surface);
             displaySurface = surface;
             compositionSurface = surface->getCompositionSurface();
         } else {
-            auto surface = sp<LegacyVirtualDisplaySurface>::make(getHwComposer(),
-                                                                 *virtualDisplayIdVariantOpt,
-                                                                 state.surface, state.displayName);
+            auto surface =
+                    sp<LegacyVirtualDisplaySurface>::make(getHwComposer(),
+                                                          *virtualDisplayIdVariantOpt,
+                                                          virtualState.surface, state.displayName);
             displaySurface = surface;
             compositionSurface = sp<Surface>::make(std::move(surface));
         }
     } else {
-        ALOGE_IF(state.surface != nullptr,
-                 "adding a supported display, but rendering "
-                 "surface is provided (%p), ignoring it",
-                 state.surface.get());
         const auto& physical = state.getPhysical();
         const auto frameBufferSurface =
                 sp<FramebufferSurface>::make(getHwComposer(), physical.id,
@@ -4455,9 +4451,15 @@ void SurfaceFlinger::processDisplayRemoved(const wp<IBinder>& displayToken) {
 void SurfaceFlinger::processDisplayChanged(const wp<IBinder>& displayToken,
                                            const DisplayDeviceState& currentState,
                                            const DisplayDeviceState& drawingState) {
+    const bool didVirtualDisplaySurfaceChange = [&]() {
+        if (!currentState.isVirtual()) {
+            return false;
+        }
+        return !Surface::areSurfacesEquivalent(currentState.getVirtual().surface,
+                                               drawingState.getVirtual().surface);
+    }();
     // Recreate the DisplayDevice if the surface or sequence ID changed.
-    if (!Surface::areSurfacesEquivalent(currentState.surface, drawingState.surface) ||
-        currentState.sequenceId != drawingState.sequenceId) {
+    if (didVirtualDisplaySurfaceChange || currentState.sequenceId != drawingState.sequenceId) {
         if (const auto display = getDisplayDeviceLocked(displayToken)) {
             display->disconnect();
             if (const auto virtualDisplayIdVariant = display->getVirtualDisplayIdVariant()) {
@@ -5614,10 +5616,10 @@ uint32_t SurfaceFlinger::setDisplayStateLocked(const DisplayState& s) {
     DisplayDeviceState& state = *stateOpt;
 
     const uint32_t what = s.what;
-    if (what & DisplayState::eSurfaceChanged) {
+    if (state.isVirtual() && (what & DisplayState::eSurfaceChanged)) {
         sp<Surface> sSurface = s.surface.toSurface();
-        if (!Surface::areSurfacesEquivalent(state.surface, sSurface)) {
-            state.surface = sSurface;
+        if (!Surface::areSurfacesEquivalent(state.getVirtual().surface, sSurface)) {
+            state.getVirtual().surface = sSurface;
             flags |= eDisplayTransactionNeeded;
         }
     }
