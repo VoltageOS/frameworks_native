@@ -243,6 +243,28 @@ public:
     nsecs_t getDropTime() const;
     bool getIsBuffer() const;
 
+    void setPreviousSurfaceFrame(const std::weak_ptr<SurfaceFrame>&);
+
+    struct PreviousFrameData {
+        enum class Status {
+            Valid,
+            OutOfOrder,
+            Unknown,
+        };
+        Status status;
+        TimelineItem predictions;
+        TimelineItem actuals;
+
+        static PreviousFrameData unknown() { return PreviousFrameData{Status::Unknown, {}, {}}; }
+        static PreviousFrameData outOfOrder() {
+            return PreviousFrameData{Status::OutOfOrder, {}, {}};
+        }
+        static PreviousFrameData create(TimelineItem predictions, TimelineItem actuals) {
+            return PreviousFrameData{Status::Valid, predictions, actuals};
+        }
+    };
+    PreviousFrameData previousFrameDataLocked() const REQUIRES(mMutex);
+
     // For prediction expired frames, this delta is subtracted from the actual end time to get a
     // start time decent enough to see in traces.
     // TODO(b/172587309): Remove this when we have actual start times.
@@ -250,6 +272,9 @@ public:
             std::chrono::duration_cast<std::chrono::nanoseconds>(2ms).count();
 
 private:
+    // Friend class for testing
+    friend class android::scheduler::FrameTimelineTest;
+
     void tracePredictions(int64_t displayFrameToken, nsecs_t monoBootOffset,
                           bool filterFramesBeforeTraceStarts) const;
     void traceActuals(int64_t displayFrameToken, nsecs_t monoBootOffset,
@@ -302,6 +327,8 @@ private:
     bool mIsBuffer;
     // GameMode from the layer. Used in metrics.
     GameMode mGameMode = GameMode::Unsupported;
+
+    std::weak_ptr<SurfaceFrame> mPreviousSurfaceFrame GUARDED_BY(mMutex);
 };
 
 /*
@@ -564,6 +591,9 @@ private:
     // display frame, this is a good starting size for the vector so that we can avoid the
     // internal vector resizing that happens with push_back.
     static constexpr uint32_t kNumSurfaceFramesInitial = 10;
+
+    std::unordered_map<int32_t /*layerId*/, std::weak_ptr<SurfaceFrame>> mPreviousSurfaceFrame
+            GUARDED_BY(mMutex);
 };
 
 } // namespace impl

@@ -412,6 +412,26 @@ void SurfaceFrame::setGpuComposition() {
     mGpuComposition = true;
 }
 
+void SurfaceFrame::setPreviousSurfaceFrame(const std::weak_ptr<SurfaceFrame>& prev) {
+    std::scoped_lock lock(mMutex);
+    mPreviousSurfaceFrame = prev;
+}
+
+SurfaceFrame::PreviousFrameData SurfaceFrame::previousFrameDataLocked() const {
+    const auto prev = mPreviousSurfaceFrame.lock();
+    if (!prev || prev->mPredictionState != PredictionState::Valid) {
+        return PreviousFrameData::unknown();
+    }
+
+    if (prev->mToken > mToken) {
+        // this can happen when a RenderThread animation is running and the UI thread is late.
+        return PreviousFrameData::outOfOrder();
+    }
+
+    std::scoped_lock lock(prev->mMutex);
+    return PreviousFrameData::create(prev->mPredictions, prev->mActuals);
+}
+
 // TODO(b/316171339): migrate from perfetto side
 bool SurfaceFrame::isSelfJanky() const {
     int32_t jankType = getJankType().value_or(JankType::None);
@@ -1012,6 +1032,16 @@ FrameTimeline::DisplayFrame::DisplayFrame(std::shared_ptr<TimeStats> timeStats,
 void FrameTimeline::addSurfaceFrame(std::shared_ptr<SurfaceFrame> surfaceFrame) {
     SFTRACE_CALL();
     std::scoped_lock lock(mMutex);
+
+    if (FlagManager::getInstance().jank_classification_v2()) {
+        if (const auto it = mPreviousSurfaceFrame.find(surfaceFrame->getLayerId());
+            it != mPreviousSurfaceFrame.end()) {
+            surfaceFrame->setPreviousSurfaceFrame(it->second);
+        }
+
+        mPreviousSurfaceFrame[surfaceFrame->getLayerId()] = surfaceFrame;
+    }
+
     mCurrentDisplayFrame->addSurfaceFrame(surfaceFrame);
 }
 
