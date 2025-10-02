@@ -9199,9 +9199,6 @@ std::vector<std::pair<Layer*, LayerFE*>> SurfaceFlinger::addLayerSnapshotsToComp
 std::vector<std::pair<Layer*, LayerFE*>> SurfaceFlinger::copyMergedSnapshots(
         compositionengine::CompositionRefreshArgs& refreshArgs) {
     std::vector<std::pair<Layer*, LayerFE*>> layers;
-    nsecs_t currentTime = systemTime();
-    const bool needsMetadata = mCompositionEngine->getFeatureFlags().test(
-            compositionengine::Feature::kSnapshotLayerMetadata);
     mLayerSnapshotBuilder.forEachMergedSnapshot(
             [&](const frontend::LayerSnapshot& snapshot) FTL_FAKE_GUARD(kMainThreadContext) {
                 if (!snapshot.hasSomethingToDraw()) {
