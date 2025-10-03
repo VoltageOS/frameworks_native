@@ -879,7 +879,7 @@ public:
                                                          mHwcDisplayType);
             display->mutableIsConnected() = true;
 
-            display->setPowerMode(mPowerMode);
+            display->setPowerMode(mPowerMode).get();
 
             const auto halDisplayId = asHalDisplayId(mDisplayIdVariant);
             ASSERT_TRUE(halDisplayId);
