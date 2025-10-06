@@ -284,11 +284,8 @@ bool renderCommandBufferToCanvas(const std::shared_ptr<RenderCommandBufferConsum
     if constexpr (DUMP_OPS) {
         ALOGE("Rendering command buffer");
     }
-    while (true) {
-      IPCRenderBufferOp* op = static_cast<IPCRenderBufferOp*>(buffer->consume());
-        if (op == nullptr) {
-            break;
-        }
+
+    for (IPCRenderBufferOp* op = buffer->getOps(); op; op = op->next) {
         if (!foundFirstDrawingOp && isDrawingOp(op->type)) {
             foundFirstDrawingOp = true;
             if (op->type == TYPE_DRAWPAINT) {
@@ -309,7 +306,6 @@ bool renderCommandBufferToCanvas(const std::shared_ptr<RenderCommandBufferConsum
         }
         renderOpToCanvas(consumer, op, canvas, renderProxyCallback);
     }
-    buffer->resetConsumeOffset();
     if constexpr (DUMP_OPS) {
         ALOGE("Done rendering command buffer");
     }
@@ -323,11 +319,8 @@ void resetRenderCommandBufferForReplay(
         ALOGE("Failed to acquire RenderCommandBuffer for replay");
         return;
     }
-    while (true) {
-      IPCRenderBufferOp* op = static_cast<IPCRenderBufferOp*>(buffer->consume());
-        if (op == nullptr) {
-            break;
-        }
+
+    for (IPCRenderBufferOp* op = buffer->getOps(); op; op = op->next) {
         if (op->type == TYPE_DRAWPATH) {
             DrawPathOp* co = (DrawPathOp*)op;
             co->resetForReplay();
@@ -336,7 +329,6 @@ void resetRenderCommandBufferForReplay(
             co->resetForReplay();
         }
     }
-    buffer->resetConsumeOffset();
 }
 
 std::string shmemPaintToString(const ShmemPaint& paint) {

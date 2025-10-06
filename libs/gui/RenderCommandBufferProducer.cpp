@@ -69,7 +69,7 @@ int RenderCommandBufferProducer::getFd() {
 void RenderCommandBufferProducer::startRecording() {
     LOG_ALWAYS_FATAL_IF(mCurrentBuffer != nullptr, "Unbalanced calls to start/finish recording");
     mCurrentBuffer = mCommandBuffer->producerAcquire();
-    mCurrentBuffer->resetProduceOffset();
+    mCurrentBuffer->reset();
 }
 void RenderCommandBufferProducer::finishRecording() {
     LOG_ALWAYS_FATAL_IF(mCurrentBuffer == nullptr, "Unbalanced calls to start/finish recording");

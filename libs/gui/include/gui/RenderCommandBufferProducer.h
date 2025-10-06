@@ -33,13 +33,12 @@ public:
     RenderCommandBuffer* acquire() {
         LOG_ALWAYS_FATAL_IF(mCurrentBuffer != nullptr, "Already acquired");
         mCurrentBuffer = mCommandBuffer->producerAcquire();
-        mCurrentBuffer->resetProduceOffset();
+        mCurrentBuffer->reset();
         return mCurrentBuffer;
     }
     void release() {
         LOG_ALWAYS_FATAL_IF(mCurrentBuffer == nullptr, "Already released");
 
-        mCurrentBuffer->resetConsumeOffset();
         mCurrentBuffer = nullptr;
         mCommandBuffer->producerRelease();
     }

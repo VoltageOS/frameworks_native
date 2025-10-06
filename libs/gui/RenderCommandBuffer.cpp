@@ -20,6 +20,25 @@
 
 namespace android {
 
+void RenderCommandBuffer::pushOp(const IPCRenderBufferOp* op) {
+    assert(reinterpret_cast<const uint8_t*>(op) > mBytes &&
+           reinterpret_cast<const uint8_t*>(op) < mBytes + sizeof(mBytes));
+
+    if (mTail) {
+        mTail->next = op;
+    }
+    if (!mHead) {
+        mHead = op;
+    }
+    mTail = op;
+}
+
+void RenderCommandBuffer::reset() {
+    mTail = nullptr;
+    mHead = nullptr;
+    mUsed = 0;
+}
+
 bool RenderCommandBuffer::dumpToFile(const char* filename) const {
     std::ofstream file(filename, std::ios::binary);
     if (!file.is_open()) {

@@ -23,7 +23,10 @@
 
 #include <android/ipcrenderbuffer/RenderBufferShmemPaint.h>
 
+struct SkRect;
+class SkM44;
 namespace android {
+struct ShmemPaint;
 struct IPCRenderBufferOp;
 std::string rectToString(const SkRect& rect);
 std::string skmatrixToString(const SkM44& matrix);

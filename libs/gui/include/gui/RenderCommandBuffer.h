@@ -18,66 +18,44 @@
 
 #include <log/log.h>
 #include <string>
+#include "RPointer.h"
 
-#define RENDER_COMMAND_BUFFER_DEFAULT_SIZE 1024 * 1024
+constexpr int RENDER_COMMAND_BUFFER_DEFAULT_SIZE = 1024 * 1024;
 
-// #define RENDER_COMMAND_BUFFER_VERBOSE 1
+constexpr bool RENDER_COMMAND_BUFFER_VERBOSE = false;
 
 namespace android {
 
 struct IPCRenderBufferOp {
+    RPointer<IPCRenderBufferOp> next;
     uint32_t type;
-    size_t size;
 };
 
 class RenderCommandBuffer {
 public:
-    RenderCommandBuffer() {
-        memset(mBytes, 0, sizeof(mBytes));
-        mUsed = 0;
-        mConsumeOffset = 0;
-    }
+    RenderCommandBuffer() { memset(mBytes, 0, sizeof(mBytes)); }
     ~RenderCommandBuffer() {}
 
-    bool record(const void* bytes, size_t size) {
-        if (mUsed + size > RENDER_COMMAND_BUFFER_DEFAULT_SIZE) {
-            ALOGE("RenderCommandBuffer overflow");
-            return false;
-        }
-        ALOGE("Recording %d bytes", (int)size);
-        memcpy(mBytes + mUsed, bytes, size);
-        mUsed += size;
-        return true;
-    }
+    IPCRenderBufferOp* getOps() { return mHead.get(); }
 
-    void* reserve(size_t size) {
-        if (mUsed + size > RENDER_COMMAND_BUFFER_DEFAULT_SIZE) {
-            ALOGE("RenderCommandBuffer overflow");
+    // op must be allocated by this RenderCommandBuffer
+    void pushOp(const IPCRenderBufferOp* op);
+
+    void reset();
+
+    template <typename T>
+    T* alloc(size_t count = 1) {
+        size_t aligned = roundUp(mUsed, alignof(T));
+        size_t allocationSize = count * sizeof(T);
+        if (aligned + allocationSize > sizeof(mBytes)) {
             return nullptr;
         }
-        void* addr = (char*)&(mBytes[0]) + mUsed;
-        mUsed += size;
-        return addr;
+        uint8_t* ptr = mBytes + aligned;
+        // TODO: do we need constructors for anything?
+        memset(ptr, 0, allocationSize);
+        mUsed = aligned + allocationSize;
+        return reinterpret_cast<T*>(ptr);
     }
-
-    IPCRenderBufferOp* consume() {
-        if (mConsumeOffset >= mUsed) {
-#ifdef RENDER_COMMAND_BUFFER_VERBOSE
-            ALOGE("RenderCommandBuffer::consume: No more ops to consume mConsumeOffset %d mUsed %d",
-                  (int)mConsumeOffset, (int)mUsed);
-#endif
-            return nullptr;
-        }
-        IPCRenderBufferOp* op =
-                reinterpret_cast<IPCRenderBufferOp*>(mBytes + mConsumeOffset);
-        mConsumeOffset += op->size;
-        return op;
-    }
-
-    void resetConsumeOffset() { mConsumeOffset = 0; }
-    void resetProduceOffset() { mUsed = 0; }
-
-    uint8_t* getBytes() { return mBytes; }
 
     bool dumpToFile(const char* filename) const;
     static RenderCommandBuffer* loadFromFile(const char* filename);
@@ -93,13 +71,30 @@ public:
     }
 
 private:
+    static size_t roundUp(size_t n, size_t m) { return ((n + m - 1) / m) * m; }
     uint8_t mBytes[RENDER_COMMAND_BUFFER_DEFAULT_SIZE];
     size_t mUsed = 0;
-    size_t mConsumeOffset = 0;
+    RPointer<IPCRenderBufferOp> mTail;
+    RPointer<IPCRenderBufferOp> mHead;
     // These are somewhat awkward, and used to achieve compatibility with the buffer based geometry
     // calculations. Effectively this is the size that the buffer would have been in the normal
     // rendering mode.
     int mWidth = 0;
     int mHeight = 0;
 };
+
+template <typename T>
+inline bool SetRSpan(RSpan<T>& span, RenderCommandBuffer* commandBuffer, const T* data,
+                     size_t count) {
+    span.data = commandBuffer->alloc<T>(count);
+    if (!span.data) {
+        return false;
+    }
+    span.size = count;
+    if (data) {
+        memcpy(span.data.get(), data, count * sizeof(T));
+    }
+    return true;
+}
+
 } // namespace android
