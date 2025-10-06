@@ -57,6 +57,7 @@ public:
     bool anchor_list() const;
     bool connected_displays_cursor() const;
     bool correct_virtual_display_power_state() const;
+    bool deprecate_vsync_sf_v2() const;
     bool disable_transparent_region_hint() const;
     bool filter_refresh_rates_within_config_group() const;
     bool frontend_caching_v0() const;
@@ -82,7 +83,6 @@ public:
     bool connected_display_hdr_v2() const;
     bool correct_dpi_with_display_size() const;
     bool deprecate_frame_tracker() const;
-    bool deprecate_vsync_sf() const;
     bool disable_synthetic_vsync_for_performance() const;
     bool display_command_modeset() const;
     bool enable_layer_command_batching() const;
