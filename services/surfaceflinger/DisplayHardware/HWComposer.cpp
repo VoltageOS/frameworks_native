@@ -1199,9 +1199,13 @@ std::optional<hal::HWDisplayId> HWComposer::fromPhysicalDisplayId(
 }
 
 bool HWComposer::shouldUseStableEdidIdsForHwcDisplay(hal::HWDisplayId hwcDisplayId) const {
+    static const bool kVendorApiLevelSupportsStableEdidIds =
+            base::GetIntProperty("ro.vendor.api_level", -1) >= 202604;
     const bool isExternalDisplay =
             getHwcDisplayConnectionType(hwcDisplayId) == ui::DisplayConnectionType::External;
-    return isExternalDisplay && FlagManager::getInstance().stable_edid_ids();
+
+    return isExternalDisplay && kVendorApiLevelSupportsStableEdidIds &&
+            FlagManager::getInstance().stable_edid_ids();
 }
 
 bool HWComposer::shouldIgnoreHotplugConnect(hal::HWDisplayId hwcDisplayId, uint8_t port,
