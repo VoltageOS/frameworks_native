@@ -64,6 +64,7 @@ public:
     bool graphite_renderengine_desktop_rollout() const;
     bool increase_missed_frame_jank_threshold() const;
     bool md_degrade_hdr() const;
+    bool mirror_uid_filtering() const;
     bool monitor_buffer_fences() const;
     bool offload_gpu_composition() const;
     bool re_check_fence() const;
