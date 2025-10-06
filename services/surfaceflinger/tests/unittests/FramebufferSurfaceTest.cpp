@@ -17,6 +17,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <gui/Surface.h>
+#include <ui/GraphicBuffer.h>
 
 #include "DisplayHardware/FramebufferSurface.h"
 #include "DisplayHardware/LegacyFramebufferSurface.h"
@@ -110,6 +111,49 @@ TEST_F(FramebufferSurfaceTest, TestTwoFrames) {
     EXPECT_NE(bufferA, bufferB);
     EXPECT_EQ(clientBufferA, bufferA);
     EXPECT_EQ(clientBufferB, bufferB);
+}
+
+TEST_F(FramebufferSurfaceTest, NoBufferNoHwcUpdate) {
+    sp<SurfaceListener> listener = sp<StubSurfaceListener>::make();
+    mRenderSurface->connect(NATIVE_WINDOW_API_CPU, listener);
+
+    // We don't expect any calls to HWC because no buffers are queued.
+    // mMockHwc is a strict mock, so any unexpected calls will fail.
+
+    mDisplaySurface->beginFrame(/*mustRecompose*/ true);
+    mDisplaySurface->prepareFrame(compositionengine::DisplaySurface::CompositionType::Gpu);
+    // No buffer is queued.
+    mDisplaySurface->advanceFrame(/*hdrSdrRatio*/ 1.0);
+    mDisplaySurface->onFrameCommitted();
+}
+
+TEST_F(FramebufferSurfaceTest, NoBuffersRenderedLeavesHwcUntouched) {
+    sp<SurfaceListener> listener = sp<StubSurfaceListener>::make();
+    mRenderSurface->connect(NATIVE_WINDOW_API_CPU, listener);
+
+    sp<GraphicBuffer> clientTargetBuffer;
+    // Expect one call to HWC for the first frame.
+    EXPECT_CALL(mMockHwc, setClientTarget(static_cast<HalDisplayId>(kDisplayId), _, _, _, _, _))
+            .WillOnce(DoAll(SaveArg<3>(&clientTargetBuffer), Return(OK)));
+
+    // First frame, with a buffer.
+    mDisplaySurface->beginFrame(/*mustRecompose*/ true);
+    mDisplaySurface->prepareFrame(compositionengine::DisplaySurface::CompositionType::Gpu);
+    sp<GraphicBuffer> buffer;
+    sp<Fence> fence;
+    ASSERT_EQ(OK, mRenderSurface->dequeueBuffer(&buffer, &fence));
+    ASSERT_EQ(OK, mRenderSurface->queueBuffer(buffer, fence));
+    mDisplaySurface->advanceFrame(/*hdrSdrRatio*/ 1.0);
+    mDisplaySurface->onFrameCommitted();
+
+    // Second frame, without a buffer.
+    mDisplaySurface->beginFrame(/*mustRecompose*/ true);
+    mDisplaySurface->prepareFrame(compositionengine::DisplaySurface::CompositionType::Gpu);
+    // No buffer is queued.
+    mDisplaySurface->advanceFrame(/*hdrSdrRatio*/ 1.0);
+    mDisplaySurface->onFrameCommitted();
+
+    EXPECT_EQ(clientTargetBuffer, buffer);
 }
 
 } // namespace android
