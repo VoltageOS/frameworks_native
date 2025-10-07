@@ -449,8 +449,11 @@ impl InputVerifier {
     pub fn dump(&self) -> String {
         format!(
             "Touching pointer IDs by device: {:?}\n\
+             Hovering pointer IDs by device: {:?}\n\
              Down times by device: {:?}\n",
-            self.touching_pointer_ids_by_device, self.down_time_by_device
+            self.touching_pointer_ids_by_device,
+            self.hovering_pointer_ids_by_device,
+            self.down_time_by_device
         )
     }
 
