@@ -126,6 +126,7 @@ void FlagManager::dump(std::string& result) const {
     DUMP_ACONFIG_FLAG(anchor_list);
     DUMP_ACONFIG_FLAG(connected_displays_cursor);
     DUMP_ACONFIG_FLAG(correct_virtual_display_power_state);
+    DUMP_ACONFIG_FLAG(deprecate_vsync_sf_v2);
     DUMP_ACONFIG_FLAG(disable_transparent_region_hint);
     DUMP_ACONFIG_FLAG(filter_refresh_rates_within_config_group);
     DUMP_ACONFIG_FLAG(frontend_caching_v0);
@@ -152,7 +153,6 @@ void FlagManager::dump(std::string& result) const {
     DUMP_ACONFIG_FLAG(connected_display_hdr_v2);
     DUMP_ACONFIG_FLAG(correct_dpi_with_display_size);
     DUMP_ACONFIG_FLAG(deprecate_frame_tracker);
-    DUMP_ACONFIG_FLAG(deprecate_vsync_sf);
     DUMP_ACONFIG_FLAG(disable_synthetic_vsync_for_performance);
     DUMP_ACONFIG_FLAG(display_command_modeset);
     DUMP_ACONFIG_FLAG(enable_layer_command_batching);
@@ -262,7 +262,6 @@ FLAG_MANAGER_ACONFIG_FLAG(cache_when_source_crop_layer_only_moved,
 FLAG_MANAGER_ACONFIG_FLAG(connected_display_hdr_v2, "debug.sf.connected_display_hdr_v2");
 FLAG_MANAGER_ACONFIG_FLAG(correct_dpi_with_display_size, "");
 FLAG_MANAGER_ACONFIG_FLAG(deprecate_frame_tracker, "");
-FLAG_MANAGER_ACONFIG_FLAG(deprecate_vsync_sf, "");
 FLAG_MANAGER_ACONFIG_FLAG(disable_synthetic_vsync_for_performance, "");
 FLAG_MANAGER_ACONFIG_FLAG(display_command_modeset, "debug.sf.display_command_modeset")
 FLAG_MANAGER_ACONFIG_FLAG(enable_layer_command_batching, "debug.sf.enable_layer_command_batching")
@@ -303,6 +302,7 @@ FLAG_MANAGER_ACONFIG_FLAG(window_blur_kawase2_fix_aliasing, "");
 FLAG_MANAGER_ACONFIG_FLAG(add_first_vsync_to_tracker, "")
 FLAG_MANAGER_ACONFIG_FLAG(adpf_gpu_sf, "")
 FLAG_MANAGER_ACONFIG_FLAG(anchor_list, "")
+FLAG_MANAGER_ACONFIG_FLAG(deprecate_vsync_sf_v2, "");
 FLAG_MANAGER_ACONFIG_FLAG(disable_transparent_region_hint,
                           "debug.sf.disable_transparent_region_hint");
 FLAG_MANAGER_ACONFIG_FLAG(filter_refresh_rates_within_config_group, "");

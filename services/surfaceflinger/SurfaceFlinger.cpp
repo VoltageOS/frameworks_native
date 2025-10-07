@@ -2426,7 +2426,7 @@ sp<IDisplayEventConnection> SurfaceFlinger::createDisplayEventConnection(
         gui::ISurfaceComposer::VsyncSource vsyncSource, EventRegistrationFlags eventRegistration,
         const sp<IBinder>& layerHandle) {
     const auto cycle = [&] {
-        if (FlagManager::getInstance().deprecate_vsync_sf()) {
+        if (FlagManager::getInstance().deprecate_vsync_sf_v2()) {
             ALOGW_IF(vsyncSource == gui::ISurfaceComposer::VsyncSource::eVsyncSourceSurfaceFlinger,
                      "requested unsupported config eVsyncSourceSurfaceFlinger");
             return scheduler::Cycle::Render;
