@@ -1850,6 +1850,13 @@ status_t SurfaceFlinger::getOverlaySupport(gui::OverlayProperties* outProperties
         std::transform(combination.pixelFormats.cbegin(), combination.pixelFormats.cend(),
                        std::back_inserter(pixelFormats),
                        [](const auto& val) { return static_cast<int32_t>(val); });
+        // Strip out fp16 support until we can standardize display support across vendors and we
+        // figure out a testing strategy. Note that when this is re-enabled we will need to guard
+        // this against vendor version so that upgrading devices with old vendors don't expose
+        // broken behavior.
+        std::erase_if(pixelFormats, [](const auto& val) {
+            return val == static_cast<int32_t>(PIXEL_FORMAT_RGBA_FP16);
+        });
         std::vector<int32_t> standards;
         standards.reserve(combination.standards.size());
         std::transform(combination.standards.cbegin(), combination.standards.cend(),
