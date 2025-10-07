@@ -127,32 +127,19 @@ status_t getBinderPidInfo(BinderDebugContext context, pid_t pid, BinderPidInfo* 
     return ret;
 }
 
-// Examples:
-// ref 6: desc 1 node 5 s 1 w 1
-// ref 6: desc 1 dead node 5 s 1 w 1
-// ref 701: desc 0 node 0 s 1 w 1  ref 1125: desc 1 node 1124 s 1 w 1  ref 1492: desc 2...
-static inline bool isRustBinderRef(const std::vector<std::string>& tokens) {
-    // Rust binder ref log entries have 10 tokens for live nodes and 11 for dead ones
-    // Multiple refs are printed as part of the same line
-    return tokens.size() == 10 || tokens.size() == 11 ||
-            (tokens.size() > 11 && (tokens[10] == "ref" || tokens[11] == "ref"));
-}
-
 // Examples of what we are looking at:
 // ref 52493: desc 910 node 52492 s 1 w 1 d 0000000000000000
 // node 29413: u00007803fc982e80 c000078042c982210 pri 0:139 hs 1 hw 1 ls 0 lw 0 is 2 iw 2 tr 1 proc 488 683
 status_t getBinderClientPids(BinderDebugContext context, pid_t pid, pid_t servicePid,
                              int32_t handle, std::vector<pid_t>* pids) {
     std::string contextStr = contextToString(context);
-    // TODO(b/444727766): Remove once rust binder output matches c binder output
-    bool rustBinder = false;
     int32_t node = -1;
     status_t ret = scanBinderContext(pid, contextStr, [&](const std::string& line) {
-        if (!base::StartsWith(line, "  ref") || rustBinder) return;
+        if (!base::StartsWith(line, "  ref ")) return;
 
         std::vector<std::string> splitString = base::Tokenize(line, " ");
 
-        if (splitString.size() == 12 || splitString.size() == 13) {
+        if (splitString.size() > 5) {
             int32_t desc;
             if (!::android::base::ParseInt(splitString[3].c_str(), &desc)) {
                 LOG(ERROR) << "Failed to parse desc int: " << splitString[3];
@@ -168,31 +155,22 @@ status_t getBinderClientPids(BinderDebugContext context, pid_t pid, pid_t servic
             }
             LOG(INFO) << "Parsed the node: " << node;
             return;
-        } else if (isRustBinderRef(splitString)) {
-            rustBinder = true;
-            return;
         }
 
         LOG(ERROR) << "Failed to parse binder_logs ref entry with size: " << splitString.size();
     });
 
     // Don't bother scanning for clients if node hasn't been parsed
-    if (ret != OK || rustBinder || node < 0) {
+    if (ret != OK || node < 0) {
         return ret;
     }
 
     ret = scanBinderContext(servicePid, contextStr, [&](const std::string& line) {
-        if (!base::StartsWith(line, "  node")) return;
+        if (!base::StartsWith(line, "  node ")) return;
 
         std::vector<std::string> splitString = base::Tokenize(line, " ");
         // Ignore lines for "node work" and nodes without a count
-        if (splitString[1] == "work" || splitString.size() == 20) {
-            return;
-        }
-        if (splitString.size() < 20) {
-            LOG(ERROR) << "Failed to parse binder_logs node entry. Expecting size greater than 19, "
-                          "but got: "
-                       << splitString.size();
+        if (splitString[1] == "work") {
             return;
         }
 
@@ -207,6 +185,7 @@ status_t getBinderClientPids(BinderDebugContext context, pid_t pid, pid_t servic
         if (node != matchedNode) {
             return;
         }
+
         bool pidsSection = false;
         for (const auto& token : splitString) {
             if (token == "proc") {
