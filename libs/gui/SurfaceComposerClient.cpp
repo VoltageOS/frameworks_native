@@ -2499,6 +2499,19 @@ SurfaceComposerClient::Transaction::clearTrustedPresentationCallback(const sp<Su
     return *this;
 }
 
+SurfaceComposerClient::Transaction& SurfaceComposerClient::Transaction::setRenderCommandBuffer(
+        const sp<SurfaceControl>& sc,
+        const std::shared_ptr<RenderCommandBufferProducer>& producer) {
+    layer_state_t* s = getLayerState(sc);
+    if (!s) {
+        mStatus = BAD_INDEX;
+        return *this;
+    }
+    s->what |= layer_state_t::eRenderCommandBufferChanged;
+    s->renderCommandBufferProducer = producer;
+    return *this;
+}
+
 // ---------------------------------------------------------------------------
 
 SurfaceComposerClient::SurfaceComposerClient() : mStatus(NO_INIT) {}

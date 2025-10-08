@@ -825,6 +825,17 @@ public:
          */
         Transaction& addTransactionBarrier(gui::TransactionBarrier barrier);
 
+        /**
+         * Set a "RenderCommandBuffer" on the SurfaceControl, referencing a
+         * a shared memory region of commands to be rendered by SurfaceFlinger
+         * as an alternative to buffer composition.
+         *
+         * WIP: b/448153717
+         */
+        Transaction& setRenderCommandBuffer(
+                const sp<SurfaceControl>& sc,
+                const std::shared_ptr<RenderCommandBufferProducer>& producer);
+
         status_t setDisplaySurface(const sp<IBinder>& token,
                 const sp<IGraphicBufferProducer>& bufferProducer);
 

@@ -296,7 +296,7 @@ filegroup {
         ":framework_native_aidl_gui",
         ":inputconstants_aidl",
         ":libgui_bufferqueue_sources",
-
+        ":rendercommandbuffer_sources",
         "BitTube.cpp",
         "BLASTBufferQueue.cpp",
         "BufferItemConsumer.cpp",
