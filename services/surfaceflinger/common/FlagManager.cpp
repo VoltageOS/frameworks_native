@@ -121,7 +121,6 @@ void FlagManager::dump(std::string& result) const {
 
     /// Trunk stable server (R/W) flags ///
     /// IMPORTANT - please keep alphabetize to reduce merge conflicts
-    DUMP_ACONFIG_FLAG(add_first_vsync_to_tracker);
     DUMP_ACONFIG_FLAG(adpf_gpu_sf);
     DUMP_ACONFIG_FLAG(anchor_list);
     DUMP_ACONFIG_FLAG(connected_displays_cursor);
@@ -298,7 +297,6 @@ FLAG_MANAGER_ACONFIG_FLAG(window_blur_kawase2_fix_aliasing, "");
 
 /// Trunk stable server (R/W) flags ///
 /// IMPORTANT - please keep alphabetized to reduce merge conflicts
-FLAG_MANAGER_ACONFIG_FLAG(add_first_vsync_to_tracker, "")
 FLAG_MANAGER_ACONFIG_FLAG(adpf_gpu_sf, "")
 FLAG_MANAGER_ACONFIG_FLAG(anchor_list, "")
 FLAG_MANAGER_ACONFIG_FLAG(deprecate_vsync_sf_v2, "");

@@ -52,7 +52,6 @@ public:
 
     /// Trunk stable server (R/W) flags ///
     /// IMPORTANT - please keep alphabetized to reduce merge conflicts
-    bool add_first_vsync_to_tracker() const;
     bool adpf_gpu_sf() const;
     bool anchor_list() const;
     bool connected_displays_cursor() const;
