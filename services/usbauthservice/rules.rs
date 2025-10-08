@@ -19,6 +19,7 @@
 
 use android_hardware_usb_auth::aidl::android::hardware::usb::UsbAuthorizationSystemState::UsbAuthorizationSystemState;
 use std::collections::HashMap;
+use thiserror::Error;
 
 // Data structures for the USB authorization rule language.
 
@@ -35,6 +36,28 @@ pub enum Action {
     Defer,
     /// Remove the device (e.g., if it was previously authorized).
     Remove,
+}
+
+impl Action {
+    /// Parses an Action from the given iterator of whitespace-separated parts.
+    pub fn parse(
+        parts: &mut std::iter::Peekable<std::str::SplitWhitespace>,
+    ) -> Result<Self, ParseError> {
+        if let Some(&action_str) = parts.peek() {
+            let action = match action_str {
+                "allow" => Ok(Action::Allow),
+                "ask" => Ok(Action::Ask),
+                "deny" => Ok(Action::Deny),
+                "defer" => Ok(Action::Defer),
+                "remove" => Ok(Action::Remove),
+                other => Err(ParseError::InvalidAction(other.to_string())),
+            }?;
+            parts.next(); // Consume the action string after successful parsing.
+            Ok(action)
+        } else {
+            Err(ParseError::UnexpectedToken(String::new()))
+        }
+    }
 }
 
 /// Represents an operator for matching multiple values in a condition.
@@ -58,6 +81,25 @@ impl Default for Operator {
 }
 
 impl Operator {
+    /// Parses an operator from the iterator, consuming it if found.
+    /// Returns `Some(Operator)` if an operator is found and parsed,
+    /// `None` if the next token is not an operator.
+    pub fn parse(parts: &mut std::iter::Peekable<std::str::SplitWhitespace>) -> Option<Self> {
+        if let Some(&op_str) = parts.peek() {
+            let operator = match op_str {
+                "all-of" => Operator::AllOf,
+                "one-of" | "any-of" => Operator::OneOf,
+                "none-of" => Operator::NoneOf,
+                "equals" => Operator::Equals,
+                _ => return None, // Not an operator, don't consume
+            };
+            parts.next(); // Consume the operator string
+            Some(operator)
+        } else {
+            None
+        }
+    }
+
     /// Evaluates the operator where each rule item is matched against a collection of device items.
     fn evaluate_match<RuleItem, DeviceItem>(
         &self,
@@ -237,6 +279,195 @@ pub struct DeviceAttributes {
     pub internal_device: Option<bool>,
 }
 
+impl DeviceAttributes {
+    /// Parses device attributes from the given iterator of whitespace-separated parts.
+    pub fn parse(
+        parts: &mut std::iter::Peekable<std::str::SplitWhitespace>,
+    ) -> Result<Option<Self>, ParseError> {
+        let mut attrs = DeviceAttributes::default();
+        let mut has_attributes = false;
+
+        while let Some(&part) = parts.peek() {
+            if !Self::is_valid_device_attribute(part) {
+                break;
+            }
+            parts.next(); // Consume the attribute keyword
+            has_attributes = true;
+            match part {
+                "name" => {
+                    attrs.name = Self::parse_string_attribute(parts, "name")?;
+                }
+                "serial" => {
+                    attrs.serial = Self::parse_string_attribute(parts, "serial")?;
+                }
+                "with-id" => {
+                    attrs.with_id = Some(Self::parse_device_id(parts)?);
+                }
+                "with-interface" => {
+                    attrs.with_interface = Some(Self::parse_interface_attribute(parts)?);
+                }
+                "internal-device" => {
+                    attrs.internal_device = Some(true);
+                }
+                "via-port" => {
+                    attrs.via_port = Some(Self::parse_port_attribute(parts)?);
+                }
+                _ => {
+                    // This case should ideally not be reached due to the `is_valid_device_attribute` check.
+                    // However, the compiler requires an exhaustive match for `&str`.
+                    return Err(ParseError::InvalidAttribute(part.to_string()));
+                }
+            }
+        }
+        if has_attributes {
+            return Ok(Some(attrs));
+        }
+        Ok(None)
+    }
+
+    fn is_valid_device_attribute(attribute_keyword: &str) -> bool {
+        attribute_keyword == "name"
+            || attribute_keyword == "serial"
+            || attribute_keyword == "with-id"
+            || attribute_keyword == "with-interface"
+            || attribute_keyword == "internal-device"
+            || attribute_keyword == "via-port"
+    }
+
+    fn parse_string_attribute(
+        parts: &mut std::iter::Peekable<std::str::SplitWhitespace>,
+        attribute_keyword: &str,
+    ) -> Result<Option<String>, ParseError> {
+        let value = parts.next().ok_or(ParseError::MissingValue(attribute_keyword.to_string()))?;
+        Ok(Some(value.to_string()))
+    }
+
+    /// Parses the 'with-id' attribute, returning a `DeviceId` on success.
+    fn parse_device_id(
+        parts: &mut std::iter::Peekable<std::str::SplitWhitespace>,
+    ) -> Result<DeviceId, ParseError> {
+        let id_str = parts.next().ok_or(ParseError::MissingValue("with-id".to_string()))?;
+        let (vendor_id, product_id) =
+            id_str.split_once(':').ok_or(ParseError::InvalidDeviceIdFormat(id_str.to_string()))?;
+        Ok(DeviceId {
+            vendor_id: if vendor_id == "*" {
+                None
+            } else {
+                Some(
+                    u16::from_str_radix(vendor_id, 16)
+                        .map_err(|e| ParseError::ParseIntError(e.to_string()))?,
+                )
+            },
+            product_id: if product_id == "*" {
+                None
+            } else {
+                Some(
+                    u16::from_str_radix(product_id, 16)
+                        .map_err(|e| ParseError::ParseIntError(e.to_string()))?,
+                )
+            },
+        })
+    }
+
+    /// Parses the 'with-interface' attribute, returning an `InterfaceAttribute` on success.
+    fn parse_interface_attribute(
+        parts: &mut std::iter::Peekable<std::str::SplitWhitespace>,
+    ) -> Result<InterfaceAttribute, ParseError> {
+        let op = Operator::parse(parts);
+        let interface_strings = if op.is_some() {
+            Self::parse_bracketed_string_list(parts, "interface")?
+        } else {
+            vec![parts
+                .next()
+                .ok_or(ParseError::MissingValue("interface type".to_string()))?
+                .to_string()]
+        };
+        let parsed_interfaces = interface_strings
+            .into_iter()
+            .map(|s| InterfaceType::parse(&s))
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(InterfaceAttribute::new(op, parsed_interfaces))
+    }
+
+    /// Parses the 'via-port' attribute, returning a `PortAttribute` on success.
+    fn parse_port_attribute(
+        parts: &mut std::iter::Peekable<std::str::SplitWhitespace>,
+    ) -> Result<PortAttribute, ParseError> {
+        let op = Operator::parse(parts);
+        let port_strings_result = if op.is_some() {
+            Self::parse_bracketed_string_list(parts, "port")
+        } else {
+            parts
+                .next()
+                .ok_or(ParseError::MissingValue("port".to_string()))
+                .map(|s| vec![s.to_string()])
+        }?;
+
+        Ok(PortAttribute::new(op, port_strings_result))
+    }
+
+    /// Parses a list of strings enclosed in curly braces `{ ... }`.
+    fn parse_bracketed_string_list(
+        parts: &mut std::iter::Peekable<std::str::SplitWhitespace>,
+        context_name: &str,
+    ) -> Result<Vec<String>, ParseError> {
+        if parts.peek() != Some(&"{") {
+            return Err(ParseError::UnexpectedToken(format!(
+                "Expected ' {{ ' to start {} list",
+                context_name
+            )));
+        }
+        parts.next(); // Consume the '{' token.
+
+        let mut items = Vec::new();
+        while let Some(part) = parts.peek() {
+            if *part == "}" {
+                break;
+            }
+            let token = parts.next().unwrap().trim_end_matches(',');
+            if !token.is_empty() {
+                items.push(token.to_string());
+            }
+        }
+        if parts.next() != Some("}") {
+            return Err(ParseError::UnexpectedToken(format!(
+                "Expected ' }} ' to close {} list",
+                context_name
+            )));
+        }
+        Ok(items)
+    }
+}
+
+impl InterfaceType {
+    fn parse(s: &str) -> Result<Self, ParseError> {
+        let parts: Vec<&str> = s.split(':').collect();
+        if parts.len() != 3 {
+            return Err(ParseError::InvalidInterfaceTypeFormat(s.to_string()));
+        }
+        Ok(InterfaceType {
+            class: u8::from_str_radix(parts[0], 16)
+                .map_err(|e| ParseError::ParseIntError(e.to_string()))?,
+            subclass: if parts[1] == "*" {
+                None
+            } else {
+                Some(
+                    u8::from_str_radix(parts[1], 16)
+                        .map_err(|e| ParseError::ParseIntError(e.to_string()))?,
+                )
+            },
+            protocol: if parts[2] == "*" {
+                None
+            } else {
+                Some(
+                    u8::from_str_radix(parts[2], 16)
+                        .map_err(|e| ParseError::ParseIntError(e.to_string()))?,
+                )
+            },
+        })
+    }
+}
+
 /// If you update the `UsbAuthorizationSystemState` AIDL file, you must also
 /// update the `ALL_SYSTEM_STATES` constant to ensure consistency
 /// between the AIDL definition and the Rust policy. This constant is used to
@@ -279,10 +510,85 @@ impl SystemCondition {
     pub fn new(operator: Option<Operator>, states: Vec<UsbAuthorizationSystemState>) -> Self {
         Self { operator: operator.unwrap_or_default(), states }
     }
+
+    /// Parses a system condition from the given iterator of whitespace-separated parts.
+    pub fn parse(
+        parts: &mut std::iter::Peekable<std::str::SplitWhitespace>,
+    ) -> Result<Option<Self>, ParseError> {
+        if parts.peek() != Some(&"when") {
+            return Ok(None);
+        }
+        parts.next(); // Consume "when"
+        let op = Operator::parse(parts);
+
+        let mut states = Vec::new();
+        if op.is_some() {
+            let state_strings =
+                DeviceAttributes::parse_bracketed_string_list(parts, "system state")?;
+            for s in state_strings {
+                states.push(Self::parse_system_state(&s)?);
+            }
+        } else {
+            // If no operator, try to parse one or more system states directly.
+            // This implicitly uses Operator::Equals for multiple states if no explicit operator is given.
+            while let Some(&state_str) = parts.peek() {
+                match Self::parse_system_state(state_str) {
+                    Ok(state) => {
+                        states.push(state);
+                        parts.next(); // Consume the state string
+                    }
+                    Err(ParseError::UnknownSystemState(e)) => {
+                        return Err(ParseError::UnknownSystemState(e));
+                    }
+                    Err(e) => {
+                        // Other parsing errors for states
+                        return Err(e);
+                    }
+                }
+            }
+        }
+
+        if states.is_empty() {
+            return Err(ParseError::MissingValue("system states for 'when' condition".to_string()));
+        }
+
+        Ok(Some(SystemCondition::new(op, states)))
+    }
+
+    fn parse_system_state(s: &str) -> Result<UsbAuthorizationSystemState, ParseError> {
+        match s {
+            "Booted" => Ok(UsbAuthorizationSystemState::BOOTED),
+            "LoggedIn" => Ok(UsbAuthorizationSystemState::LOGGED_IN),
+            "ScreenLocked" => Ok(UsbAuthorizationSystemState::SCREEN_LOCKED),
+            "Setup" => Ok(UsbAuthorizationSystemState::SET_UP),
+            _ => Err(ParseError::UnknownSystemState(s.to_string())),
+        }
+    }
 }
 
 /// Implementation of the `Rule` struct.
 impl Rule {
+    /// Parses a rule from the given iterator of whitespace-separated parts.
+    ///
+    /// A rule string follows the format: `action [device-attributes] [when system-conditions]`
+    /// For example: `allow name "MyDevice" when OneOf { Booted, LoggedIn }`
+    pub fn parse(
+        parts: &mut std::iter::Peekable<std::str::SplitWhitespace>,
+    ) -> Result<Self, ParseError> {
+        let action = Action::parse(parts)?;
+        let attributes = DeviceAttributes::parse(parts)?;
+        let condition = SystemCondition::parse(parts)?;
+
+        if parts.peek().is_some() {
+            return Err(ParseError::UnexpectedToken(format!(
+                "Unexpected token at end of rule: '{}'",
+                parts.next().unwrap()
+            )));
+        }
+
+        Ok(Rule { action, attributes, condition })
+    }
+
     /// Evaluates if the given `UsbDevice` matches the rule's attributes.
     pub fn evaluate(&self, device: &UsbDevice) -> bool {
         // If no attributes are specified in the rule, it matches all devices.
@@ -530,43 +836,47 @@ mod tests {
 }
 
 /// Represents an error that occurred when adding a rule to a policy.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Error, PartialEq)]
 pub enum AddRuleError {
     /// The rule contains a `UsbAuthorizationSystemState` that is not recognized by the system.
+    #[error("Rule contains an invalid system state: {0:?}")]
     InvalidSystemState(UsbAuthorizationSystemState),
     /// Attempted to add a second default rule, but only one is allowed.
+    #[error("Attempted to add a second default rule, but only one is allowed.")]
     DuplicateDefaultRule,
 }
 
-impl std::fmt::Display for AddRuleError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            AddRuleError::InvalidSystemState(state) => {
-                write!(f, "Rule contains an invalid system state: {:?}", state)
-            }
-            AddRuleError::DuplicateDefaultRule => {
-                write!(f, "Attempted to add a second default rule, but only one is allowed.")
-            }
-        }
-    }
+/// Represents an error that occurred during parsing of a rule or policy.
+#[derive(Debug, Error, PartialEq)]
+pub enum ParseError {
+    /// Indicates an invalid action keyword (e.g., "unknown-action").
+    #[error("Invalid action: '{0}'")]
+    InvalidAction(String),
+    /// Indicates an invalid attribute keyword (e.g., "invalid-attr").
+    #[error("Unknown attribute: '{0}'")]
+    InvalidAttribute(String),
+    /// Indicates an invalid operator keyword (e.g., "wrong-op").
+    #[error("Invalid operator: '{0}'")]
+    InvalidOperator(String),
+    /// Indicates a missing value for an expected attribute (e.g., "name").
+    #[error("Missing value for '{0}'")]
+    MissingValue(String),
+    /// Indicates an invalid format for a device ID (e.g., "123").
+    #[error("Invalid device ID format: '{0}'")]
+    InvalidDeviceIdFormat(String),
+    /// Indicates an error parsing a number (e.g., vendor ID, product ID, class).
+    #[error("Parse integer error: '{0}'")]
+    ParseIntError(String),
+    /// Indicates an invalid format for an interface type (e.g., "1:2").
+    #[error("Invalid interface type format: '{0}'")]
+    InvalidInterfaceTypeFormat(String),
+    /// Indicates an unknown system state keyword (e.g., "Unauthorised").
+    #[error("Unknown system state: '{0}'")]
+    UnknownSystemState(String),
+    /// Indicates an unexpected token in the input stream.
+    #[error("Unexpected token: '{0}'")]
+    UnexpectedToken(String),
+    /// Generic parsing error for unexpected situations.
+    #[error("Parsing error: '{0}'")]
+    Generic(String),
 }
-
-impl std::error::Error for AddRuleError {}
-
-/// Represents an error that occurred during policy loading.
-#[derive(Debug, PartialEq, Default)]
-pub struct PolicyLoadError {
-    /// The file path from which the policy was attempted to be loaded.
-    pub file_path: String,
-    /// A descriptive error message.
-    pub error: String,
-}
-
-/// Implements the `std::error::Error` trait for `PolicyLoadError`.
-impl std::fmt::Display for PolicyLoadError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "Error loading policy from {}: {}", self.file_path, self.error)
-    }
-}
-
-impl std::error::Error for PolicyLoadError {}

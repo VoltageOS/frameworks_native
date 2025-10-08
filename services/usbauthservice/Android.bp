@@ -21,14 +21,16 @@ rust_defaults {
     edition: "2021",
     rustlibs: [
         "android.hardware.usb.auth-rust",
+        "libtempfile",
+        "libthiserror",
     ],
 }
 
 rust_library {
     name: "libusbauthservice_rules",
     crate_name: "usbauthservice_rules",
-    srcs: ["rules.rs"],
     defaults: ["libusbauthservice_defaults"],
+    srcs: ["rules.rs"],
     host_supported: true,
 }
 
@@ -37,6 +39,27 @@ rust_test_host {
     crate_name: "usbauthservice_rules",
     defaults: ["libusbauthservice_defaults"],
     srcs: ["rules.rs"],
+    test_suites: ["general-tests"],
+    test_options: {
+        unit_test: true,
+    },
+}
+
+rust_library {
+    name: "libusbauthservice_parser",
+    crate_name: "usbauthservice_parser",
+    defaults: ["libusbauthservice_defaults"],
+    srcs: ["parser.rs"],
+    rustlibs: ["libusbauthservice_rules"],
+    host_supported: true,
+}
+
+rust_test_host {
+    name: "libusbauthservice_parser_test",
+    crate_name: "usbauthservice_parser",
+    defaults: ["libusbauthservice_defaults"],
+    srcs: ["parser.rs"],
+    rustlibs: ["libusbauthservice_rules"],
     test_suites: ["general-tests"],
     test_options: {
         unit_test: true,
