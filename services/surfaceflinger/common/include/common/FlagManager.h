@@ -66,6 +66,7 @@ public:
     bool increase_missed_frame_jank_threshold() const;
     bool jank_classification_v2() const;
     bool md_degrade_hdr() const;
+    bool mirror_uid_filtering() const;
     bool monitor_buffer_fences() const;
     bool offload_gpu_composition() const;
     bool re_check_fence() const;
