@@ -66,30 +66,14 @@ pub struct NotifyMotionArgs<'a> {
 }
 
 /// Verifies the properties of an event that should always be true, regardless of the current state.
-fn verify_event(
-    event: NotifyMotionArgs<'_>,
-    verify_buttons: bool,
-    verify_down_time: bool,
-) -> Result<(), String> {
+fn verify_event(event: NotifyMotionArgs<'_>, verify_buttons: bool) -> Result<(), String> {
     let pointer_count = event.pointer_properties.len();
     if pointer_count < 1 {
         return Err(format!("Invalid {} event: no pointers", event.action));
     }
     match event.action {
-        MotionAction::Down => {
-            if pointer_count != 1 {
-                return Err(format!(
-                    "Invalid DOWN event: there are {pointer_count} pointers in the event"
-                ));
-            }
-            if verify_down_time && event.down_time_nanos != event.event_time_nanos {
-                return Err(format!(
-                    "Invalid DOWN event: down time {}ns does not equal event time {}ns",
-                    event.down_time_nanos, event.event_time_nanos
-                ));
-            }
-        }
-        MotionAction::HoverEnter
+        MotionAction::Down
+        | MotionAction::HoverEnter
         | MotionAction::HoverExit
         | MotionAction::HoverMove
         | MotionAction::Up => {
@@ -263,7 +247,7 @@ impl InputVerifier {
             );
         }
 
-        verify_event(event, self.verify_buttons, self.verify_down_time)?;
+        verify_event(event, self.verify_buttons)?;
 
         if self.verify_buttons {
             self.button_verifier_by_device
@@ -453,7 +437,7 @@ impl InputVerifier {
              Down times by device: {:?}\n",
             self.touching_pointer_ids_by_device,
             self.hovering_pointer_ids_by_device,
-            self.down_time_by_device
+            self.down_time_by_device,
         )
     }
 
@@ -792,19 +776,6 @@ mod tests {
             .process_movement(NotifyMotionArgs {
                 action: MotionAction::Move,
                 pointer_properties: &pointer_properties,
-                ..BASE_EVENT
-            })
-            .is_err());
-    }
-
-    #[test]
-    fn down_with_old_down_time() {
-        let mut verifier = make_test_verifier();
-        assert!(verifier
-            .process_movement(NotifyMotionArgs {
-                event_time_nanos: 200,
-                action: MotionAction::Down,
-                down_time_nanos: 100,
                 ..BASE_EVENT
             })
             .is_err());
