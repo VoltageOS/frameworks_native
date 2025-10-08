@@ -47,6 +47,23 @@ pub enum DeviceInfoError {
     },
 }
 
+/// Custom error type for device authorization.
+#[derive(Error, Debug)]
+pub enum AuthorizationError {
+    /// An I/O error occurred during authorization (e.g., writing to sysfs).
+    #[error("I/O error during authorization for device '{syspath}': {source}")]
+    Io {
+        /// The sysfs path of the device that caused the I/O error.
+        syspath: String,
+        /// The underlying `std::io::Error`.
+        #[source]
+        source: std::io::Error,
+    },
+    /// The authorization sysfs path does not exist for the device.
+    #[error("Authorization path '{0}' does not exist.")]
+    AuthorizationPathNotFound(String),
+}
+
 /// Represents a USB device with its authorization state.
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
