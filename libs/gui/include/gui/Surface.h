@@ -286,6 +286,9 @@ public:
     status_t setAdditionalOptions(const std::vector<gui::AdditionalOptions>& options);
 #endif
 
+    status_t setProducerThrottlingEnabled(bool enabled);
+    status_t isProducerThrottlingEnabled(bool* outEnabled) const;
+
 protected:
     virtual ~Surface();
 
@@ -376,6 +379,8 @@ private:
     int dispatchGetLastQueuedBuffer2(va_list args);
     int dispatchSetFrameTimelineInfo(va_list args);
     int dispatchSetAdditionalOptions(va_list args);
+    int dispatchSetProducerThrottlingEnabled(va_list args);
+    int dispatchIsProducerThrottlingEnabled(va_list args);
 
 protected:
     virtual int dequeueBuffer(sp<GraphicBuffer>* buffer, int* fenceFd);

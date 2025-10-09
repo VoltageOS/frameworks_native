@@ -210,6 +210,9 @@ public:
     status_t setFrameRate(float frameRate, int8_t compatibility,
                           int8_t changeFrameRateStrategy) override;
 
+    status_t setProducerThrottlingEnabled(bool enabled) override;
+    status_t isProducerThrottlingEnabled(bool* outEnabled) const override;
+
 #if COM_ANDROID_GRAPHICS_LIBGUI_FLAGS(BQ_EXTENDEDALLOCATE)
     status_t setAdditionalOptions(const std::vector<gui::AdditionalOptions>& options) override;
 #endif
@@ -300,7 +303,6 @@ private:
     // Condition variable to signal allocateBuffers() that dequeueBuffer() is no longer waiting for
     // allocation to complete.
     std::condition_variable mDequeueWaitingForAllocationCondition;
-
 }; // class BufferQueueProducer
 
 } // namespace android

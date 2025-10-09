@@ -1188,8 +1188,16 @@ status_t BufferQueueProducer::queueBuffer(int slot,
         VALIDATE_CONSISTENCY();
 
         connectedApi = mCore->mConnectedApi;
-        if (flags::bq_producer_throttles_only_async_mode()) {
-            enableEglCpuThrottling = mCore->mAsyncMode || mCore->mDequeueBufferCannotBlock;
+        if (com::android::graphics::libgui::flags::bq_producer_backpressure_control()) {
+            if (mCore->mProducerThrottlingEnabled) {
+                // throttling is enabled via setProducerThrottlingEnabled(true) [default]
+                enableEglCpuThrottling = true;
+            } else {
+                // throttling is disabled via setProducerThrottlingEnabled(false), in this case
+                // we disable it only if we're not in async mode (since async mode doesn't
+                // throttle in dequeueBuffer()) or if mDequeueBufferCannotBlock is set.
+                enableEglCpuThrottling = mCore->mAsyncMode || mCore->mDequeueBufferCannotBlock;
+            }
         }
         lastQueuedFence = std::move(mLastQueueBufferFence);
 
@@ -1950,6 +1958,24 @@ status_t BufferQueueProducer::setFrameRate(float frameRate, int8_t compatibility
     if (listener != nullptr) {
         listener->onSetFrameRate(frameRate, compatibility, changeFrameRateStrategy);
     }
+    return NO_ERROR;
+}
+
+status_t BufferQueueProducer::setProducerThrottlingEnabled(bool enabled) {
+    ATRACE_FORMAT("%s(%s)", __func__, enabled ? "true" : "false");
+    BQ_LOGV("setProducerThrottlingEnabled: %s", enabled ? "true" : "false");
+    std::lock_guard<std::mutex> lock(mCore->mMutex);
+    mCore->mProducerThrottlingEnabled = enabled;
+    return NO_ERROR;
+}
+
+status_t BufferQueueProducer::isProducerThrottlingEnabled(bool* outEnabled) const {
+    ATRACE_FORMAT("%s(%p)", __func__, outEnabled);
+    if (!outEnabled) {
+        return BAD_VALUE;
+    }
+    std::lock_guard<std::mutex> lock(mCore->mMutex);
+    *outEnabled = mCore->mProducerThrottlingEnabled;
     return NO_ERROR;
 }
 
