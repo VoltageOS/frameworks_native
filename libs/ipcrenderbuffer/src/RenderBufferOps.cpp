@@ -21,6 +21,9 @@
 #include <SkFontMgr.h>
 
 #include "SkFontScanner_FreeType.h"
+#include "src/core/SkReadBuffer.h"
+//#include "src/core/SkVerticesPriv.h"
+#include "src/core/SkWriteBuffer.h"
 
 #include <android/ipcrenderbuffer/RenderBufferOps.h>
 #include <android/ipcrenderbuffer/RenderBufferDebugUtils.h>
@@ -941,17 +944,34 @@ std::string DrawPointsOp::toString() const {
 DrawVerticesOp* DrawVerticesOp::Create(RenderCommandBuffer* commandBuffer,
                                        const SkVertices* vertices, SkBlendMode mode,
                                        const SkPaint& paint) {
+    
+    IPCRENDERBUFFER_UNIMPLEMENTED;
+    return nullptr;
+
+    #if 0
     DrawVerticesOp* op = commandBuffer->allocAligned<DrawVerticesOp>();
     OP_REQUIRE(op);
     op->type = kType;
     op->mode = mode;
     op->paint = toShmemPaint(paint);
-    IPCRENDERBUFFER_UNIMPLEMENTED;
+    SkBinaryWriteBuffer writeBuffer(SkSerialProcs{});
+    vertices->priv().encode(writeBuffer);
+    auto data = writeBuffer.snapshotAsData();
+    OP_REQUIRE(SetRSpan<uint8_t>(op->verticesData, commandBuffer,
+                                 reinterpret_cast<const uint8_t*>(data->data()), data->size()));
     return op;
+    #endif
 }
 
 void DrawVerticesOp::draw(SkCanvas* c, const SkMatrix&) {
     IPCRENDERBUFFER_UNIMPLEMENTED;
+    #if 0
+    SkReadBuffer readBuffer(verticesData.data.get(), verticesData.size);
+    sk_sp<SkVertices> vertices = SkVerticesPriv::Decode(readBuffer);
+    if (vertices) {
+        c->drawVertices(vertices, mode, fromShmemPaint(paint));
+    }
+    #endif
 }
 std::string DrawVerticesOp::toString() const {
     return "DrawVerticesOp";

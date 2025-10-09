@@ -279,4 +279,167 @@ TEST_F(IPCRecordingCanvasTest, DrawTextBlob) {
     ASSERT_TRUE(compareRendering(drawTextBlob, "DrawTextBlob"));
 }
 
+TEST_F(IPCRecordingCanvasTest, DrawPath) {
+    auto drawPath = [&](SkCanvas* c) {
+        SkPaint paint;
+        paint.setColor(SK_ColorRED);
+        paint.setStyle(SkPaint::kStroke_Style);
+        paint.setStrokeWidth(10);
+        SkPath path;
+        path.moveTo(10, 10);
+        path.lineTo(100, 100);
+        path.quadTo(150, 10, 200, 100);
+        c->drawPath(path, paint);
+    };
+    ASSERT_TRUE(compareRendering(drawPath, "DrawPath"));
+}
+
+TEST_F(IPCRecordingCanvasTest, DrawRegion) {
+    auto drawRegion = [&](SkCanvas* c) {
+        SkPaint paint;
+        paint.setColor(SK_ColorBLUE);
+        SkRegion region(SkIRect::MakeLTRB(20, 20, 80, 80));
+        region.op(SkIRect::MakeLTRB(50, 50, 120, 120), SkRegion::kXOR_Op);
+        c->drawRegion(region, paint);
+    };
+    ASSERT_TRUE(compareRendering(drawRegion, "DrawRegion"));
+}
+
+TEST_F(IPCRecordingCanvasTest, DrawArc) {
+    auto drawArc = [&](SkCanvas* c) {
+        SkPaint paint;
+        paint.setColor(SK_ColorGREEN);
+        paint.setStyle(SkPaint::kStroke_Style);
+        paint.setStrokeWidth(5);
+        c->drawArc(SkRect::MakeLTRB(10, 10, 150, 150), 45, 270, true, paint);
+    };
+    ASSERT_TRUE(compareRendering(drawArc, "DrawArc"));
+}
+
+TEST_F(IPCRecordingCanvasTest, DrawRRect) {
+    auto drawRRect = [&](SkCanvas* c) {
+        SkPaint paint;
+        paint.setColor(SK_ColorMAGENTA);
+        SkRRect rrect = SkRRect::MakeRectXY(SkRect::MakeLTRB(20, 20, 180, 120), 20, 20);
+        c->drawRRect(rrect, paint);
+    };
+    ASSERT_TRUE(compareRendering(drawRRect, "DrawRRect"));
+}
+
+TEST_F(IPCRecordingCanvasTest, DrawPoints) {
+    auto drawPoints = [&](SkCanvas* c) {
+        SkPaint paint;
+        paint.setColor(SK_ColorCYAN);
+        paint.setStrokeWidth(10);
+        paint.setStrokeCap(SkPaint::kRound_Cap);
+        SkPoint points[] = {{20, 20}, {100, 20}, {100, 100}, {20, 100}};
+        c->drawPoints(SkCanvas::kPolygon_PointMode, 4, points, paint);
+    };
+    ASSERT_TRUE(compareRendering(drawPoints, "DrawPoints"));
+}
+
+TEST_F(IPCRecordingCanvasTest, DrawPatch) {
+    auto drawPatch = [&](SkCanvas* c) {
+        SkPaint paint;
+        paint.setColor(SK_ColorYELLOW);
+        const SkPoint cubics[12] = {
+                {10, 10},  {60, 10},  {110, 10},  {10, 60},  {60, 60},  {110, 60},
+                {10, 110}, {60, 110}, {110, 110}, {10, 160}, {60, 160}, {110, 160},
+        };
+        const SkColor colors[4] = {SK_ColorRED, SK_ColorGREEN, SK_ColorBLUE, SK_ColorBLACK};
+        c->drawPatch(cubics, colors, nullptr, SkBlendMode::kModulate, paint);
+    };
+    ASSERT_TRUE(compareRendering(drawPatch, "DrawPatch"));
+}
+
+TEST_F(IPCRecordingCanvasTest, StrokeMiter) {
+    auto drawStrokeMiter = [&](SkCanvas* c) {
+        SkPaint paint;
+        paint.setColor(SK_ColorRED);
+        paint.setStyle(SkPaint::kStroke_Style);
+        paint.setStrokeWidth(20);
+        paint.setStrokeMiter(1.0f);
+        SkPath path;
+        path.moveTo(50, 200);
+        path.lineTo(150, 50);
+        path.lineTo(250, 200);
+        c->drawPath(path, paint);
+    };
+    ASSERT_TRUE(compareRendering(drawStrokeMiter, "StrokeMiter"));
+}
+
+TEST_F(IPCRecordingCanvasTest, StrokeCap) {
+    auto drawStrokeCap = [&](SkCanvas* c) {
+        SkPaint paint;
+        paint.setColor(SK_ColorBLUE);
+        paint.setStyle(SkPaint::kStroke_Style);
+        paint.setStrokeWidth(20);
+
+        paint.setStrokeCap(SkPaint::kButt_Cap);
+        c->drawLine(50, 50, 200, 50, paint);
+
+        paint.setStrokeCap(SkPaint::kRound_Cap);
+        c->drawLine(50, 100, 200, 100, paint);
+
+        paint.setStrokeCap(SkPaint::kSquare_Cap);
+        c->drawLine(50, 150, 200, 150, paint);
+    };
+    ASSERT_TRUE(compareRendering(drawStrokeCap, "StrokeCap"));
+}
+
+TEST_F(IPCRecordingCanvasTest, StrokeJoin) {
+    auto drawStrokeJoin = [&](SkCanvas* c) {
+        SkPaint paint;
+        paint.setColor(SK_ColorGREEN);
+        paint.setStyle(SkPaint::kStroke_Style);
+        paint.setStrokeWidth(20);
+        SkPath path;
+        path.moveTo(50, 250);
+        path.lineTo(100, 200);
+        path.lineTo(150, 250);
+
+        paint.setStrokeJoin(SkPaint::kMiter_Join);
+        c->drawPath(path, paint);
+
+        path.offset(150, 0);
+        paint.setStrokeJoin(SkPaint::kRound_Join);
+        c->drawPath(path, paint);
+
+        path.offset(150, 0);
+        paint.setStrokeJoin(SkPaint::kBevel_Join);
+        c->drawPath(path, paint);
+    };
+    ASSERT_TRUE(compareRendering(drawStrokeJoin, "StrokeJoin"));
+}
+
+TEST_F(IPCRecordingCanvasTest, AntiAlias) {
+    auto drawAntiAlias = [&](SkCanvas* c) {
+        SkPaint paint;
+        paint.setColor(SK_ColorMAGENTA);
+
+        paint.setAntiAlias(false);
+        c->drawCircle(100, 100, 50, paint);
+
+        paint.setAntiAlias(true);
+        c->drawCircle(250, 100, 50, paint);
+    };
+    ASSERT_TRUE(compareRendering(drawAntiAlias, "AntiAlias"));
+}
+
+#if 0
+TEST_F(IPCRecordingCanvasTest, DrawVertices) {
+    auto drawVertices = [&](SkCanvas* c) {
+        SkPaint paint;
+        paint.setColor(SK_ColorCYAN);
+        const SkPoint positions[] = {{50, 50}, {150, 50}, {150, 150}, {50, 150}, {100, 100}};
+        const SkColor colors[] = {SK_ColorRED, SK_ColorGREEN, SK_ColorBLUE, SK_ColorYELLOW,
+                                  SK_ColorMAGENTA};
+        auto vertices = SkVertices::MakeCopy(SkVertices::kTriangleFan_VertexMode, 5, positions,
+                                             nullptr, colors);
+        c->drawVertices(vertices, SkBlendMode::kDst, paint);
+    };
+    ASSERT_TRUE(compareRendering(drawVertices, "DrawVertices"));
+}
+#endif
+
 } // namespace android
