@@ -113,6 +113,7 @@ void FlagManager::dump(std::string& result) const {
     DUMP_SYSPROP_FLAG(disable_sched_fifo_composer);
     DUMP_SYSPROP_FLAG(disable_sched_fifo_composer_callback);
     DUMP_SYSPROP_FLAG(productionize_readback_screenshot);
+    DUMP_SYSPROP_FLAG(stable_edid_ids_for_external_displays_optin);
 
     /// Legacy server flags ///
     DUMP_LEGACY_SERVER_FLAG(test_flag);
@@ -246,6 +247,7 @@ FLAG_MANAGER_SYSPROP_FLAG(disable_sched_fifo_re, /* default */ false)
 FLAG_MANAGER_SYSPROP_FLAG(disable_sched_fifo_composer, /* default */ false)
 FLAG_MANAGER_SYSPROP_FLAG(disable_sched_fifo_composer_callback, /* default */ false)
 FLAG_MANAGER_SYSPROP_FLAG(productionize_readback_screenshot, /* default */ false)
+FLAG_MANAGER_SYSPROP_FLAG(stable_edid_ids_for_external_displays_optin, /* default */ false)
 
 /// Legacy server flags ///
 FLAG_MANAGER_LEGACY_SERVER_FLAG(test_flag, "", "")

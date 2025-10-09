@@ -44,6 +44,7 @@ public:
     bool disable_sched_fifo_composer() const;
     bool disable_sched_fifo_composer_callback() const;
     bool productionize_readback_screenshot() const;
+    bool stable_edid_ids_for_external_displays_optin() const;
 
     /// Legacy server flags ///
     bool test_flag() const;
