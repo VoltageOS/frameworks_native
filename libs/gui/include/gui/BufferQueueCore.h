@@ -169,7 +169,10 @@ private:
 
     // mConsumerControlledByApp indicates whether the connected consumer is
     // controlled by the application.
-    bool mConsumerControlledByApp;
+#if COM_ANDROID_GRAPHICS_LIBGUI_FLAGS(REMOVE_CONTROLLED_BY_APP)
+    const
+#endif
+            bool mConsumerControlledByApp;
 
     // mConsumerName is a string used to identify the BufferQueue in log
     // messages. It is set by the IGraphicBufferConsumer::setConsumerName
