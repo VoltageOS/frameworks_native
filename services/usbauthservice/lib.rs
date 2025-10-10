@@ -14,3 +14,6 @@
 
 /// Defines the structure and logic for USB authorization rules.
 pub mod rules;
+
+/// Defines the parser for USB authorization rules.
+pub mod parser;
