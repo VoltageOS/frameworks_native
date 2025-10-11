@@ -89,6 +89,7 @@ public:
     bool deprecate_frame_tracker() const;
     bool disable_synthetic_vsync_for_performance() const;
     bool display_command_modeset() const;
+    bool enable_user_preferred_hdr_mode() const;
     bool frame_rate_category_mrr() const;
     bool graphite_renderengine() const;
     bool hdcp_level_hal() const;
