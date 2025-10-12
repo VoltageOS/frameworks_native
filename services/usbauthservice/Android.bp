@@ -23,6 +23,7 @@ rust_defaults {
         "android.hardware.usb.auth-rust",
         "libtempfile",
         "libthiserror",
+        "libueventd",
     ],
 }
 
@@ -39,6 +40,25 @@ rust_test_host {
     crate_name: "usbauthservice_rules",
     defaults: ["libusbauthservice_defaults"],
     srcs: ["rules.rs"],
+    test_suites: ["general-tests"],
+    test_options: {
+        unit_test: true,
+    },
+}
+
+rust_library {
+    name: "libusbauthservice_device_info",
+    crate_name: "usbauthservice_device_info",
+    defaults: ["libusbauthservice_defaults"],
+    srcs: ["device_info.rs"],
+    host_supported: true,
+}
+
+rust_test_host {
+    name: "libusbauthservice_device_info_test",
+    crate_name: "usbauthservice_device_info",
+    defaults: ["libusbauthservice_defaults"],
+    srcs: ["device_info.rs"],
     test_suites: ["general-tests"],
     test_options: {
         unit_test: true,
