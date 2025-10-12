@@ -21,6 +21,7 @@ use log::debug;
 use std::fs;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
+use ueventd::device::Device;
 use usbauthservice_authorization as authorization;
 use usbauthservice_device_info::UsbDeviceInfoWithState;
 use usbauthservice_parser::{Parser, PolicyLoadError};
@@ -34,6 +35,9 @@ pub enum Error {
     /// An I/O error occurred while interacting with the file system.
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
+    /// An error occurred during device authorization.
+    #[error("Authorization error: {0}")]
+    Authorization(#[from] usbauthservice_device_info::AuthorizationError),
     /// An error occurred while parsing the USB authorization policy.
     #[error("Policy parsing error: {0}")]
     Parse(#[from] PolicyLoadError),
@@ -92,6 +96,7 @@ impl UsbDeviceManager {
     pub fn ask_devices(&self) -> Vec<UsbDeviceInfoWithState> {
         self.ask_devices.clone()
     }
+
     /// Returns a reference to the current system state for USB authorization.
     pub fn system_state(&self) -> &UsbAuthorizationSystemState {
         &self.system_state
@@ -221,28 +226,25 @@ impl UsbDeviceManager {
 
     /// Re-evaluates deferred devices when the system state changes.
     fn reevaluate_deferred_devices(&mut self) {
-        let system_state = self.system_state;
         let deferred = std::mem::take(&mut self.deferred_devices);
         for device in deferred {
-            self.process_usb_device(device, system_state);
+            self.process_usb_device(device);
         }
     }
 
     /// Re-evaluates devices requiring user interaction when the system state changes.
     fn reevaluate_ask_devices(&mut self) {
-        let system_state = self.system_state;
         let ask = std::mem::take(&mut self.ask_devices);
         for device in ask {
-            self.process_usb_device(device, system_state);
+            self.process_usb_device(device);
         }
     }
 
     /// Re-evaluates authorized devices when the system state changes.
     fn reevaluate_authorized_devices(&mut self) {
-        let system_state = self.system_state;
         let processed = std::mem::take(&mut self.processed_devices);
         for device in processed {
-            self.process_usb_device(device, system_state);
+            self.process_usb_device(device);
         }
     }
 
@@ -263,13 +265,9 @@ impl UsbDeviceManager {
 
     /// Processes a newly added USB device, determines its authorization state, and adds it to the
     /// appropriate list within the `UsbDeviceManager`.
-    pub fn process_usb_device(
-        &mut self,
-        mut device_with_state: UsbDeviceInfoWithState,
-        system_state: UsbAuthorizationSystemState,
-    ) {
+    pub fn process_usb_device(&mut self, mut device_with_state: UsbDeviceInfoWithState) {
         let action =
-            authorization::authorize_device(&device_with_state, &self.policy, system_state);
+            authorization::authorize_device(&device_with_state, &self.policy, self.system_state);
         device_with_state.authorized = action == Action::Allow;
         device_with_state.is_deferred = action == Action::Defer;
         match action {
@@ -296,10 +294,53 @@ impl UsbDeviceManager {
         if let Some(pos) = self.ask_devices.iter().position(|d| d.info.syspath == device_syspath) {
             let mut device_with_state = self.ask_devices.remove(pos);
             device_with_state.authorized = authorized;
+            authorization::authorize_device_via_sysfs(&device_with_state.info.syspath, authorized)?;
             self.processed_devices.push(device_with_state);
             Ok(())
         } else {
             Err(Error::DeviceNotFound(device_syspath.to_string()))
+        }
+    }
+
+    /// Adds a new USB device to the manager.
+    ///
+    /// This function converts the provided `Device` into a `UsbDeviceInfoWithState`,
+    /// processes it to determine its authorization state, and adds it to the
+    /// appropriate internal list (`processed_devices`, `deferred_devices`, or `ask_devices`).
+    ///
+    /// # Arguments
+    /// * `device` - A reference to the `Device` object representing the newly added USB device.
+    ///
+    /// # Returns
+    /// * `Ok(())` if the device was successfully added and processed.
+    /// * `Err(Error::DeviceNotFound)` if there was an issue getting device info from the `Device` object.
+    pub fn add_usb_device(&mut self, device: &Device) -> Result<(), Error> {
+        debug!("Add USB device: {:?}", device.name());
+        match UsbDeviceInfoWithState::from_device(device) {
+            Ok(device_with_state) => {
+                self.process_usb_device(device_with_state);
+                Ok(())
+            }
+            Err(_) => Err(Error::DeviceNotFound(device.syspath().display().to_string())),
+        }
+    }
+
+    /// Removes a USB device from all internal lists (`processed_devices`, `deferred_devices`,
+    /// and `ask_devices`).
+    ///
+    /// This function is typically called when a USB device is disconnected from the system.
+    ///
+    /// # Arguments
+    /// * `device` - The `Device` object representing the USB device to be removed.
+    pub fn remove_usb_device(&mut self, device: &Device) -> Result<(), Error> {
+        if let Some(device_syspath) = device.syspath().to_str() {
+            self.processed_devices.retain(|d| d.info.syspath != device_syspath);
+            self.deferred_devices.retain(|d| d.info.syspath != device_syspath);
+            self.ask_devices.retain(|d| d.info.syspath != device_syspath);
+            Ok(())
+        } else {
+            debug!("Failed to get syspath for device: {:?}", device.name());
+            Err(Error::DeviceNotFound(device.syspath().display().to_string()))
         }
     }
 }
@@ -480,7 +521,8 @@ mod tests {
             is_deferred: false,
         };
 
-        manager.process_usb_device(device, UsbAuthorizationSystemState::BOOTED);
+        manager.handle_system_state_change(UsbAuthorizationSystemState::BOOTED);
+        manager.process_usb_device(device);
 
         assert!(manager.processed_devices().is_empty());
         assert_eq!(manager.deferred_devices().len(), 1);

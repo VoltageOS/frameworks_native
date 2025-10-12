@@ -27,6 +27,7 @@ rust_defaults {
         "liblog_rust",
         "liblogger",
         "libtokio",
+        "libtokio_stream",
         "libbinder_rs",
     ],
 }
@@ -48,6 +49,41 @@ rust_test_host {
     test_options: {
         unit_test: true,
     },
+}
+
+rust_binary {
+    name: "usbauthservice",
+    crate_name: "usbauthservice",
+    defaults: ["libusbauthservice_defaults"],
+    srcs: ["usbauthservice.rs"],
+    rustlibs: [
+        "libusbauthservice_service",
+        "libusbauthservice_device_info",
+        "libusbauthservice_authorization",
+        "libusbauthservice_manager",
+        "libusbauthservice_parser",
+        "libusbauthservice_rules",
+    ],
+}
+
+rust_test_host {
+    name: "usbauthservice_test",
+    crate_name: "usbauthservice",
+    defaults: ["libusbauthservice_defaults"],
+    srcs: ["usbauthservice.rs"],
+    rustlibs: [
+        "libusbauthservice_service",
+        "libusbauthservice_device_info",
+        "libusbauthservice_authorization",
+        "libusbauthservice_manager",
+        "libusbauthservice_parser",
+        "libusbauthservice_rules",
+    ],
+    test_suites: ["general-tests"],
+    test_options: {
+        unit_test: true,
+    },
+    compile_multilib: "both",
 }
 
 rust_library {

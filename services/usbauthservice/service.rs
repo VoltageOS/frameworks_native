@@ -150,6 +150,10 @@ mod tests {
                     SysfsFile::RegularFile("1"),
                 )])),
             ),
+            (
+                "ask_device",
+                SysfsFile::Dir(HashMap::from([("authorized", SysfsFile::RegularFile("1"))])),
+            ),
         ])))
         .unwrap()
     }
@@ -190,7 +194,8 @@ mod tests {
         ));
         let service = UsbAuthServiceImpl { device_manager: device_manager.clone() };
 
-        let device_info = create_test_device("ask_device");
+        let device_syspath = mock_sys.path().join("ask_device").display().to_string();
+        let device_info = create_test_device(&device_syspath);
         let device_with_state = UsbDeviceInfoWithState {
             info: device_info.clone(),
             authorized: false,
@@ -199,7 +204,8 @@ mod tests {
 
         // Process the device, which should put it in the "ask" list.
         let mut manager = device_manager.lock().unwrap();
-        manager.process_usb_device(device_with_state, UsbAuthorizationSystemState::LOGGED_IN);
+        manager.handle_system_state_change(UsbAuthorizationSystemState::LOGGED_IN);
+        manager.process_usb_device(device_with_state);
         assert_eq!(manager.ask_devices().len(), 1);
         assert!(manager.processed_devices().is_empty());
         drop(manager);
@@ -219,7 +225,7 @@ mod tests {
         assert!(manager.ask_devices().is_empty());
         assert_eq!(manager.processed_devices().len(), 1);
         assert!(manager.processed_devices()[0].authorized);
-        assert_eq!(manager.processed_devices()[0].info.syspath, "ask_device");
+        assert_eq!(manager.processed_devices()[0].info.syspath, device_syspath);
         drop(manager);
 
         // Verify the new status via the service.
