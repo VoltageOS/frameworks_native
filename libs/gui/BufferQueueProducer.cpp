@@ -1082,10 +1082,27 @@ status_t BufferQueueProducer::queueBuffer(int slot,
         item.mSlot = slot;
         item.mFence = acquireFence;
         item.mFenceTime = acquireFenceTime;
-        item.mIsDroppable = mCore->mAsyncMode ||
-                (mConsumerIsSurfaceFlinger && mCore->mQueueBufferCanDrop) ||
-                (mCore->mLegacyBufferDrop && mCore->mQueueBufferCanDrop) ||
-                (mCore->mSharedBufferMode && mCore->mSharedBufferSlot == slot);
+        if (mCore->mAsyncMode) {
+            item.mIsDroppable = true;
+            BQ_LOGV("queueBuffer: slot %d is droppable (mAsyncMode)", slot);
+        } else if (mConsumerIsSurfaceFlinger && mCore->mQueueBufferCanDrop) {
+            item.mIsDroppable = true;
+            BQ_LOGV("queueBuffer: slot %d is droppable (mConsumerIsSurfaceFlinger && "
+                    "mQueueBufferCanDrop)",
+                    slot);
+        } else if (mCore->mLegacyBufferDrop && mCore->mQueueBufferCanDrop) {
+            item.mIsDroppable = true;
+            BQ_LOGV("queueBuffer: slot %d is droppable (mLegacyBufferDrop && mQueueBufferCanDrop)",
+                    slot);
+        } else if (mCore->mSharedBufferMode && mCore->mSharedBufferSlot == slot) {
+            item.mIsDroppable = true;
+            BQ_LOGV("queueBuffer: slot %d is droppable (mSharedBufferMode && mSharedBufferSlot == "
+                    "slot)",
+                    slot);
+        } else {
+            item.mIsDroppable = false;
+        }
+
         item.mSurfaceDamage = surfaceDamage;
         item.mQueuedBuffer = true;
         item.mAutoRefresh = mCore->mSharedBufferMode && mCore->mAutoRefresh;
