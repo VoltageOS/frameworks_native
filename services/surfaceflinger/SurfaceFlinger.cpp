@@ -3198,9 +3198,11 @@ CompositeResultsPerDisplay SurfaceFlinger::composite(
 
     constexpr bool kCursorOnly = false;
     const auto layers = mLayerSnapshotBuilder.hasMergedSnapshots()
-            ? copyMergedSnapshots(refreshArgs)
+            ? copyMergedSnapshots(mainThreadRefreshArgs)
             : addLayerSnapshotsToCompositionArgs(mainThreadRefreshArgs, kCursorOnly);
-    setVisibleRegionDirtyIfNeeded(mainThreadRefreshArgs);
+    // setVisibleRegionDirtyIfNeeded(mainThreadRefreshArgs);
+
+    prepareLayersForComposition(mainThreadRefreshArgs, kCursorOnly, layers);
 
     for (auto& [layer, layerFE] : layers) {
         validateForReadback(layerFE);
