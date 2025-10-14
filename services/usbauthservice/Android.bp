@@ -57,6 +57,7 @@ rust_binary {
     crate_name: "usbauthservice",
     defaults: ["libusbauthservice_defaults"],
     srcs: ["usbauthservice.rs"],
+    init_rc: ["usbauthservice.rc"],
     rustlibs: [
         "libusbauthservice_service",
         "libusbauthservice_device_info",
@@ -251,12 +252,6 @@ rust_test_host {
     test_options: {
         unit_test: true,
     },
-}
-
-prebuilt_etc {
-    name: "usbauthservice.rc",
-    src: "usbauthservice.rc",
-    sub_dir: "init",
 }
 
 prebuilt_etc {

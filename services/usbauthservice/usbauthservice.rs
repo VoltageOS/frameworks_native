@@ -72,6 +72,11 @@ fn is_device_usb(device: &Device) -> bool {
 /// Main function of the usb_auth crate.
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    logger::init(
+        logger::Config::default()
+            .with_tag_on_device("usbauthservice")
+            .with_max_level(log::LevelFilter::Debug),
+    );
     debug!("UsbAuth service is starting...");
     let device_manager = UsbDeviceManager::new()?;
     let device_manager = Arc::new(Mutex::new(device_manager));
