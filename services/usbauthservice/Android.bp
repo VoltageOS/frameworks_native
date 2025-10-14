@@ -29,6 +29,7 @@ rust_defaults {
         "libtokio",
         "libtokio_stream",
         "libbinder_rs",
+        "libclap",
     ],
 }
 
@@ -64,6 +65,7 @@ rust_binary {
         "libusbauthservice_parser",
         "libusbauthservice_rules",
     ],
+    prefer_rlib: true,
 }
 
 rust_test_host {
@@ -84,6 +86,42 @@ rust_test_host {
         unit_test: true,
     },
     compile_multilib: "both",
+}
+
+rust_binary {
+    name: "usbauthservice_client",
+    crate_name: "usbauthservice_client",
+    defaults: ["libusbauthservice_defaults"],
+    srcs: ["utils/client.rs"],
+    prefer_rlib: true,
+}
+
+rust_binary_host {
+    name: "usbauthservice_validate_policy",
+    crate_name: "usbauthservice_validate_policy",
+    defaults: ["libusbauthservice_defaults"],
+    srcs: ["utils/validate_policy_file.rs"],
+    rustlibs: [
+        "libusbauthservice_parser",
+        "libusbauthservice_rules",
+    ],
+}
+
+rust_test_host {
+    name: "usbauthservice_validate_policy_test",
+    crate_name: "usbauthservice_validate_policy",
+    defaults: ["libusbauthservice_defaults"],
+    srcs: ["utils/validate_policy_file.rs"],
+    data: ["config/desktop_auth_policy.conf"],
+    rustlibs: [
+        "libusbauthservice_parser",
+        "libusbauthservice_rules",
+        "libenv_logger",
+    ],
+    test_suites: ["general-tests"],
+    test_options: {
+        unit_test: true,
+    },
 }
 
 rust_library {
