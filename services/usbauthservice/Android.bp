@@ -214,3 +214,16 @@ rust_test_host {
         unit_test: true,
     },
 }
+
+prebuilt_etc {
+    name: "usbauthservice.rc",
+    src: "usbauthservice.rc",
+    sub_dir: "init",
+}
+
+prebuilt_etc {
+    name: "desktop_auth_policy",
+    src: "config/desktop_auth_policy.conf",
+    sub_dir: "usb_auth",
+    filename: "policy.conf",
+}
