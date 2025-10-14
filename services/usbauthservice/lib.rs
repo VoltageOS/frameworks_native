@@ -26,3 +26,6 @@ pub mod authorization;
 
 /// Handles the core logic for the USB authorization service.
 pub mod manager;
+
+/// Handles the core logic for the USB authorization service.
+pub mod service;

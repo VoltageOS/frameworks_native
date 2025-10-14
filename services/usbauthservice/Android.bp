@@ -27,6 +27,7 @@ rust_defaults {
         "liblog_rust",
         "liblogger",
         "libtokio",
+        "libbinder_rs",
     ],
 }
 
@@ -102,6 +103,34 @@ rust_test_host {
         "libusbauthservice_device_info",
         "libusbauthservice_parser",
         "libusbauthservice_rules",
+        "libenv_logger",
+    ],
+    test_suites: ["general-tests"],
+    test_options: {
+        unit_test: true,
+    },
+}
+
+rust_library {
+    name: "libusbauthservice_service",
+    crate_name: "usbauthservice_service",
+    defaults: ["libusbauthservice_defaults"],
+    srcs: ["service.rs"],
+    rustlibs: [
+        "libusbauthservice_manager",
+        "libusbauthservice_device_info",
+    ],
+    host_supported: true,
+}
+
+rust_test_host {
+    name: "libusbauthservice_service_test",
+    crate_name: "usbauthservice_service",
+    defaults: ["libusbauthservice_defaults"],
+    srcs: ["service.rs"],
+    rustlibs: [
+        "libusbauthservice_manager",
+        "libusbauthservice_device_info",
         "libenv_logger",
     ],
     test_suites: ["general-tests"],
