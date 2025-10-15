@@ -2549,6 +2549,14 @@ int Surface::setBuffersDimensions(uint32_t width, uint32_t height)
     return NO_ERROR;
 }
 
+int Surface::setLegacyBufferDrop(bool legacyBufferDrop) {
+    ATRACE_CALL();
+    SURF_LOGV("Surface::setBuffersDimensions %s", legacyBufferDrop ? "true" : "false");
+
+    Mutex::Autolock lock(mMutex);
+    return mGraphicBufferProducer->setLegacyBufferDrop(legacyBufferDrop);
+}
+
 int Surface::setBuffersUserDimensions(uint32_t width, uint32_t height)
 {
     ATRACE_CALL();

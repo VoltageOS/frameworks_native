@@ -406,6 +406,7 @@ public:
     virtual int setAutoRefresh(bool autoRefresh);
     virtual int setAutoPrerotation(bool autoPrerotation);
     virtual int setBuffersDimensions(uint32_t width, uint32_t height);
+    virtual int setLegacyBufferDrop(bool legacyBufferDrop);
     virtual int lock(ANativeWindow_Buffer* outBuffer, ARect* inOutDirtyBounds);
     virtual int unlockAndPost();
     virtual int query(int what, int* value) const;
