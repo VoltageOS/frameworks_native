@@ -142,7 +142,9 @@ impl UsbDeviceManager {
         };
         debug!("Setting initial USB authorization state to deny all devices.");
         manager.set_default_to_deny_for_new_devices()?;
+        debug!("Loading static policy");
         manager.load_static_policy()?;
+        debug!("Loading internal devices list");
         manager.load_internal_devices()?;
         debug!("System state set to Booted");
         debug!("Binder service will be set up in main.");
@@ -161,7 +163,6 @@ impl UsbDeviceManager {
         }
         Ok(())
     }
-
     /// Loads the static USB policy from a file or creates a default one if the file does not exist.
     fn load_static_policy(&mut self) -> Result<(), Error> {
         debug!("Loading static USB policy");
@@ -175,11 +176,12 @@ impl UsbDeviceManager {
         }
         Ok(())
     }
-
     /// Iterates through existing USB devices and sets their 'authorized_default' to '0' (deny).
     /// This is called during the initial setup of the UsbDeviceManager.
     fn set_default_to_deny_for_new_devices(&mut self) -> Result<(), Error> {
+        debug!("Setting default to deny for new devices");
         self.set_module_default_to_deny()?;
+        debug!("Setting default to deny for existing USB devices");
         let usb_devices_path = self.root_sys_dir.join(USB_DEVICES_PATH);
         for path in fs::read_dir(usb_devices_path)?.filter_map(|e| e.ok().map(|entry| entry.path()))
         {
