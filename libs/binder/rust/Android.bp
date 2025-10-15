@@ -104,6 +104,7 @@ rust_library {
         "liblibc",
         "liblog_rust",
         "libzerocopy",
+        "libbinder_rs_ndk_compat",
     ],
     host_supported: true,
     vendor_available: true,
@@ -139,6 +140,7 @@ rust_library {
         "liblog_rust_nostd",
         "libspin_nostd",
         "libzerocopy",
+        "libbinder_rs_ndk_compat",
     ],
     cfgs: [
         "single_threaded",
@@ -164,6 +166,7 @@ rust_library {
         "libbinder_ndk_sys_on_trusty_mock",
         "libdowncast_rs",
         "liblibc",
+        "libbinder_rs_ndk_compat",
     ],
     vendor: true,
 }
@@ -406,6 +409,7 @@ rust_test {
         "liblibc",
         "liblog_rust",
         "libzerocopy",
+        "libbinder_rs_ndk_compat",
     ],
 }
 
@@ -424,6 +428,7 @@ rust_test {
         "liblog_rust_nostd",
         "libspin_nostd",
         "libzerocopy",
+        "libbinder_rs_ndk_compat",
     ],
 }
 
