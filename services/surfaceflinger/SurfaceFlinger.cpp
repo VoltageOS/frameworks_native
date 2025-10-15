@@ -5797,8 +5797,8 @@ uint32_t SurfaceFlinger::updateLayerCallbacksAndStats(const FrameTimelineInfo& f
         layer->setTransformHint(transformHint);
         std::optional<gui::CornerRadii> cornerRadii = std::nullopt;
         if (snapshot) {
-            cornerRadii = std::make_optional<gui::CornerRadii>(
-                    snapshot->roundedCorner.croppedRequestedRadii);
+            cornerRadii =
+                    std::make_optional<gui::CornerRadii>(snapshot->roundedCorner.reportedRadii);
         }
         layer->setCornerRadii(cornerRadii);
         if (layer->setBuffer(composerState.externalTexture, *s.bufferData, postTime,
