@@ -140,7 +140,6 @@ rust_library {
         "liblog_rust_nostd",
         "libspin_nostd",
         "libzerocopy",
-        "libbinder_rs_ndk_compat",
     ],
     cfgs: [
         "single_threaded",
@@ -428,7 +427,6 @@ rust_test {
         "liblog_rust_nostd",
         "libspin_nostd",
         "libzerocopy",
-        "libbinder_rs_ndk_compat",
     ],
 }
 
