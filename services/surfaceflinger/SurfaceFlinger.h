@@ -21,6 +21,7 @@
  * NOTE: Make sure this file doesn't include  anything from <gl/ > or <gl2/ >
  */
 
+#include <android-base/expected.h>
 #include <android-base/stringprintf.h>
 #include <android-base/strings.h>
 #include <android-base/thread_annotations.h>
@@ -868,8 +869,13 @@ private:
     status_t mirrorLayer(const LayerCreationArgs& args, const sp<IBinder>& mirrorFromHandle,
                          const sp<IBinder>& stopAtHandle, gui::CreateSurfaceResult& outResult);
 
-    status_t mirrorDisplay(DisplayId displayId, const LayerCreationArgs& args,
-                           gui::CreateSurfaceResult& outResult);
+    // Finds the layer stack associated with the provided `displayId`, and returns the surface
+    // control via `gui::CreateSurfaceResult`. Otherwise, PERMISSION_DENIED if the client lacks the
+    // necessary permissions, or NAME_NOT_FOUND if the `displayId` does not exist, or NO_MEMORY if
+    // the layer cannot be created due to a leak. Note: The mirrored layer stack does not change,
+    // even if the display's layer does.
+    base::expected<gui::CreateSurfaceResult, status_t> mirrorLayerStack(
+            DisplayId displayId, const LayerCreationArgs& args);
 
     // add a layer to SurfaceFlinger
     status_t addClientLayer(LayerCreationArgs& args, const sp<IBinder>& handle,

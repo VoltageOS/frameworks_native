@@ -25,6 +25,7 @@
 #include "SurfaceFlinger.h"
 
 #include <aidl/android/hardware/power/Boost.h>
+#include <android-base/logging.h>
 #include <android-base/parseint.h>
 #include <android-base/properties.h>
 #include <android-base/stringprintf.h>
@@ -5874,44 +5875,40 @@ status_t SurfaceFlinger::mirrorLayer(const LayerCreationArgs& args,
                           nullptr /* parent */, nullptr /* outTransformHint */);
 }
 
-status_t SurfaceFlinger::mirrorDisplay(DisplayId displayId, const LayerCreationArgs& args,
-                                       gui::CreateSurfaceResult& outResult) {
-    IPCThreadState* ipc = IPCThreadState::self();
-    const int uid = ipc->getCallingUid();
-    if (uid != AID_ROOT && uid != AID_GRAPHICS && uid != AID_SYSTEM && uid != AID_SHELL) {
-        ALOGE("Permission denied when trying to mirror display");
-        return PERMISSION_DENIED;
+base::expected<gui::CreateSurfaceResult, status_t> SurfaceFlinger::mirrorLayerStack(
+        DisplayId displayId, const LayerCreationArgs& args) {
+    const IPCThreadState* threadState = IPCThreadState::self();
+    if (const int uid = threadState->getCallingUid();
+        uid != AID_ROOT && uid != AID_GRAPHICS && uid != AID_SYSTEM && uid != AID_SHELL) {
+        LOG(ERROR) << "Permission denied when trying to mirror layer stack ID";
+        return base::unexpected(PERMISSION_DENIED);
     }
 
-    ui::LayerStack layerStack;
-    sp<Layer> rootMirrorLayer;
-    status_t result = 0;
-    LayerCreationArgs mirrorArgs = LayerCreationArgs::fromOtherArgs(args);
-
+    LayerCreationArgs mirrorArgs(LayerCreationArgs::fromOtherArgs(args));
+    gui::CreateSurfaceResult surfaceResult{};
+    sp<Layer> rootMirrorLayer{};
     {
-        Mutex::Autolock lock(mStateLock);
+        const Mutex::Autolock lock(mStateLock);
 
-        const auto display = getDisplayDeviceLocked(displayId);
-        if (!display) {
-            return NAME_NOT_FOUND;
+        const sp<const DisplayDevice> displayDevice = getDisplayDeviceLocked(displayId);
+        if (displayDevice == nullptr) {
+            return base::unexpected(NAME_NOT_FOUND);
         }
-
-        layerStack = display->getLayerStack();
+        mirrorArgs.layerStackToMirror = displayDevice->getLayerStack();
         mirrorArgs.flags |= ISurfaceComposerClient::eNoColorFill;
         mirrorArgs.addToRoot = true;
-        mirrorArgs.layerStackToMirror = layerStack;
-        result = createLayer(mirrorArgs, &outResult.handle, &rootMirrorLayer);
-        if (result != NO_ERROR) {
-            return result;
+        if (const status_t status =
+                    createLayer(mirrorArgs, &surfaceResult.handle, &rootMirrorLayer);
+            status != OK) {
+            return base::unexpected(status);
         }
     }
-    outResult.layerId = rootMirrorLayer->sequence;
-    outResult.layerName = String16(rootMirrorLayer->getDebugName());
-    addClientLayer(mirrorArgs, outResult.handle, rootMirrorLayer /* layer */, nullptr /* parent */,
-                   nullptr /* outTransformHint */);
-
+    surfaceResult.layerId = rootMirrorLayer->sequence;
+    surfaceResult.layerName = static_cast<String16>(rootMirrorLayer->getDebugName());
+    addClientLayer(mirrorArgs, surfaceResult.handle, rootMirrorLayer, /*parent=*/nullptr,
+                   /*outTransformHint=*/nullptr);
     setTransactionFlags(eTransactionFlushNeeded);
-    return NO_ERROR;
+    return surfaceResult;
 }
 
 status_t SurfaceFlinger::createLayer(LayerCreationArgs& args, gui::CreateSurfaceResult& outResult) {
@@ -7527,7 +7524,7 @@ status_t SurfaceFlinger::onTransact(uint32_t code, const Parcel& data, Parcel* r
                         int64_t arg1 = data.readInt64();
                         int64_t arg2 = data.readInt64();
                         // Enable mirroring for one display
-                        auto mirrorRoot = SurfaceComposerClient::getDefault()->mirrorDisplay(
+                        auto mirrorRoot = SurfaceComposerClient::getDefault()->mirrorLayerStack(
                                 DisplayId::fromValue(arg1));
                         const auto token2 =
                                 getPhysicalDisplayToken(PhysicalDisplayId::fromValue(arg2));
