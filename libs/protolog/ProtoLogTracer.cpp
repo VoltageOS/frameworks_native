@@ -41,17 +41,6 @@ namespace android {
 namespace protolog {
 
 namespace {
-struct LogParam {
-    enum class Type { kInt, kDouble, kString, kBool, kInternedString };
-    Type type;
-    union {
-        int64_t int_val;
-        double double_val;
-        const char* string_val;
-        bool bool_val;
-        uint64_t interned_string_id;
-    };
-};
 
 inline uint64_t InternGroupName(
         ProtoLogDataSource::TraceContext& ctx,
@@ -232,6 +221,81 @@ std::string getNativeStackTraceString() {
 }
 
 void ProtoLogTracer::Log(perfetto::protos::ProtoLogLevel level, const char* group,
+                         uint64_t messageHash, std::vector<LogParam>& params) {
+    if (mActiveSessions.load(std::memory_order_relaxed) == 0) {
+        return;
+    }
+
+    ProtoLogDataSource::Trace([&](ProtoLogDataSource::TraceContext ctx) mutable {
+        auto* tlsState = ctx.GetCustomTlsState();
+        const auto& config = tlsState->config;
+        const auto& groupConfig = config.getConfigFor(group);
+
+        if (toProtoLogPriority(level) < toProtoLogPriority(groupConfig.logFrom)) {
+            return;
+        }
+
+        auto* incrementalState = ctx.GetIncrementalState();
+
+        if (!incrementalState->clearReported) {
+            auto packet = ctx.NewTracePacket();
+            packet->set_sequence_flags(
+                    perfetto::protos::pbzero::TracePacket::SEQ_INCREMENTAL_STATE_CLEARED);
+            incrementalState->clearReported = true;
+        }
+
+        InternGroupName(ctx, incrementalState, group);
+        InternStringArgs(ctx, incrementalState, params);
+
+        uint64_t stacktraceId = 0;
+        if (groupConfig.collectStackTrace) {
+            std::string stacktrace = getNativeStackTraceString();
+            stacktraceId = InternStackTrace(ctx, stacktrace, incrementalState);
+        }
+
+        WriteLogMessage(ctx, messageHash, stacktraceId, params);
+    });
+}
+
+void ProtoLogTracer::Log(perfetto::protos::ProtoLogLevel level, const char* group,
+                         const char* format, std::vector<LogParam>& params) {
+    if (mActiveSessions.load(std::memory_order_relaxed) == 0) {
+        return;
+    }
+
+    ProtoLogDataSource::Trace([&](ProtoLogDataSource::TraceContext ctx) mutable {
+        auto* tlsState = ctx.GetCustomTlsState();
+        const auto& config = tlsState->config;
+        const auto& groupConfig = config.getConfigFor(group);
+
+        if (toProtoLogPriority(level) < toProtoLogPriority(groupConfig.logFrom)) {
+            return;
+        }
+
+        auto* incrementalState = ctx.GetIncrementalState();
+
+        if (!incrementalState->clearReported) {
+            auto packet = ctx.NewTracePacket();
+            packet->set_sequence_flags(
+                    perfetto::protos::pbzero::TracePacket::SEQ_INCREMENTAL_STATE_CLEARED);
+            incrementalState->clearReported = true;
+        }
+
+        uint64_t groupId = InternGroupName(ctx, incrementalState, group);
+        uint64_t messageId = InternMessage(ctx, incrementalState, format, level, group, groupId);
+        InternStringArgs(ctx, incrementalState, params);
+
+        uint64_t stacktraceId = 0;
+        if (groupConfig.collectStackTrace) {
+            std::string stacktrace = getNativeStackTraceString();
+            stacktraceId = InternStackTrace(ctx, stacktrace, incrementalState);
+        }
+
+        WriteLogMessage(ctx, messageId, stacktraceId, params);
+    });
+}
+
+void ProtoLogTracer::Log(perfetto::protos::ProtoLogLevel level, const char* group,
                          const char* format, va_list args) {
     if (mActiveSessions.load(std::memory_order_relaxed) == 0) {
         return;
@@ -282,36 +346,7 @@ void ProtoLogTracer::Log(perfetto::protos::ProtoLogLevel level, const char* grou
     }
     va_end(args_for_parsing);
 
-    ProtoLogDataSource::Trace([&](ProtoLogDataSource::TraceContext ctx) mutable {
-        auto* tlsState = ctx.GetCustomTlsState();
-        const auto& config = tlsState->config;
-        const auto& groupConfig = config.getConfigFor(group);
-
-        if (toProtoLogPriority(level) < toProtoLogPriority(groupConfig.logFrom)) {
-            return;
-        }
-
-        auto* incrementalState = ctx.GetIncrementalState();
-
-        if (!incrementalState->clearReported) {
-            auto packet = ctx.NewTracePacket();
-            packet->set_sequence_flags(
-                    perfetto::protos::pbzero::TracePacket::SEQ_INCREMENTAL_STATE_CLEARED);
-            incrementalState->clearReported = true;
-        }
-
-        uint64_t groupId = InternGroupName(ctx, incrementalState, group);
-        uint64_t messageId = InternMessage(ctx, incrementalState, format, level, group, groupId);
-        InternStringArgs(ctx, incrementalState, params);
-
-        uint64_t stacktraceId = 0;
-        if (groupConfig.collectStackTrace) {
-            std::string stacktrace = getNativeStackTraceString();
-            stacktraceId = InternStackTrace(ctx, stacktrace, incrementalState);
-        }
-
-        WriteLogMessage(ctx, messageId, stacktraceId, params);
-    });
+    Log(level, group, format, params);
 }
 
 } // namespace protolog
