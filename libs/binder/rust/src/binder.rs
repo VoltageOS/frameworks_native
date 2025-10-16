@@ -27,6 +27,7 @@ use std::cmp::Ordering;
 use std::convert::TryFrom;
 use std::ffi::{c_void, CStr, CString};
 use std::fmt;
+#[cfg(feature = "std")]
 use std::io::Write;
 use std::marker::PhantomData;
 use std::ops::Deref;
@@ -65,6 +66,7 @@ pub trait Interface: Send + Sync + DowncastSync {
     ///
     /// This handler is a no-op by default and should be implemented for each
     /// Binder service struct that wishes to respond to dump transactions.
+    #[cfg(feature = "std")]
     fn dump(&self, _writer: &mut dyn Write, _args: &[&CStr]) -> Result<()> {
         Ok(())
     }
@@ -193,6 +195,7 @@ pub trait Remotable: Send + Sync + 'static {
 
     /// Handle a request to invoke the dump transaction on this
     /// object.
+    #[cfg(feature = "std")]
     fn on_dump(&self, file: &mut dyn Write, args: &[&CStr]) -> Result<()>;
 
     /// Retrieve the class of this remote object.
@@ -817,6 +820,39 @@ pub struct BinderFeatures {
     pub _non_exhaustive: (),
 }
 
+/// A helper to generate on_dump.
+/// This is pulled out into its own macro so that it's
+/// correctly conditionally generated based on feature = "std".
+///
+/// It is not expected that callers use this directly, but it is
+/// exported because it's used in declare_binder_interface!
+/// TODO: b/25915863 - Once AIDL is std-aware and sets its own "std" feature,
+/// the contents of this macro can be moved back into the `declare_binder_interface!` macro.
+#[doc(hidden)]
+#[cfg(feature = "std")]
+#[macro_export]
+macro_rules! on_dump_impl {
+    () => {
+        fn on_dump(
+            &self,
+            writer: &mut dyn std::io::Write,
+            args: &[&std::ffi::CStr],
+        ) -> std::result::Result<(), $crate::StatusCode> {
+            self.0.dump(writer, args)
+        }
+    };
+}
+
+/// no-op version of `on_dump_impl` for `no_std` builds
+/// TODO: b/25915863 - Once AIDL is std-aware and sets its own "std" feature,
+/// the contents of this macro can be moved back into the `declare_binder_interface!` macro.
+#[doc(hidden)]
+#[cfg(not(feature = "std"))]
+#[macro_export]
+macro_rules! on_dump_impl {
+    () => {};
+}
+
 /// Declare typed interfaces for a binder object.
 ///
 /// Given an interface trait and descriptor string, create a native and remote
@@ -1066,9 +1102,7 @@ macro_rules! declare_binder_interface {
                 }
             }
 
-            fn on_dump(&self, writer: &mut dyn std::io::Write, args: &[&std::ffi::CStr]) -> std::result::Result<(), $crate::StatusCode> {
-                self.0.dump(writer, args)
-            }
+            $crate::on_dump_impl!();
 
             fn get_class() -> $crate::binder_impl::InterfaceClass {
                 static CLASS: std::sync::OnceLock<$crate::binder_impl::InterfaceClass> =
