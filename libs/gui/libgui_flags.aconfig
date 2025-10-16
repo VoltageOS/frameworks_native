@@ -130,3 +130,13 @@ flag {
   }
 } # default_scaling_mode_freeze
 
+flag {
+  name: "remove_controlled_by_app"
+  namespace: "core_graphics"
+  description: "ControlledByApp is inconsistent and weird, nuke it from orbit"
+  bug: "447611028"
+  is_fixed_read_only: true
+  metadata {
+      purpose: PURPOSE_BUGFIX
+  }
+}
