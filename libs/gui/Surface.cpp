@@ -1776,6 +1776,12 @@ int Surface::perform(int operation, va_list args)
     case NATIVE_WINDOW_SET_BUFFERS_ADDITIONAL_OPTIONS:
         res = dispatchSetAdditionalOptions(args);
         break;
+    case NATIVE_WINDOW_SET_PRODUCER_THROTTLING_ENABLED:
+        res = dispatchSetProducerThrottlingEnabled(args);
+        break;
+    case NATIVE_WINDOW_GET_PRODUCER_THROTTLING_ENABLED:
+        res = dispatchIsProducerThrottlingEnabled(args);
+        break;
     default:
         res = NAME_NOT_FOUND;
         break;
@@ -2009,6 +2015,16 @@ int Surface::dispatchSetFrameRate(va_list args) {
     int8_t compatibility = static_cast<int8_t>(va_arg(args, int));
     int8_t changeFrameRateStrategy = static_cast<int8_t>(va_arg(args, int));
     return setFrameRate(frameRate, compatibility, changeFrameRateStrategy);
+}
+
+int Surface::dispatchSetProducerThrottlingEnabled(va_list args) {
+    bool enabled = bool(va_arg(args, int));
+    return setProducerThrottlingEnabled(enabled);
+}
+
+int Surface::dispatchIsProducerThrottlingEnabled(va_list args) {
+    bool* outEnabled = va_arg(args, bool*);
+    return isProducerThrottlingEnabled(outEnabled);
 }
 
 int Surface::dispatchAddCancelInterceptor(va_list args) {
@@ -3080,6 +3096,18 @@ status_t Surface::setFrameTimelineInfo(uint64_t /*frameNumber*/,
                                        const FrameTimelineInfo& /*frameTimelineInfo*/) {
     // ISurfaceComposer no longer supports setFrameTimelineInfo
     return BAD_VALUE;
+}
+
+status_t Surface::setProducerThrottlingEnabled(bool enabled) {
+    status_t err = mGraphicBufferProducer->setProducerThrottlingEnabled(enabled);
+    SURF_LOGE_IF(err, "IGraphicBufferProducer::setProducerThrottlingEnabled(%s) returned %s",
+                 enabled ? "true" : "false", strerror(-err));
+    return err;
+}
+
+status_t Surface::isProducerThrottlingEnabled(bool* outEnabled) const {
+    status_t err = mGraphicBufferProducer->isProducerThrottlingEnabled(outEnabled);
+    return err;
 }
 
 #if COM_ANDROID_GRAPHICS_LIBGUI_FLAGS(BQ_EXTENDEDALLOCATE)

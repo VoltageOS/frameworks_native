@@ -389,6 +389,9 @@ private:
     // will eventually be released or acquired by the consumer.
     bool mAllowExtraAcquire = false;
 
+    // state of producer throttling, see setProducerThrottlingEnabled()
+    bool mProducerThrottlingEnabled = true;
+
 #if COM_ANDROID_GRAPHICS_LIBGUI_FLAGS(BQ_EXTENDEDALLOCATE)
     // Additional options to pass when allocating GraphicBuffers.
     // GenerationID changes when the options change, indicating reallocation is required
