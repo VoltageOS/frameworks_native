@@ -62,5 +62,7 @@ interface ISurfaceComposerClient {
 
     CreateSurfaceResult mirrorLayerStack(long displayId);
 
+    CreateSurfaceResult mirrorDisplay(long displayId);
+
     SchedulingPolicy getSchedulingPolicy();
 }
