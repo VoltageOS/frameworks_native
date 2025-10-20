@@ -71,6 +71,7 @@
 #include <scheduler/TransactionSchedule.h>
 #include <scheduler/interface/CompositionCoverage.h>
 #include <scheduler/interface/ICompositor.h>
+#include <ui/DisplayId.h>
 #include <ui/FenceResult.h>
 
 #include "ActivePictureTracker.h"
@@ -741,6 +742,8 @@ private:
     [[nodiscard]] std::pair<ftl::Future<status_t>, ftl::FinalizerStd>
     setPhysicalDisplayPowerModeAsync(const sp<DisplayDevice>& display, hal::PowerMode mode)
             REQUIRES(mStateLock, kMainThreadContext);
+    [[nodiscard]] ftl::FinalizerStd makePowerModeAsyncFinalizer(PhysicalDisplayId displayId,
+                                                                hal::PowerMode mode);
     void setVirtualDisplayPowerMode(const sp<DisplayDevice>& display, hal::PowerMode mode)
             REQUIRES(mStateLock, kMainThreadContext);
 
