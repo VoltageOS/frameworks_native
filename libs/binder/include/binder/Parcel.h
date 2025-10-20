@@ -1100,11 +1100,11 @@ private:
                 // + 2 for null char
                 // The string + null is padded for 4 byte alignment
                 // + 4 byte int32 for len
-                totalSize += ((t.size() * 2 + 2 + 3) & ~3) + 4;
+                totalSize += ((t.size() * 2u + 2u + 3u) & ~3u) + 4u;
             }
             totalSize += mDataPos;
             if (dataCapacity() < totalSize) {
-                setDataCapacity(totalSize / 2 * 3);
+                setDataCapacity(totalSize / 2u * 3u);
             }
             writeData(size);
             for (const auto& t : c) {

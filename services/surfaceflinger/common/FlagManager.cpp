@@ -113,6 +113,7 @@ void FlagManager::dump(std::string& result) const {
     DUMP_SYSPROP_FLAG(disable_sched_fifo_composer);
     DUMP_SYSPROP_FLAG(disable_sched_fifo_composer_callback);
     DUMP_SYSPROP_FLAG(productionize_readback_screenshot);
+    DUMP_SYSPROP_FLAG(stable_edid_ids_for_external_displays_optin);
 
     /// Legacy server flags ///
     DUMP_LEGACY_SERVER_FLAG(test_flag);
@@ -123,27 +124,29 @@ void FlagManager::dump(std::string& result) const {
     /// IMPORTANT - please keep alphabetize to reduce merge conflicts
     DUMP_ACONFIG_FLAG(add_first_vsync_to_tracker);
     DUMP_ACONFIG_FLAG(adpf_gpu_sf);
-    DUMP_ACONFIG_FLAG(adpf_native_session_manager);
-    DUMP_ACONFIG_FLAG(adpf_use_fmq_channel);
-    DUMP_ACONFIG_FLAG(adpf_use_fmq_channel_fixed);
     DUMP_ACONFIG_FLAG(anchor_list);
-    DUMP_ACONFIG_FLAG(buffer_stuffing_fix);
     DUMP_ACONFIG_FLAG(connected_displays_cursor);
     DUMP_ACONFIG_FLAG(correct_virtual_display_power_state);
+    DUMP_ACONFIG_FLAG(deprecate_vsync_sf_v2);
     DUMP_ACONFIG_FLAG(disable_transparent_region_hint);
     DUMP_ACONFIG_FLAG(filter_refresh_rates_within_config_group);
     DUMP_ACONFIG_FLAG(frontend_caching_v0);
     DUMP_ACONFIG_FLAG(graphite_renderengine_preview_rollout);
+    DUMP_ACONFIG_FLAG(graphite_renderengine_desktop_rollout);
     DUMP_ACONFIG_FLAG(increase_missed_frame_jank_threshold);
+    DUMP_ACONFIG_FLAG(jank_classification_v2);
     DUMP_ACONFIG_FLAG(luts_api);
+    DUMP_ACONFIG_FLAG(md_degrade_hdr);
+    DUMP_ACONFIG_FLAG(mirror_uid_filtering);
     DUMP_ACONFIG_FLAG(monitor_buffer_fences);
     DUMP_ACONFIG_FLAG(offload_gpu_composition);
     DUMP_ACONFIG_FLAG(readback_screenshot);
+    DUMP_ACONFIG_FLAG(re_check_fence);
+    DUMP_ACONFIG_FLAG(re_powered_off_displays_inform_cache_budgets);
     DUMP_ACONFIG_FLAG(refresh_rate_overlay_on_external_display);
-    DUMP_ACONFIG_FLAG(reset_model_flushes_fence);
-    DUMP_ACONFIG_FLAG(resync_on_tx);
-    DUMP_ACONFIG_FLAG(unify_refresh_rate_callbacks);
-    DUMP_ACONFIG_FLAG(vsync_predictor_predicts_within_threshold);
+    DUMP_ACONFIG_FLAG(resync_on_tx_separate_timer);
+    DUMP_ACONFIG_FLAG(supported_refresh_rate_update);
+    DUMP_ACONFIG_FLAG(use_at_least_60_for_min_vote);
 
     /// Trunk stable readonly flags ///
     /// IMPORTANT - please keep alphabetize to reduce merge conflicts
@@ -153,22 +156,22 @@ void FlagManager::dump(std::string& result) const {
     DUMP_ACONFIG_FLAG(connected_display_hdr_v2);
     DUMP_ACONFIG_FLAG(correct_dpi_with_display_size);
     DUMP_ACONFIG_FLAG(deprecate_frame_tracker);
-    DUMP_ACONFIG_FLAG(deprecate_vsync_sf);
     DUMP_ACONFIG_FLAG(disable_synthetic_vsync_for_performance);
     DUMP_ACONFIG_FLAG(display_command_modeset);
     DUMP_ACONFIG_FLAG(enable_layer_command_batching);
     DUMP_ACONFIG_FLAG(enable_small_area_detection);
     DUMP_ACONFIG_FLAG(flush_buffer_slots_to_uncache);
     DUMP_ACONFIG_FLAG(follower_arbitrary_refresh_rate_selection);
+    DUMP_ACONFIG_FLAG(follower_display_backpressure);
+    DUMP_ACONFIG_FLAG(force_slower_follower_gpu_composition);
     DUMP_ACONFIG_FLAG(fp16_client_target);
     DUMP_ACONFIG_FLAG(frame_rate_category_mrr);
-    DUMP_ACONFIG_FLAG(game_default_frame_rate);
     DUMP_ACONFIG_FLAG(graphite_renderengine);
     DUMP_ACONFIG_FLAG(hdcp_level_hal);
     DUMP_ACONFIG_FLAG(hdcp_negotiation);
     DUMP_ACONFIG_FLAG(local_tonemap_screenshots);
+    DUMP_ACONFIG_FLAG(modeset_state_machine);
     DUMP_ACONFIG_FLAG(no_vsyncs_on_screen_off);
-    DUMP_ACONFIG_FLAG(pacesetter_selection);
     DUMP_ACONFIG_FLAG(parse_edid_version_and_input_type);
     DUMP_ACONFIG_FLAG(protected_if_client);
     DUMP_ACONFIG_FLAG(renderable_buffer_usage);
@@ -179,8 +182,8 @@ void FlagManager::dump(std::string& result) const {
     DUMP_ACONFIG_FLAG(stop_layer);
     DUMP_ACONFIG_FLAG(synced_resolution_switch);
     DUMP_ACONFIG_FLAG(true_hdr_screenshots);
-    DUMP_ACONFIG_FLAG(use_known_refresh_rate_for_fps_consistency);
     DUMP_ACONFIG_FLAG(vulkan_renderengine);
+    DUMP_ACONFIG_FLAG(wb_framebuffersurface2);
     DUMP_ACONFIG_FLAG(wb_virtualdisplay2);
     DUMP_ACONFIG_FLAG(window_blur_kawase2);
     DUMP_ACONFIG_FLAG(window_blur_kawase2_fix_aliasing);
@@ -245,6 +248,7 @@ FLAG_MANAGER_SYSPROP_FLAG(disable_sched_fifo_re, /* default */ false)
 FLAG_MANAGER_SYSPROP_FLAG(disable_sched_fifo_composer, /* default */ false)
 FLAG_MANAGER_SYSPROP_FLAG(disable_sched_fifo_composer_callback, /* default */ false)
 FLAG_MANAGER_SYSPROP_FLAG(productionize_readback_screenshot, /* default */ false)
+FLAG_MANAGER_SYSPROP_FLAG(stable_edid_ids_for_external_displays_optin, /* default */ false)
 
 /// Legacy server flags ///
 FLAG_MANAGER_LEGACY_SERVER_FLAG(test_flag, "", "")
@@ -262,7 +266,6 @@ FLAG_MANAGER_ACONFIG_FLAG(cache_when_source_crop_layer_only_moved,
 FLAG_MANAGER_ACONFIG_FLAG(connected_display_hdr_v2, "debug.sf.connected_display_hdr_v2");
 FLAG_MANAGER_ACONFIG_FLAG(correct_dpi_with_display_size, "");
 FLAG_MANAGER_ACONFIG_FLAG(deprecate_frame_tracker, "");
-FLAG_MANAGER_ACONFIG_FLAG(deprecate_vsync_sf, "");
 FLAG_MANAGER_ACONFIG_FLAG(disable_synthetic_vsync_for_performance, "");
 FLAG_MANAGER_ACONFIG_FLAG(display_command_modeset, "debug.sf.display_command_modeset")
 FLAG_MANAGER_ACONFIG_FLAG(enable_layer_command_batching, "debug.sf.enable_layer_command_batching")
@@ -270,15 +273,17 @@ FLAG_MANAGER_ACONFIG_FLAG(enable_small_area_detection, "")
 FLAG_MANAGER_ACONFIG_FLAG(flush_buffer_slots_to_uncache, "");
 FLAG_MANAGER_ACONFIG_FLAG(follower_arbitrary_refresh_rate_selection,
                           "debug.sf.follower_arbitrary_refresh_rate_selection");
+FLAG_MANAGER_ACONFIG_FLAG(follower_display_backpressure, "debug.sf.follower_display_backpressure");
+FLAG_MANAGER_ACONFIG_FLAG(force_slower_follower_gpu_composition,
+                          "debug.sf.force_slower_follower_gpu_composition");
 FLAG_MANAGER_ACONFIG_FLAG(fp16_client_target, "debug.sf.fp16_client_target")
 FLAG_MANAGER_ACONFIG_FLAG(frame_rate_category_mrr, "debug.sf.frame_rate_category_mrr")
-FLAG_MANAGER_ACONFIG_FLAG(game_default_frame_rate, "")
 FLAG_MANAGER_ACONFIG_FLAG(graphite_renderengine, "debug.renderengine.graphite")
 FLAG_MANAGER_ACONFIG_FLAG(hdcp_level_hal, "")
 FLAG_MANAGER_ACONFIG_FLAG(hdcp_negotiation, "debug.sf.hdcp_negotiation");
 FLAG_MANAGER_ACONFIG_FLAG(local_tonemap_screenshots, "debug.sf.local_tonemap_screenshots");
+FLAG_MANAGER_ACONFIG_FLAG(modeset_state_machine, "");
 FLAG_MANAGER_ACONFIG_FLAG(no_vsyncs_on_screen_off, "debug.sf.no_vsyncs_on_screen_off")
-FLAG_MANAGER_ACONFIG_FLAG(pacesetter_selection, "debug.sf.pacesetter_selection")
 FLAG_MANAGER_ACONFIG_FLAG(parse_edid_version_and_input_type,
                           "debug.sf.parse_edid_version_and_input_type");
 FLAG_MANAGER_ACONFIG_FLAG(protected_if_client, "")
@@ -290,8 +295,8 @@ FLAG_MANAGER_ACONFIG_FLAG(stable_edid_ids, "debug.sf.stable_edid_ids")
 FLAG_MANAGER_ACONFIG_FLAG(stop_layer, "");
 FLAG_MANAGER_ACONFIG_FLAG(synced_resolution_switch, "");
 FLAG_MANAGER_ACONFIG_FLAG(true_hdr_screenshots, "debug.sf.true_hdr_screenshots");
-FLAG_MANAGER_ACONFIG_FLAG(use_known_refresh_rate_for_fps_consistency, "")
 FLAG_MANAGER_ACONFIG_FLAG(vulkan_renderengine, "debug.renderengine.vulkan")
+FLAG_MANAGER_ACONFIG_FLAG(wb_framebuffersurface2, "");
 FLAG_MANAGER_ACONFIG_FLAG(wb_virtualdisplay2, "");
 FLAG_MANAGER_ACONFIG_FLAG(window_blur_kawase2, "");
 FLAG_MANAGER_ACONFIG_FLAG(window_blur_kawase2_fix_aliasing, "");
@@ -300,28 +305,30 @@ FLAG_MANAGER_ACONFIG_FLAG(window_blur_kawase2_fix_aliasing, "");
 /// IMPORTANT - please keep alphabetized to reduce merge conflicts
 FLAG_MANAGER_ACONFIG_FLAG(add_first_vsync_to_tracker, "")
 FLAG_MANAGER_ACONFIG_FLAG(adpf_gpu_sf, "")
-FLAG_MANAGER_ACONFIG_FLAG(adpf_native_session_manager, "");
 FLAG_MANAGER_ACONFIG_FLAG(anchor_list, "")
-FLAG_MANAGER_ACONFIG_FLAG(buffer_stuffing_fix, "");
+FLAG_MANAGER_ACONFIG_FLAG(deprecate_vsync_sf_v2, "");
 FLAG_MANAGER_ACONFIG_FLAG(disable_transparent_region_hint,
                           "debug.sf.disable_transparent_region_hint");
 FLAG_MANAGER_ACONFIG_FLAG(filter_refresh_rates_within_config_group, "");
 FLAG_MANAGER_ACONFIG_FLAG(frontend_caching_v0, "");
 FLAG_MANAGER_ACONFIG_FLAG(graphite_renderengine_preview_rollout, "");
+FLAG_MANAGER_ACONFIG_FLAG(graphite_renderengine_desktop_rollout, "");
 FLAG_MANAGER_ACONFIG_FLAG(increase_missed_frame_jank_threshold, "");
+FLAG_MANAGER_ACONFIG_FLAG(jank_classification_v2, "debug.sf.jank_classification_v2")
+FLAG_MANAGER_ACONFIG_FLAG(md_degrade_hdr, "");
+FLAG_MANAGER_ACONFIG_FLAG(mirror_uid_filtering, "");
 FLAG_MANAGER_ACONFIG_FLAG(monitor_buffer_fences, "");
 FLAG_MANAGER_ACONFIG_FLAG(offload_gpu_composition, "");
+FLAG_MANAGER_ACONFIG_FLAG(re_check_fence, "");
+FLAG_MANAGER_ACONFIG_FLAG(re_powered_off_displays_inform_cache_budgets, "");
 FLAG_MANAGER_ACONFIG_FLAG(readback_screenshot, "")
 FLAG_MANAGER_ACONFIG_FLAG(refresh_rate_overlay_on_external_display, "")
-FLAG_MANAGER_ACONFIG_FLAG(reset_model_flushes_fence, "");
-FLAG_MANAGER_ACONFIG_FLAG(resync_on_tx, "");
-FLAG_MANAGER_ACONFIG_FLAG(unify_refresh_rate_callbacks, "");
-FLAG_MANAGER_ACONFIG_FLAG(vsync_predictor_predicts_within_threshold, "");
+FLAG_MANAGER_ACONFIG_FLAG(resync_on_tx_separate_timer, "");
+FLAG_MANAGER_ACONFIG_FLAG(supported_refresh_rate_update, "");
+FLAG_MANAGER_ACONFIG_FLAG(use_at_least_60_for_min_vote, "");
 
 /// Trunk stable server (R/W) flags from outside SurfaceFlinger ///
 
-FLAG_MANAGER_ACONFIG_FLAG_IMPORTED(adpf_use_fmq_channel, "", android::os)
-FLAG_MANAGER_ACONFIG_FLAG_IMPORTED(adpf_use_fmq_channel_fixed, "", android::os)
 FLAG_MANAGER_ACONFIG_FLAG_IMPORTED(connected_displays_cursor, "", com::android::input::flags)
 FLAG_MANAGER_ACONFIG_FLAG_IMPORTED(correct_virtual_display_power_state, "",
                                    android::companion::virtualdevice::flags)

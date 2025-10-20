@@ -63,7 +63,6 @@ filegroup {
         "mock/MockEventThread.cpp",
         "mock/MockFrameTimeline.cpp",
         "mock/MockFrameTracer.cpp",
-        "mock/MockNativeWindowSurface.cpp",
         "mock/MockTimeStats.cpp",
         "mock/MockVSyncDispatch.cpp",
         "mock/MockVSyncTracker.cpp",
@@ -166,7 +165,7 @@ cc_defaults {
         "libutils",
     ],
     header_libs: [
-        "android.hardware.graphics.composer3-command-buffer",
+        "android.hardware.graphics.composer3-command-buffer-V5",
         "android.hardware.graphics.composer@2.1-command-buffer",
         "android.hardware.graphics.composer@2.2-command-buffer",
         "android.hardware.graphics.composer@2.3-command-buffer",

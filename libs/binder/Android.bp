@@ -247,8 +247,8 @@ cc_defaults {
     host_supported: true,
 
     defaults: [
+        "libbinder_bpbinder_decstrong_last_flag_default",
         "libbinder_defer_bc_request_freeze_notification_flag_default",
-        "libbinder_no_flush_on_last_ref_flag_default",
     ],
 
     srcs: [
@@ -557,6 +557,14 @@ libbinder_addservice_cache_config {
 }
 
 cc_defaults {
+    name: "libbinder_bpbinder_decstrong_last_flag_default",
+    cflags: select(release_flag("RELEASE_LIBBINDER_BPBINDER_DECSTRONG_LAST"), {
+        true: ["-DLIBBINDER_BPBINDER_DECSTRONG_LAST"],
+        default: [],
+    }),
+}
+
+cc_defaults {
     name: "libbinder_defer_bc_request_freeze_notification_flag_default",
     cflags: select(release_flag("RELEASE_LIBBINDER_DEFER_BC_REQUEST_FREEZE_NOTIFICATION"), {
         true: ["-DLIBBINDER_DEFER_BC_REQUEST_FREEZE_NOTIFICATION"],
@@ -565,25 +573,9 @@ cc_defaults {
 }
 
 cc_defaults {
-    name: "libbinder_no_flush_on_last_ref_flag_default",
-    cflags: select(release_flag("RELEASE_LIBBINDER_NO_FLUSH_ON_LAST_REF"), {
-        true: ["-DLIBBINDER_NO_FLUSH_ON_LAST_REF"],
-        default: [],
-    }),
-}
-
-cc_defaults {
-    name: "libbinder_fix_double_derefs_flag_default",
-    cflags: select(release_flag("RELEASE_LIBBINDER_FIX_RECURSIVE_DOUBLE_DEREFS"), {
-        true: ["-DLIBBINDER_FIX_RECURSIVE_DOUBLE_DEREFS"],
-        default: [],
-    }),
-}
-
-cc_defaults {
-    name: "libbinder_freeze_use_flush_if_needed_flag_default",
-    cflags: select(release_flag("RELEASE_LIBBINDER_FREEZE_USE_FLUSH_IF_NEEDED"), {
-        true: ["-DLIBBINDER_FREEZE_USE_FLUSH_IF_NEEDED"],
+    name: "libbinder_freeze_use_flush_eagerly_flag_default",
+    cflags: select(release_flag("RELEASE_LIBBINDER_FREEZE_USE_FLUSH_EAGERLY"), {
+        true: ["-DLIBBINDER_FREEZE_USE_FLUSH_EAGERLY"],
         default: [],
     }),
 }
@@ -595,8 +587,7 @@ cc_defaults {
         "libbinder_defer_bc_request_freeze_notification_flag_default",
         "libbinder_addservice_cache_flag",
         "libbinder_remove_cache_static_list_flag",
-        "libbinder_fix_double_derefs_flag_default",
-        "libbinder_freeze_use_flush_if_needed_flag_default",
+        "libbinder_freeze_use_flush_eagerly_flag_default",
     ],
     srcs: [
         "BufferedTextOutput.cpp",
@@ -609,8 +600,8 @@ cc_defaults {
         ":libbinder_aidl",
         ":libbinder_accessor_aidl",
         ":libbinder_device_interface_sources",
-        ":android-os-statsbootstrap-aidl",
         ":libbinder_observer_sources",
+        ":android-os-binderstatsconsumer-aidl",
     ],
     target: {
         vendor: {
@@ -808,7 +799,7 @@ cc_library {
     ],
 }
 
-cc_library {
+cc_library_static {
     name: "libbinder_rpc_single_threaded",
     defaults: [
         "libbinder_common_defaults",
@@ -823,7 +814,7 @@ cc_library {
     ],
 }
 
-cc_library {
+cc_library_static {
     name: "libbinder_rpc_single_threaded_no_kernel",
     defaults: [
         "libbinder_common_defaults",
@@ -905,6 +896,25 @@ cc_library {
         "//hardware/interfaces/security/see:__subpackages__",
         "//system/core/trusty:__subpackages__",
         "//vendor:__subpackages__",
+    ],
+}
+
+cc_library {
+    name: "libbindernetlink",
+    vendor_available: false,
+    shared_libs: [
+        "libbase",
+        "liblog",
+        "libnl",
+    ],
+    srcs: [
+        "BinderNetlink.cpp",
+    ],
+    export_include_dirs: [
+        "include",
+    ],
+    export_shared_lib_headers: [
+        "libnl",
     ],
 }
 

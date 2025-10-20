@@ -52,9 +52,10 @@
 #include "test_framework/hwc3/delegators/Composer.h"
 #include "test_framework/hwc3/delegators/ComposerCallback.h"
 #include "test_framework/hwc3/delegators/ComposerClient.h"
+#include "test_framework/hwc3/events/BufferPendingDisplay.h"
+#include "test_framework/hwc3/events/BufferPendingRelease.h"
 #include "test_framework/hwc3/events/ClientDestroyed.h"
 #include "test_framework/hwc3/events/DisplayPresented.h"
-#include "test_framework/hwc3/events/PendingBufferSwap.h"
 #include "test_framework/hwc3/events/PowerMode.h"
 #include "test_framework/hwc3/events/VSync.h"
 #include "test_framework/hwc3/events/VSyncEnabled.h"
@@ -153,7 +154,7 @@ struct ComposerClientObserver final : public ComposerClientForwarder {
         auto onVsync(int64_t in_display, int64_t in_timestamp, int32_t in_vsyncPeriodNanos)
                 -> ::ndk::ScopedAStatus override {
             if (auto controller = mController.lock()) {
-                controller->callbacks().onVSyncCallbackSent(events::VSync{
+                controller->onVSyncCallbackSent(events::VSync{
                         .displayId = in_display,
                         .expectedAt =
                                 events::VSync::TimePoint(std::chrono::nanoseconds(in_timestamp)),
@@ -201,7 +202,7 @@ struct ComposerClientObserver final : public ComposerClientForwarder {
     auto setPowerMode(int64_t in_display, PowerMode in_mode) -> ndk::ScopedAStatus override {
         LOG(VERBOSE) << __func__;
         if (auto observer = mController.lock()) {
-            observer->callbacks().onPowerModeChanged(
+            observer->onPowerModeChanged(
                     events::PowerMode{.displayId = in_display, .mode = in_mode});
         }
 
@@ -211,7 +212,7 @@ struct ComposerClientObserver final : public ComposerClientForwarder {
     auto setVsyncEnabled(int64_t in_display, bool in_enabled) -> ndk::ScopedAStatus override {
         LOG(VERBOSE) << __func__;
         if (auto observer = mController.lock()) {
-            observer->callbacks().onVsyncEnabledChanged(
+            observer->onVsyncEnabledChanged(
                     events::VSyncEnabled{.displayId = in_display, .enabled = in_enabled});
         }
         return Base::setVsyncEnabled(in_display, in_enabled);
@@ -276,14 +277,23 @@ struct ComposerClientObserver final : public ComposerClientForwarder {
         const auto released = std::exchange(layerState.current, displayed);
 
         if (auto observer = mController.lock()) {
-            observer->callbacks().onPendingBufferSwap(events::PendingBufferSwap{
+            observer->onBufferPendingDisplay(events::BufferPendingDisplay{
                     .displayId = eventTemplate.displayId,
                     .layerId = layerId,
-                    .pendingDisplay = displayed,
-                    .pendingRelease = released,
+                    .bufferId = displayed,
                     .expectedPresentTime = eventTemplate.expectedPresentTime,
                     .receivedAt = eventTemplate.receivedAt,
             });
+
+            if (released) {
+                observer->onBufferPendingRelease(events::BufferPendingRelease{
+                        .displayId = eventTemplate.displayId,
+                        .layerId = layerId,
+                        .bufferId = *released,
+                        .expectedPresentTime = eventTemplate.expectedPresentTime,
+                        .receivedAt = eventTemplate.receivedAt,
+                });
+            }
         }
 
         LOG(VERBOSE) << "Displaying buffer " << toString(displayed);
@@ -298,11 +308,10 @@ struct ComposerClientObserver final : public ComposerClientForwarder {
 
         if (released) {
             if (auto observer = mController.lock()) {
-                observer->callbacks().onPendingBufferSwap(events::PendingBufferSwap{
+                observer->onBufferPendingRelease(events::BufferPendingRelease{
                         .displayId = eventTemplate.displayId,
                         .layerId = layerId,
-                        .pendingDisplay = displayed,
-                        .pendingRelease = released,
+                        .bufferId = *released,
                         .expectedPresentTime = eventTemplate.expectedPresentTime,
                         .receivedAt = eventTemplate.receivedAt,
                 });
@@ -363,7 +372,7 @@ struct ComposerClientObserver final : public ComposerClientForwarder {
 
             if (cmd.presentOrValidateDisplay) {
                 if (auto observer = mController.lock()) {
-                    observer->callbacks().onDisplayPresented(
+                    observer->onDisplayPresented(
                             events::DisplayPresented{.displayId = cmd.display,
                                                      .expectedPresentTime = expectedPresentTime,
                                                      .receivedAt = receivedTime});
@@ -427,7 +436,7 @@ struct ObservingComposer::ObservingComposerImpl final : public ComposerForwarder
     // Finalizers should be last so their destructors are invoked first.
     ftl::FinalizerFtl1 mCleanup{[this] {
         if (auto controller = mController.lock()) {
-            controller->callbacks().onClientDestroyed(events::ClientDestroyed{});
+            controller->onClientDestroyed(events::ClientDestroyed{});
         }
     }};
 };

@@ -473,4 +473,15 @@ const LayerFE::HwcLayerDebugState& LayerFE::getLastHwcState() const {
     return mLastHwcState;
 };
 
+void LayerFE::setLastClientTargetAcquireFence(const FenceResult& lastCompositionAcquireFence) {
+    mLastClientCompositionAcquireFence = lastCompositionAcquireFence;
+}
+
+sp<Fence> LayerFE::getAndClearLastClientTargetAcquireFence() {
+    sp<Fence> lastCompositionAcquireFence =
+            mLastClientCompositionAcquireFence.value_or(Fence::NO_FENCE);
+    mLastClientCompositionAcquireFence = Fence::NO_FENCE;
+    return lastCompositionAcquireFence;
+}
+
 } // namespace android

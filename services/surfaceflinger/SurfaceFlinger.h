@@ -37,8 +37,10 @@
 #include <cutils/atomic.h>
 #include <cutils/compiler.h>
 #include <ftl/algorithm.h>
+#include <ftl/finalizer.h>
 #include <ftl/future.h>
 #include <ftl/non_null.h>
+#include <ftl/small_map.h>
 #include <gui/BufferQueue.h>
 #include <gui/CompositorTiming.h>
 #include <gui/FrameTimestamps.h>
@@ -80,6 +82,7 @@
 #include "DisplayHardware/HWComposer.h"
 #include "DisplayIdGenerator.h"
 #include "Effects/Daltonizer.h"
+#include "FrontEnd/Caching/MergeableHierarchyManager.h"
 #include "FrontEnd/DisplayInfo.h"
 #include "FrontEnd/LayerCreationArgs.h"
 #include "FrontEnd/LayerLifecycleManager.h"
@@ -129,11 +132,11 @@ class FlagManager;
 class FpsReporter;
 class TunnelModeEnabledReporter;
 class HdrLayerInfoReporter;
-class IGraphicBufferProducer;
 class Layer;
 class MessageBase;
 class RefreshRateOverlay;
 class RegionSamplingThread;
+class Surface;
 class TimeStats;
 class FrameTracer;
 class ScreenCapturer;
@@ -402,19 +405,7 @@ private:
 
         const LayerVector::StateSet stateSet = LayerVector::StateSet::Invalid;
 
-        // TODO(b/241285876): Replace deprecated DefaultKeyedVector with ftl::SmallMap.
-        DefaultKeyedVector<wp<IBinder>, DisplayDeviceState> displays;
-
-        std::optional<size_t> getDisplayIndex(PhysicalDisplayId displayId) const {
-            for (size_t i = 0; i < displays.size(); i++) {
-                const auto& state = displays.valueAt(i);
-                if (state.physical && state.physical->id == displayId) {
-                    return i;
-                }
-            }
-
-            return {};
-        }
+        ui::DisplayMap<wp<IBinder>, DisplayDeviceState> displays;
 
         bool colorMatrixChanged = true;
         mat4 colorMatrix;
@@ -584,7 +575,9 @@ private:
     void setAutoLowLatencyMode(const sp<IBinder>& displayToken, bool on);
     void setGameContentType(const sp<IBinder>& displayToken, bool on);
     status_t getMaxLayerPictureProfiles(const sp<IBinder>& displayToken, int32_t* outMaxProfiles);
+    // TODO b/339477240 - Remove.
     void setPowerMode(const sp<IBinder>& displayToken, int mode);
+    void setPowerModeAsync(const sp<IBinder>& displayToken, int mode);
     status_t overrideHdrTypes(const sp<IBinder>& displayToken,
                               const std::vector<ui::Hdr>& hdrTypes);
     status_t onPullAtom(const int32_t atomId, std::vector<uint8_t>* pulledData, bool* success);
@@ -630,10 +623,10 @@ private:
             const sp<IBinder>& displayToken,
             std::optional<aidl::android::hardware::graphics::common::DisplayDecorationSupport>*
                     outSupport) const;
-    status_t setFrameRate(const sp<IGraphicBufferProducer>& surface, float frameRate,
-                          int8_t compatibility, int8_t changeFrameRateStrategy);
+    status_t setFrameRate(const sp<Surface>& surface, float frameRate, int8_t compatibility,
+                          int8_t changeFrameRateStrategy);
 
-    status_t setFrameTimelineInfo(const sp<IGraphicBufferProducer>& surface,
+    status_t setFrameTimelineInfo(const sp<Surface>& surface,
                                   const gui::FrameTimelineInfo& frameTimelineInfo);
 
     status_t setGameModeFrameRateOverride(uid_t uid, float frameRate);
@@ -690,7 +683,7 @@ private:
     // ISchedulerCallback overrides:
     void requestHardwareVsync(PhysicalDisplayId, bool) override;
     void requestDisplayModes(std::vector<display::DisplayModeRequest>) override;
-    void kernelTimerChanged(bool expired) override;
+    void kernelTimerChanged(PhysicalDisplayId, bool expired) override;
     void onChoreographerAttached() override;
     void onExpectedPresentTimePosted(TimePoint expectedPresentTime, ftl::NonNull<DisplayModePtr>,
                                      Fps renderRate) override;
@@ -732,11 +725,21 @@ private:
     bool finalizeDisplayModeChange(PhysicalDisplayId) REQUIRES(kMainThreadContext)
             REQUIRES(mStateLock);
 
+    // TODO: Remove once `modeset_state_machine` flag is cleaned up.
     void dropModeRequest(PhysicalDisplayId) REQUIRES(kMainThreadContext);
     void applyActiveMode(PhysicalDisplayId) REQUIRES(kMainThreadContext);
 
+    void dropModeRequest(display::DisplayModeRequest&&) REQUIRES(kMainThreadContext);
+    void applyActiveMode(display::DisplayModeRequest&&) REQUIRES(kMainThreadContext);
+
     // Called on the main thread in response to setPowerMode()
     void setPhysicalDisplayPowerMode(const sp<DisplayDevice>& display, hal::PowerMode mode)
+            REQUIRES(mStateLock, kMainThreadContext);
+    // Returns a future for the slow hardware operation which can run on any
+    // thread and a finalizer whose function must be scheduled on the main
+    // thread.
+    [[nodiscard]] std::pair<ftl::Future<status_t>, ftl::FinalizerStd>
+    setPhysicalDisplayPowerModeAsync(const sp<DisplayDevice>& display, hal::PowerMode mode)
             REQUIRES(mStateLock, kMainThreadContext);
     void setVirtualDisplayPowerMode(const sp<DisplayDevice>& display, hal::PowerMode mode)
             REQUIRES(mStateLock, kMainThreadContext);
@@ -776,6 +779,9 @@ private:
     void moveSnapshotsFromCompositionArgs(compositionengine::CompositionRefreshArgs& refreshArgs,
                                           const std::vector<std::pair<Layer*, LayerFE*>>& layers)
             REQUIRES(kMainThreadContext);
+    std::vector<std::pair<Layer*, LayerFE*>> copyMergedSnapshots(
+            compositionengine::CompositionRefreshArgs& refreshArgs) REQUIRES(kMainThreadContext);
+
     // Return true if we must composite this frame
     bool updateLayerSnapshots(VsyncId vsyncId, nsecs_t frameTimeNs, nsecs_t expecedPresentTimeNs,
                               bool transactionsFlushed, bool& out) REQUIRES(kMainThreadContext);
@@ -989,7 +995,7 @@ private:
         Gpu,
     };
     base::expected<ScreenshotStrategy, status_t> setScreenshotSnapshotsAndDisplayState(
-            ScreenshotArgs& args);
+            ScreenshotArgs& args, ui::PixelFormat requestedPixelFormat);
 
     void captureScreenCommon(ScreenshotArgs& args, ui::PixelFormat,
                              const sp<IScreenCaptureListener>&);
@@ -1059,9 +1065,6 @@ private:
     }
 
     sp<DisplayDevice> getPacesetterDisplayLocked() REQUIRES(mStateLock) {
-        if (!FlagManager::getInstance().pacesetter_selection()) {
-            return getFrontInternalDisplayLocked();
-        }
         return getDisplayDeviceLocked(mScheduler->getPacesetterDisplayId());
     }
 
@@ -1081,13 +1084,6 @@ private:
     sp<const DisplayDevice> getFrontInternalDisplay() const EXCLUDES(mStateLock) {
         Mutex::Autolock lock(mStateLock);
         return getFrontInternalDisplayLocked();
-    }
-
-    std::optional<PhysicalDisplayId> getDefaultPacesetterDisplay() const {
-        if (FlagManager::getInstance().pacesetter_selection()) {
-            return std::nullopt;
-        }
-        return mFrontInternalDisplayId;
     }
 
     using DisplayDeviceAndSnapshot = std::pair<sp<DisplayDevice>, display::DisplaySnapshotRef>;
@@ -1182,7 +1178,7 @@ private:
             std::shared_ptr<compositionengine::Display> compositionDisplay,
             const DisplayDeviceState& state,
             const sp<compositionengine::DisplaySurface>& displaySurface,
-            const sp<IGraphicBufferProducer>& producer) REQUIRES(mStateLock);
+            const sp<Surface>& compositionSurface) REQUIRES(mStateLock);
     void processDisplayChangesLocked() REQUIRES(mStateLock, kMainThreadContext);
     void processDisplayAdded(const wp<IBinder>& displayToken, const DisplayDeviceState&)
             REQUIRES(mStateLock, kMainThreadContext);
@@ -1286,6 +1282,7 @@ private:
 
     void appendSfConfigString(std::string& result) const;
     void listLayers(std::string& result) const REQUIRES(kMainThreadContext);
+    void captureRenderDocFrame(std::string& result);
     void dumpStats(const DumpArgs& args, std::string& result) const
             REQUIRES(mStateLock, kMainThreadContext);
     void clearStats(const DumpArgs& args, std::string& result) REQUIRES(kMainThreadContext);
@@ -1613,8 +1610,8 @@ private:
                 [](const auto& display) { return display.isHdrSdrRatioOverlayEnabled(); });
     }
 
-    std::vector<std::pair<Layer*, sp<LayerFE>>> getLayerSnapshotsForScreenshots(
-            const SnapshotRequestArgs& args) REQUIRES(kMainThreadContext);
+    base::expected<std::vector<std::pair<Layer*, sp<LayerFE>>>, status_t>
+    getLayerSnapshotsForScreenshots(const SnapshotRequestArgs& args) REQUIRES(kMainThreadContext);
 
     const sp<WindowInfosListenerInvoker> mWindowInfosListenerInvoker;
 
@@ -1635,6 +1632,8 @@ private:
     frontend::LayerLifecycleManager mLayerLifecycleManager GUARDED_BY(kMainThreadContext);
     frontend::LayerHierarchyBuilder mLayerHierarchyBuilder GUARDED_BY(kMainThreadContext);
     frontend::LayerSnapshotBuilder mLayerSnapshotBuilder GUARDED_BY(kMainThreadContext);
+    frontend::caching::MergeableHierarchyManager mMergeableHierarchyManager
+            GUARDED_BY(kMainThreadContext);
 
     mutable std::mutex mCreatedLayersLock;
     std::vector<sp<Layer>> mCreatedLayers GUARDED_BY(mCreatedLayersLock);
@@ -1687,6 +1686,10 @@ private:
                                          TimePoint expectedPresentTime, Fps frameInterval,
                                          std::optional<Period> timeoutOpt);
 
+    void updateHdrInfos(
+            const std::vector<std::pair<compositionengine::Display*, sp<HdrLayerInfoReporter>>>&
+                    listeners) REQUIRES(kMainThreadContext);
+
     void sfdo_enableRefreshRateOverlay(bool active);
     void sfdo_setDebugFlash(int delay);
     void sfdo_scheduleComposite();
@@ -1707,9 +1710,15 @@ private:
     std::future<void> offloadGpuCompositedDisplays(
             compositionengine::CompositionRefreshArgs offloadedRefreshArgs,
             std::vector<std::pair<Layer*, LayerFE*>> offloadedLayers);
+    void prepareLayersForComposition(compositionengine::CompositionRefreshArgs& refreshArgs,
+                                     bool kCursorOnly,
+                                     const std::vector<std::pair<Layer*, LayerFE*>>& layers);
     // TODO(b/431836223): Workaround to capture traces to disk and recover gracefully by forcing CE
     //  to rebuild layer stack instead of crashing.
     void setVisibleRegionDirtyIfNeeded(compositionengine::CompositionRefreshArgs& refreshArgs);
+
+    void setForcedClientCompositionLayerStacks(
+            compositionengine::CompositionRefreshArgs& refreshArgs) EXCLUDES(mStateLock);
 };
 
 class SurfaceComposerAIDL : public gui::BnSurfaceComposer {

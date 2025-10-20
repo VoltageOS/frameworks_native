@@ -18,8 +18,11 @@
 #define LOG_TAG "LibSurfaceFlingerUnittests"
 
 #include <ftl/fake_guard.h>
+#include <gui/BufferItemConsumer.h>
+#include <gui/Surface.h>
 #include <ui/ScreenPartStatus.h>
 
+#include "DisplayDevice.h"
 #include "DisplayHardware/DisplayMode.h"
 
 #include "DisplayTransactionTestHelpers.h"
@@ -42,8 +45,6 @@ struct WideColorP3ColorimetricSupportedVariant {
     }
 
     static void setupComposerCallExpectations(DisplayTransactionTest* test) {
-        EXPECT_CALL(*test->mNativeWindow, perform(NATIVE_WINDOW_SET_BUFFERS_DATASPACE)).Times(1);
-
         EXPECT_CALL(*test->mComposer,
                     getRenderIntents(Display::HWC_DISPLAY_ID, ColorMode::DISPLAY_P3, _))
                 .WillOnce(DoAll(SetArgPointee<2>(
@@ -200,7 +201,8 @@ void SetupNewDisplayDeviceInternalTest::setupNewDisplayDeviceInternalTest() {
     const sp<BBinder> displayToken = sp<BBinder>::make();
     const sp<compositionengine::mock::DisplaySurface> displaySurface =
             sp<compositionengine::mock::DisplaySurface>::make();
-    const auto producer = sp<mock::GraphicBufferProducer>::make();
+    const auto [consumer, surface] =
+            BufferItemConsumer::create(AHARDWAREBUFFER_USAGE_CPU_READ_RARELY);
 
     // --------------------------------------------------------------------
     // Preconditions
@@ -211,10 +213,6 @@ void SetupNewDisplayDeviceInternalTest::setupNewDisplayDeviceInternalTest() {
     // The display is setup with the HWC.
     Case::Display::injectHwcDisplay(this);
 
-    // SurfaceFlinger will use a test-controlled factory for native window
-    // surfaces.
-    injectFakeNativeWindowSurfaceFactory();
-
     // A compositionengine::Display has already been created
     auto compositionDisplay = Case::Display::injectCompositionDisplay(this);
 
@@ -222,7 +220,6 @@ void SetupNewDisplayDeviceInternalTest::setupNewDisplayDeviceInternalTest() {
     // Call Expectations
 
     // Various native window calls will be made.
-    Case::Display::setupNativeWindowSurfaceCreationCallExpectations(this);
     Case::Display::setupHwcGetActiveConfigCallExpectations(this);
     Case::Display::setupHwcGetConfigsCallExpectations(this);
     Case::WideColorSupport::setupComposerCallExpectations(this);
@@ -232,7 +229,7 @@ void SetupNewDisplayDeviceInternalTest::setupNewDisplayDeviceInternalTest() {
     // --------------------------------------------------------------------
     // Invocation
 
-    DisplayDeviceState state;
+    std::optional<DisplayDeviceState> stateOpt;
 
     constexpr auto kConnectionTypeOpt = Case::Display::CONNECTION_TYPE::value;
     if constexpr (kConnectionTypeOpt) {
@@ -250,10 +247,7 @@ void SetupNewDisplayDeviceInternalTest::setupNewDisplayDeviceInternalTest() {
                                             .setGroup(0)
                                             .build();
 
-        state.physical = {.id = *displayId,
-                          .hwcDisplayId = *hwcDisplayId,
-                          .port = *port,
-                          .activeMode = activeMode};
+        stateOpt = DisplayDeviceState::createPhysical(*displayId, *hwcDisplayId, *port, activeMode);
 
         ui::ColorModes colorModes;
         if constexpr (Case::WideColorSupport::WIDE_COLOR_SUPPORTED) {
@@ -270,13 +264,18 @@ void SetupNewDisplayDeviceInternalTest::setupNewDisplayDeviceInternalTest() {
         FTL_FAKE_GUARD(kMainThreadContext,
                        mFlinger.mutableDisplayModeController()
                                .registerDisplay(it->second.snapshot(), activeMode->getId(), {}));
+    } else {
+        constexpr uid_t kOwnerUid = 123;
+        stateOpt = DisplayDeviceState::createVirtual(kOwnerUid);
     }
 
+    LOG_ALWAYS_FATAL_IF(!stateOpt);
+    DisplayDeviceState& state = *stateOpt;
     state.isSecure = static_cast<bool>(Case::Display::SECURE);
     state.flags = Case::Display::DISPLAY_FLAGS;
 
     auto device = mFlinger.setupNewDisplayDeviceInternal(displayToken, compositionDisplay, state,
-                                                         displaySurface, producer);
+                                                         displaySurface, surface);
 
     // --------------------------------------------------------------------
     // Postconditions

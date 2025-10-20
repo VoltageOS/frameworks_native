@@ -142,10 +142,10 @@ static bool intersectionIsRoundRect(const SkRect& bounds, const SkRect& crop,
     // In particular the round rect implementation will scale the value of all corner radii
     // if the sum of the radius along any edge is greater than the length of that edge.
     // See https://www.w3.org/TR/css-backgrounds-3/#corner-overlap
-    const bool requiredWidth = bounds.width() > (cornerRadii.topLeft.x + cornerRadii.topRight.x) ||
+    const bool requiredWidth = bounds.width() > (cornerRadii.topLeft.x + cornerRadii.topRight.x) &&
             bounds.width() > (cornerRadii.bottomLeft.x + cornerRadii.bottomRight.x);
     const bool requiredHeight =
-            bounds.height() > (cornerRadii.topLeft.y + cornerRadii.bottomLeft.y) ||
+            bounds.height() > (cornerRadii.topLeft.y + cornerRadii.bottomLeft.y) &&
             bounds.height() > (cornerRadii.topRight.y + cornerRadii.bottomRight.y);
     if (!requiredWidth || !requiredHeight) {
         return false;
@@ -216,9 +216,9 @@ static inline std::pair<SkRRect, SkRRect> getBoundsAndClip(
         // converting them to a single RRect draw. It is possible there are other cases
         // that can be converted.
         if (crop.contains(bounds)) {
-            float dx = std::min({cornerRadii.topLeft.x, cornerRadii.topRight.x,
+            float dx = std::max({cornerRadii.topLeft.x, cornerRadii.topRight.x,
                                  cornerRadii.bottomLeft.x, cornerRadii.bottomRight.x});
-            float dy = std::min({cornerRadii.topLeft.y, cornerRadii.topRight.y,
+            float dy = std::max({cornerRadii.topLeft.y, cornerRadii.topRight.y,
                                  cornerRadii.bottomLeft.y, cornerRadii.bottomRight.y});
             const auto insetCrop = crop.makeInset(dx, dy);
             if (insetCrop.contains(bounds)) {
@@ -321,6 +321,7 @@ SkiaRenderEngine::SkiaRenderEngine(Threaded threaded, PixelFormat pixelFormat,
                                    BlurAlgorithm blurAlgorithm)
       : RenderEngine(threaded),
         mRuntimeEffectManager(RuntimeEffectManager(blurAlgorithm)),
+        mBoxShadowUtils(mRuntimeEffectManager),
         mDefaultPixelFormat(pixelFormat) {
     // Note: do not introduce further switching on flags here, or within individual blur filters.
     // BlurAlgorithm should be the only determining factor.
@@ -365,8 +366,6 @@ void SkiaRenderEngine::finishRenderingAndAbandonContexts() {
     if (mBlurFilter) {
         delete mBlurFilter;
     }
-
-    mBoxShadowUtils.cleanup();
 
     // Leftover textures may hold refs to backend-specific Skia contexts, which must be released
     // before ~SkiaGpuContext is called.
@@ -472,8 +471,6 @@ void SkiaRenderEngine::ensureContextsCreated() {
     }
 
     std::tie(mContext, mProtectedContext) = createContexts();
-
-    mBoxShadowUtils.init(getActiveContext());
 }
 
 void SkiaRenderEngine::mapExternalTextureBuffer(const sp<GraphicBuffer>& buffer,
@@ -736,10 +733,10 @@ private:
 
 static SkRRect getBlurRRect(const BlurRegion& region) {
     const auto rect = SkRect::MakeLTRB(region.left, region.top, region.right, region.bottom);
-    const SkVector radii[4] = {SkVector::Make(region.cornerRadiusTL, region.cornerRadiusTL),
-                               SkVector::Make(region.cornerRadiusTR, region.cornerRadiusTR),
-                               SkVector::Make(region.cornerRadiusBR, region.cornerRadiusBR),
-                               SkVector::Make(region.cornerRadiusBL, region.cornerRadiusBL)};
+    const SkVector radii[4] = {SkVector::Make(region.cornerRadiusTLX, region.cornerRadiusTLY),
+                               SkVector::Make(region.cornerRadiusTRX, region.cornerRadiusTRY),
+                               SkVector::Make(region.cornerRadiusBRX, region.cornerRadiusBRY),
+                               SkVector::Make(region.cornerRadiusBLX, region.cornerRadiusBLY)};
     SkRRect roundedRect;
     roundedRect.setRectRadii(rect, radii);
     return roundedRect;
@@ -782,6 +779,16 @@ private:
     DISALLOW_COPY_AND_ASSIGN(DeferTextureCleanup);
     AutoBackendTexture::CleanupManager& mMgr;
 };
+
+void SkiaRenderEngine::waitFence(SkiaGpuContext* context, base::borrowed_fd fenceFd) {
+    // If the fence is already signaled, we can skip waiting on it.
+    if (FlagManager::getInstance().re_check_fence() && fenceFd.get() >= 0) {
+        if (sync_wait(fenceFd.get(), 0) >= 0) {
+            return;
+        }
+    }
+    waitFenceImpl(context, fenceFd);
+}
 
 void SkiaRenderEngine::drawLayersInternal(
         const std::shared_ptr<std::promise<FenceResult>>&& resultPromise,
@@ -871,6 +878,11 @@ void SkiaRenderEngine::drawLayersInternal(
     }
 
     AutoSaveRestore surfaceAutoSaveRestore(canvas);
+
+    if (mRenderDocCaptureNextFrame) {
+        mRenderDoc.startFrameCapture();
+    }
+
     // Clear the entire canvas with a transparent black to prevent ghost images.
     canvas->clear(SK_ColorTRANSPARENT);
     initCanvas(canvas, display);
@@ -1067,6 +1079,20 @@ void SkiaRenderEngine::drawLayersInternal(
                     originalBounds.isRect() && !originalClip.isEmpty() ? originalClip
                                                                        : originalBounds;
 
+            if (!layer.boxShadowSettings.boxShadows.empty()) {
+                LOG_ALWAYS_FATAL_IF(layer.disableBlending,
+                                    "Cannot disableBlending with a box shadow");
+
+                float cornerRadius =
+                        roundf(preferredOriginalBounds.radii(SkRRect::kUpperLeft_Corner).fX);
+                const bool opaqueContent =
+                        (!layer.source.buffer.buffer || layer.source.buffer.isOpaque) &&
+                        layer.alpha == 1.0f;
+                mBoxShadowUtils.drawBoxShadows(canvas, preferredOriginalBounds.rect(), cornerRadius,
+                                               layer.boxShadowSettings,
+                                               opaqueContent && supportsForwardPixelKill());
+            }
+
             // Similar to shadows, do the rendering before the clip is applied because even when the
             // layer is occluded it should have an outline.
             if (layer.borderSettings.strokeWidth > 0) {
@@ -1083,17 +1109,6 @@ void SkiaRenderEngine::drawLayersInternal(
                 paint.setColor(layer.borderSettings.color);
                 paint.setStyle(SkPaint::kFill_Style);
                 canvas->drawDRRect(outlineRect, preferredOriginalBounds, paint);
-            }
-
-            if (!layer.boxShadowSettings.boxShadows.empty()) {
-                SFTRACE_NAME("BoxShadows");
-                LOG_ALWAYS_FATAL_IF(layer.disableBlending,
-                                    "Cannot disableBlending with a box shadow");
-
-                float cornerRadius =
-                        roundf(preferredOriginalBounds.radii(SkRRect::kUpperLeft_Corner).fX);
-                mBoxShadowUtils.drawBoxShadows(canvas, preferredOriginalBounds.rect(), cornerRadius,
-                                               layer.boxShadowSettings);
             }
         }
 
@@ -1359,6 +1374,11 @@ void SkiaRenderEngine::drawLayersInternal(
         }
     }
     resultPromise->set_value(std::move(drawFence));
+
+    if (mRenderDocCaptureNextFrame) {
+        mRenderDoc.endFrameCapture();
+        mRenderDocCaptureNextFrame = false;
+    }
 }
 
 void SkiaRenderEngine::tonemapAndDrawGainmapInternal(
@@ -1456,6 +1476,14 @@ void SkiaRenderEngine::onActiveDisplaySizeChanged(ui::Size size) {
     // conservative default based on that analysis.
     const float SURFACE_SIZE_MULTIPLIER = 3.5f * bytesPerPixel(mDefaultPixelFormat);
     const int maxResourceBytes = size.width * size.height * SURFACE_SIZE_MULTIPLIER;
+    if (FlagManager::getInstance().re_powered_off_displays_inform_cache_budgets()) {
+        LOG_ALWAYS_FATAL_IF(maxResourceBytes <= 0,
+                            "Invalid maxResourceBytes (size: %dx%d, bytesPerPixel(%d): %" PRIu32
+                            ")",
+                            size.getWidth(), size.getHeight(),
+                            static_cast<int>(mDefaultPixelFormat),
+                            bytesPerPixel(mDefaultPixelFormat));
+    }
 
     // start by resizing the current context
     getActiveContext()->setResourceCacheLimit(maxResourceBytes);

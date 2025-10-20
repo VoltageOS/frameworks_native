@@ -31,6 +31,7 @@
 
 #ifndef NO_BINDER
 #include <android/gui/DisplayStatInfo.h>
+#include <binder/IInterface.h>
 #include <gui/AidlUtil.h>
 #include <gui/ISurfaceComposer.h>
 #include <gui/LayerState.h>
@@ -191,6 +192,23 @@ Surface::~Surface() {
 
 sp<Surface> Surface::from(ANativeWindow* anw) {
     return sp<Surface>::fromExisting(static_cast<Surface*>(anw));
+}
+
+bool Surface::areSurfacesEquivalent(const sp<Surface>& a, const sp<Surface>& b) {
+    if (a == b) {
+        return true;
+    }
+
+    if ((a == nullptr && b != nullptr) || (a != nullptr && b == nullptr)) {
+        return false;
+    }
+
+#ifndef NO_BINDER
+    return IInterface::asBinder(a->mGraphicBufferProducer) ==
+            IInterface::asBinder(b->mGraphicBufferProducer);
+#else
+    return a->mGraphicBufferProducer == b->mGraphicBufferProducer;
+#endif
 }
 
 #ifndef NO_BINDER
@@ -1758,6 +1776,12 @@ int Surface::perform(int operation, va_list args)
     case NATIVE_WINDOW_SET_BUFFERS_ADDITIONAL_OPTIONS:
         res = dispatchSetAdditionalOptions(args);
         break;
+    case NATIVE_WINDOW_SET_PRODUCER_THROTTLING_ENABLED:
+        res = dispatchSetProducerThrottlingEnabled(args);
+        break;
+    case NATIVE_WINDOW_GET_PRODUCER_THROTTLING_ENABLED:
+        res = dispatchIsProducerThrottlingEnabled(args);
+        break;
     default:
         res = NAME_NOT_FOUND;
         break;
@@ -1993,6 +2017,16 @@ int Surface::dispatchSetFrameRate(va_list args) {
     return setFrameRate(frameRate, compatibility, changeFrameRateStrategy);
 }
 
+int Surface::dispatchSetProducerThrottlingEnabled(va_list args) {
+    bool enabled = bool(va_arg(args, int));
+    return setProducerThrottlingEnabled(enabled);
+}
+
+int Surface::dispatchIsProducerThrottlingEnabled(va_list args) {
+    bool* outEnabled = va_arg(args, bool*);
+    return isProducerThrottlingEnabled(outEnabled);
+}
+
 int Surface::dispatchAddCancelInterceptor(va_list args) {
     ANativeWindow_cancelBufferInterceptor interceptor =
             va_arg(args, ANativeWindow_cancelBufferInterceptor);
@@ -2116,6 +2150,7 @@ int Surface::dispatchSetFrameTimelineInfo(va_list args) {
     ftlInfo.useForRefreshRateSelection = nativeWindowFtlInfo.useForRefreshRateSelection;
     ftlInfo.skippedFrameVsyncId = nativeWindowFtlInfo.skippedFrameVsyncId;
     ftlInfo.skippedFrameStartTimeNanos = nativeWindowFtlInfo.skippedFrameStartTimeNanos;
+    ftlInfo.vsyncResyncedJitterNanos = nativeWindowFtlInfo.vsyncResyncedJitterNanos;
 
     return setFrameTimelineInfo(nativeWindowFtlInfo.frameNumber, ftlInfo);
 #endif
@@ -2211,36 +2246,46 @@ int Surface::connect(int api, const sp<SurfaceListener>& listener, bool reportBu
 int Surface::disconnect(int api, IGraphicBufferProducer::DisconnectMode mode) {
     ATRACE_CALL();
     SURF_LOGV("Surface::disconnect");
+    int err = mGraphicBufferProducer->disconnect(api, mode);
+    if (err == BAD_VALUE) {
+        SURF_LOGE("Surface failed to disconnect with error %d (%s). Likely the wrong API was "
+                  "requested (%d). Not cleaning up internals.",
+                  err, statusToString(err).c_str(), api);
+        return err;
+    }
+
+    // In this case the surface is either already disconnected or the process is dead.
+    SURF_LOGE_IF(err != NO_ERROR,
+                 "Surface failed to disconnect. Cleaning up internals anyway. Error %d (%s).", err,
+                 statusToString(err).c_str());
+
     Mutex::Autolock lock(mMutex);
     mRemovedBuffers.clear();
     mSharedBufferSlot = BufferItem::INVALID_BUFFER_SLOT;
     mSharedBufferHasBeenQueued = false;
     clearBuffersForDisconnectLocked();
-    int err = mGraphicBufferProducer->disconnect(api, mode);
-    if (!err) {
-        mReqFormat = 0;
-        mReqWidth = 0;
-        mReqHeight = 0;
-        mReqUsage = 0;
-        mCrop.clear();
-        mDataSpace = Dataspace::UNKNOWN;
-        mScalingMode = NATIVE_WINDOW_SCALING_MODE_FREEZE;
-        mTransform = 0;
-        mStickyTransform = 0;
-        mAutoPrerotation = false;
-        mEnableFrameTimestamps = false;
-        mMaxBufferCount = NUM_BUFFER_SLOTS;
+    mReqFormat = 0;
+    mReqWidth = 0;
+    mReqHeight = 0;
+    mReqUsage = 0;
+    mCrop.clear();
+    mDataSpace = Dataspace::UNKNOWN;
+    mScalingMode = NATIVE_WINDOW_SCALING_MODE_FREEZE;
+    mTransform = 0;
+    mStickyTransform = 0;
+    mAutoPrerotation = false;
+    mEnableFrameTimestamps = false;
+    mMaxBufferCount = NUM_BUFFER_SLOTS;
 
-        if (api == NATIVE_WINDOW_API_CPU) {
-            mConnectedToCpu = false;
-        }
-
-        std::scoped_lock _dl(mDebugMutex);
-        // Keep the old name in case we get subsequent calls, for logging.
-        mDebugName = mDebugName + "-DISCONNECTED";
-        mId = 0;
-        mIsConnected = false;
+    if (api == NATIVE_WINDOW_API_CPU) {
+        mConnectedToCpu = false;
     }
+
+    std::scoped_lock _dl(mDebugMutex);
+    // Keep the old name in case we get subsequent calls, for logging.
+    mDebugName = mDebugName + "-DISCONNECTED";
+    mId = 0;
+    mIsConnected = false;
 
 #if !defined(NO_BINDER)
     if (mSurfaceDeathListener != nullptr) {
@@ -2261,17 +2306,17 @@ int Surface::detachNextBuffer(sp<GraphicBuffer>* outBuffer,
         return BAD_VALUE;
     }
 
-    Mutex::Autolock lock(mMutex);
-    if (mReportRemovedBuffers) {
-        mRemovedBuffers.clear();
-    }
-
     sp<GraphicBuffer> buffer(nullptr);
     sp<Fence> fence(nullptr);
     status_t result = mGraphicBufferProducer->detachNextBuffer(
             &buffer, &fence);
     if (result != NO_ERROR) {
         return result;
+    }
+
+    Mutex::Autolock lock(mMutex);
+    if (mReportRemovedBuffers) {
+        mRemovedBuffers.clear();
     }
 
     *outBuffer = buffer;
@@ -2518,6 +2563,14 @@ int Surface::setBuffersDimensions(uint32_t width, uint32_t height)
     mReqWidth = width;
     mReqHeight = height;
     return NO_ERROR;
+}
+
+int Surface::setLegacyBufferDrop(bool legacyBufferDrop) {
+    ATRACE_CALL();
+    SURF_LOGV("Surface::setBuffersDimensions %s", legacyBufferDrop ? "true" : "false");
+
+    Mutex::Autolock lock(mMutex);
+    return mGraphicBufferProducer->setLegacyBufferDrop(legacyBufferDrop);
 }
 
 int Surface::setBuffersUserDimensions(uint32_t width, uint32_t height)
@@ -3045,6 +3098,18 @@ status_t Surface::setFrameTimelineInfo(uint64_t /*frameNumber*/,
     return BAD_VALUE;
 }
 
+status_t Surface::setProducerThrottlingEnabled(bool enabled) {
+    status_t err = mGraphicBufferProducer->setProducerThrottlingEnabled(enabled);
+    SURF_LOGE_IF(err, "IGraphicBufferProducer::setProducerThrottlingEnabled(%s) returned %s",
+                 enabled ? "true" : "false", strerror(-err));
+    return err;
+}
+
+status_t Surface::isProducerThrottlingEnabled(bool* outEnabled) const {
+    status_t err = mGraphicBufferProducer->isProducerThrottlingEnabled(outEnabled);
+    return err;
+}
+
 #if COM_ANDROID_GRAPHICS_LIBGUI_FLAGS(BQ_EXTENDEDALLOCATE)
 status_t Surface::setAdditionalOptions(const std::vector<gui::AdditionalOptions>& options) {
     if (!GraphicBufferAllocator::get().supportsAdditionalOptions()) {
@@ -3067,16 +3132,14 @@ void Surface::destroy() {
 }
 
 bool Surface::IsCursorPlaneCompatibilitySupported() {
-    if (com::android::graphics::libgui::flags::cursor_plane_compatibility()) {
-        const AHardwareBuffer_Desc testDesc{.width = 64,
-                                            .height = 64,
-                                            .layers = 1,
-                                            .format = AHARDWAREBUFFER_FORMAT_B8G8R8A8_UNORM,
-                                            .usage = GRALLOC_USAGE_CURSOR};
-        return AHardwareBuffer_isSupported(&testDesc);
-    }
-
-    return false;
+    const AHardwareBuffer_Desc testDesc{.width = 64,
+                                        .height = 64,
+                                        .layers = 1,
+                                        .format = AHARDWAREBUFFER_FORMAT_B8G8R8A8_UNORM,
+                                        .usage = GRALLOC_USAGE_CURSOR};
+    const bool ret = AHardwareBuffer_isSupported(&testDesc);
+    ALOGW_IF(!ret, "Required cursor plane buffer format not supported");
+    return ret;
 }
 
 }; // namespace android

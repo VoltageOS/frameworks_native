@@ -32,14 +32,15 @@
 #include "InterfaceMocks.h"
 #include "TestConstants.h"
 #include "TestInputListener.h"
+#include "input/Input.h"
 #include "input/PropertyMap.h"
 
 namespace android {
 
 class InputMapperUnitTest : public testing::Test {
 protected:
-    static constexpr int32_t EVENTHUB_ID = 1;
-    static constexpr int32_t DEVICE_ID = END_RESERVED_ID + 1000;
+    static constexpr RawDeviceId EVENTHUB_ID = 1;
+    static constexpr DeviceId DEVICE_ID = END_RESERVED_ID + 1000;
     virtual void SetUp() override { SetUp(/*bus=*/0, /*isExternal=*/false); }
     virtual void SetUp(int bus, bool isExternal);
 
@@ -79,11 +80,11 @@ class InputMapperTest : public testing::Test {
 protected:
     static const char* DEVICE_NAME;
     static const char* DEVICE_LOCATION;
-    static constexpr int32_t DEVICE_ID = END_RESERVED_ID + 1000;
+    static constexpr DeviceId DEVICE_ID = END_RESERVED_ID + 1000;
     static constexpr int32_t DEVICE_GENERATION = 2;
     static constexpr int32_t DEVICE_CONTROLLER_NUMBER = 0;
     static const ftl::Flags<InputDeviceClass> DEVICE_CLASSES;
-    static constexpr int32_t EVENTHUB_ID = 1;
+    static constexpr RawDeviceId EVENTHUB_ID = 1;
 
     std::shared_ptr<FakeEventHub> mFakeEventHub;
     sp<FakeInputReaderPolicy> mFakePolicy;
@@ -100,20 +101,6 @@ protected:
     std::shared_ptr<InputDevice> newDevice(int32_t deviceId, const std::string& name,
                                            const std::string& location, int32_t eventHubId,
                                            ftl::Flags<InputDeviceClass> classes, int bus = 0);
-    template <class T, typename... Args>
-    T& addMapperAndConfigure(Args... args) {
-        T& mapper =
-                mDevice->addMapper<T>(EVENTHUB_ID, mFakePolicy->getReaderConfiguration(), args...);
-        configureDevice(/*changes=*/{});
-        std::list<NotifyArgs> resetArgList = mDevice->reset(ARBITRARY_TIME);
-        resetArgList += mapper.reset(ARBITRARY_TIME);
-        // Loop the reader to flush the input listener queue.
-        for (const NotifyArgs& loopArgs : resetArgList) {
-            mFakeListener->notify(loopArgs);
-        }
-        mReader->loopOnce();
-        return mapper;
-    }
 
     template <class T, typename... Args>
     T& constructAndAddMapper(Args... args) {

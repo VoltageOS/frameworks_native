@@ -87,12 +87,10 @@ public:
     BufferQueueCore();
     virtual ~BufferQueueCore();
 
-#if COM_ANDROID_GRAPHICS_LIBGUI_FLAGS(BUFFER_RELEASE_CHANNEL)
 protected:
     // Wake up any threads waiting for a buffer release. The BufferQueue mutex should always held
     // when this method is called.
     virtual void notifyBufferReleased() const;
-#endif
 
 private:
     // Dump our state in a string
@@ -171,7 +169,10 @@ private:
 
     // mConsumerControlledByApp indicates whether the connected consumer is
     // controlled by the application.
-    bool mConsumerControlledByApp;
+#if COM_ANDROID_GRAPHICS_LIBGUI_FLAGS(REMOVE_CONTROLLED_BY_APP)
+    const
+#endif
+            bool mConsumerControlledByApp;
 
     // mConsumerName is a string used to identify the BufferQueue in log
     // messages. It is set by the IGraphicBufferConsumer::setConsumerName
@@ -387,6 +388,9 @@ private:
     // This allows the consumer to acquire an additional buffer if that buffer is not droppable and
     // will eventually be released or acquired by the consumer.
     bool mAllowExtraAcquire = false;
+
+    // state of producer throttling, see setProducerThrottlingEnabled()
+    bool mProducerThrottlingEnabled = true;
 
 #if COM_ANDROID_GRAPHICS_LIBGUI_FLAGS(BQ_EXTENDEDALLOCATE)
     // Additional options to pass when allocating GraphicBuffers.

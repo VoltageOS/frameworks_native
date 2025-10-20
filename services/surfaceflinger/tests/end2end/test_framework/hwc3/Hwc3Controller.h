@@ -21,14 +21,22 @@
 #include <string>
 
 #include <android-base/expected.h>
+#include <ftl/non_null.h>
 
 #include "test_framework/core/DisplayConfiguration.h"
+#include "test_framework/hwc3/events/BufferPendingDisplay.h"
+#include "test_framework/hwc3/events/BufferPendingRelease.h"
 #include "test_framework/hwc3/events/ClientDestroyed.h"
 #include "test_framework/hwc3/events/DisplayPresented.h"
-#include "test_framework/hwc3/events/PendingBufferSwap.h"
 #include "test_framework/hwc3/events/PowerMode.h"
 #include "test_framework/hwc3/events/VSync.h"
 #include "test_framework/hwc3/events/VSyncEnabled.h"
+
+namespace android::surfaceflinger::tests::end2end::test_framework::core {
+
+class TestService;
+
+}  // namespace android::surfaceflinger::tests::end2end::test_framework::core
 
 namespace android::surfaceflinger::tests::end2end::test_framework::hwc3 {
 
@@ -52,8 +60,11 @@ class Hwc3Controller final : public std::enable_shared_from_this<Hwc3Controller>
         // Invoked when SF presents a display.
         events::DisplayPresented::AsyncConnector onDisplayPresented;
 
-        // Invoked when SF is swapping the buffer content of a hardware overlay.
-        events::PendingBufferSwap::AsyncConnector onPendingBufferSwap;
+        // Invoked when SF is setting new buffer content to display on a hardware overlay.
+        events::BufferPendingDisplay::AsyncConnector onBufferPendingDisplay;
+
+        // Invoked when SF is replacing displayed buffer content on a hardware overlay.
+        events::BufferPendingRelease::AsyncConnector onBufferPendingRelease;
 
         // Invoked when the client sends SF a vsync callback.
         events::VSync::AsyncConnector onVSyncCallbackSent;
@@ -63,10 +74,12 @@ class Hwc3Controller final : public std::enable_shared_from_this<Hwc3Controller>
     [[nodiscard]] static auto getServiceName() -> std::string;
 
     // Makes the HWC3 controller instance.
-    [[nodiscard]] static auto make(std::span<const core::DisplayConfiguration> displays)
+    [[nodiscard]] static auto make(ftl::NonNull<std::weak_ptr<core::TestService>> service,
+                                   std::span<const core::DisplayConfiguration> displays)
             -> base::expected<std::shared_ptr<hwc3::Hwc3Controller>, std::string>;
 
-    explicit Hwc3Controller(Passkey passkey);
+    explicit Hwc3Controller(ftl::NonNull<std::weak_ptr<core::TestService>> service,
+                            Passkey passkey);
 
     // Allows the callbacks to be routed.
     [[nodiscard]] auto editCallbacks() -> Callbacks&;
@@ -80,12 +93,22 @@ class Hwc3Controller final : public std::enable_shared_from_this<Hwc3Controller>
     // Removes a new display from the HWC3, which will become a hotplug disconnect event.
     void removeDisplay(core::DisplayConfiguration::Id displayId);
 
+    // Invoked by ObservingComposer to signal certain events.
+    void onClientDestroyed(const events::ClientDestroyed& event) const;
+    void onPowerModeChanged(const events::PowerMode& event) const;
+    void onVsyncEnabledChanged(const events::VSyncEnabled& event) const;
+    void onDisplayPresented(const events::DisplayPresented& event) const;
+    void onBufferPendingDisplay(const events::BufferPendingDisplay& event) const;
+    void onBufferPendingRelease(const events::BufferPendingRelease& event) const;
+    void onVSyncCallbackSent(const events::VSync& event) const;
+
   private:
     static constexpr std::string baseServiceName = "fake";
 
     [[nodiscard]] auto init(std::span<const core::DisplayConfiguration> displays)
             -> base::expected<void, std::string>;
 
+    const ftl::NonNull<std::weak_ptr<core::TestService>> mService;
     std::shared_ptr<FakeComposer> mFakeComposer;
     std::shared_ptr<ObservingComposer> mObservingComposer;
     Callbacks mCallbacks;

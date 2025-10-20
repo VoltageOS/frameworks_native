@@ -193,6 +193,29 @@ bool LayerHierarchy::hasRelZLoop(uint32_t& outInvalidRelativeRoot) const {
     return outInvalidRelativeRoot != UNASSIGNED_LAYER_ID;
 }
 
+bool LayerHierarchy::hasLayerCycle(std::unordered_set<uint32_t>& visited) const {
+    if (!mLayer) {
+        return false;
+    }
+
+    auto const [it, newVisit] = visited.insert(mLayer->id);
+    if (!newVisit) {
+        return true;
+    }
+
+    for (auto& [child, childVariant] : mChildren) {
+        if (childVariant != LayerHierarchy::Variant::Detached && child->hasLayerCycle(visited)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool LayerHierarchy::hasLayerCycle() const {
+    std::unordered_set<uint32_t> visited;
+    return hasLayerCycle(visited);
+}
+
 void LayerHierarchyBuilder::init(const std::vector<std::unique_ptr<RequestedLayerState>>& layers) {
     mLayerIdToHierarchy.clear();
     mHierarchies.clear();

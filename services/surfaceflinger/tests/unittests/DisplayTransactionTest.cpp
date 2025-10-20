@@ -37,15 +37,6 @@ DisplayTransactionTest::DisplayTransactionTest(bool withMockScheduler) {
     mFlinger.mutableSupportsWideColor() = false;
     mFlinger.mutableDisplayColorSetting() = DisplayColorSetting::kUnmanaged;
 
-    mFlinger.setCreateBufferQueueFunction([](auto, auto, auto) {
-        ADD_FAILURE() << "Unexpected request to create a buffer queue.";
-    });
-
-    mFlinger.setCreateNativeWindowSurface([](auto) {
-        ADD_FAILURE() << "Unexpected request to create a native window surface.";
-        return nullptr;
-    });
-
     if (withMockScheduler) {
         injectMockScheduler(PhysicalDisplayId::fromPort(0));
     }
@@ -87,30 +78,6 @@ void DisplayTransactionTest::injectMockComposer(int virtualDisplayCount) {
     Mock::VerifyAndClear(mComposer);
 }
 
-void DisplayTransactionTest::injectFakeBufferQueueFactory() {
-    // This setup is only expected once per test.
-    ASSERT_TRUE(mConsumer == nullptr && mProducer == nullptr);
-
-    mConsumer = sp<mock::GraphicBufferConsumer>::make();
-    mProducer = sp<mock::GraphicBufferProducer>::make();
-
-    mFlinger.setCreateBufferQueueFunction([this](auto outProducer, auto outConsumer, bool) {
-        *outProducer = mProducer;
-        *outConsumer = mConsumer;
-    });
-}
-
-void DisplayTransactionTest::injectFakeNativeWindowSurfaceFactory() {
-    // This setup is only expected once per test.
-    ASSERT_TRUE(mNativeWindowSurface == nullptr);
-
-    mNativeWindowSurface = new surfaceflinger::mock::NativeWindowSurface();
-
-    mFlinger.setCreateNativeWindowSurface([this](auto) {
-        return std::unique_ptr<surfaceflinger::NativeWindowSurface>(mNativeWindowSurface);
-    });
-}
-
 bool DisplayTransactionTest::hasPhysicalHwcDisplay(HWDisplayId hwcDisplayId) const {
     const auto& map = mFlinger.hwcPhysicalDisplayIdMap();
 
@@ -134,21 +101,21 @@ const DisplayDevice& DisplayTransactionTest::getDisplayDevice(
 }
 
 bool DisplayTransactionTest::hasCurrentDisplayState(const sp<IBinder>& displayToken) const {
-    return mFlinger.currentState().displays.indexOfKey(displayToken) >= 0;
+    return mFlinger.currentState().displays.contains(displayToken);
 }
 
 const DisplayDeviceState& DisplayTransactionTest::getCurrentDisplayState(
         const sp<IBinder>& displayToken) const {
-    return mFlinger.currentState().displays.valueFor(displayToken);
+    return *mFlinger.currentState().displays.get(displayToken);
 }
 
 bool DisplayTransactionTest::hasDrawingDisplayState(const sp<IBinder>& displayToken) const {
-    return mFlinger.drawingState().displays.indexOfKey(displayToken) >= 0;
+    return mFlinger.drawingState().displays.contains(displayToken);
 }
 
 const DisplayDeviceState& DisplayTransactionTest::getDrawingDisplayState(
         const sp<IBinder>& displayToken) const {
-    return mFlinger.drawingState().displays.valueFor(displayToken);
+    return *mFlinger.drawingState().displays.get(displayToken);
 }
 
 } // namespace android

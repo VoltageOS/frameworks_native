@@ -169,6 +169,8 @@ void BufferQueueCore::dumpState(const String8& prefix, String8* outResult) const
                             mTransformHint, mFrameCounter);
     outResult->appendFormat("%s  mTransformHintInUse=%02x mAutoPrerotation=%d\n", prefix.c_str(),
                             mTransformHintInUse, mAutoPrerotation);
+    outResult->appendFormat("%s  mProducerThrottlingEnabled=%s\n", prefix.c_str(),
+                            mProducerThrottlingEnabled ? "true" : "false");
 
     outResult->appendFormat("%sFIFO(%zu):\n", prefix.c_str(), mQueue.size());
 
@@ -394,11 +396,9 @@ void BufferQueueCore::waitWhileAllocatingLocked(std::unique_lock<std::mutex>& lo
     }
 }
 
-#if COM_ANDROID_GRAPHICS_LIBGUI_FLAGS(BUFFER_RELEASE_CHANNEL)
 void BufferQueueCore::notifyBufferReleased() const {
     mDequeueCondition.notify_all();
 }
-#endif
 
 #if DEBUG_ONLY_CODE
 void BufferQueueCore::validateConsistencyLocked() const {

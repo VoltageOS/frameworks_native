@@ -58,7 +58,8 @@ static const char* kNdkTrace = "AIDL::ndk::";
 static const char* kServerTrace = "::server";
 static const char* kClientTrace = "::client";
 static const char* kSeparator = "::";
-static const char* kUnknownCode = "name=?_code=";
+static const char* kUnknownCode = "#";
+static const char* kBackendType = "ndk";
 
 namespace ABBinderTag {
 
@@ -229,6 +230,9 @@ bool AIBinder::associateClass(const AIBinder_Class* clazz) {
 ABBinder::ABBinder(const AIBinder_Class* clazz, void* userData)
     : AIBinder(clazz), BBinder(), mUserData(userData) {
     LOG_ALWAYS_FATAL_IF(clazz == nullptr, "clazz == nullptr");
+    if (clazz->mTransactionCodeData.names != nullptr) {
+        BBinder::setTransactionCodeMap(&clazz->mTransactionCodeData);
+    }
 }
 ABBinder::~ABBinder() {
     getClass()->onDestroy(mUserData);
@@ -458,31 +462,32 @@ AIBinder_Class::AIBinder_Class(const char* interfaceDescriptor, AIBinder_Class_o
       onDestroy(onDestroy),
       onTransact(onTransact),
       mInterfaceDescriptor(interfaceDescriptor),
-      mWideInterfaceDescriptor(interfaceDescriptor) {}
+      mWideInterfaceDescriptor(interfaceDescriptor),
+      mTransactionCodeData{sizeof(android::TransactionCodeData), kBackendType, nullptr, 0} {}
 
-bool AIBinder_Class::setTransactionCodeMap(const char** transactionCodeMap, size_t length) {
-    if (mTransactionCodeToFunction != nullptr) {
+bool AIBinder_Class::setTransactionCodeMap(const char* const* transactionCodeMap, size_t length) {
+    if (mTransactionCodeData.names != nullptr) {
         ALOGE("mTransactionCodeToFunction is already set!");
         return false;
     }
-    mTransactionCodeToFunction = transactionCodeMap;
-    mTransactionCodeToFunctionLength = length;
+    mTransactionCodeData.names = transactionCodeMap;
+    mTransactionCodeData.count = length;
     return true;
 }
 
 const char* AIBinder_Class::getFunctionName(transaction_code_t code) const {
-    if (mTransactionCodeToFunction == nullptr) {
+    if (mTransactionCodeData.names == nullptr) {
         ALOGE("mTransactionCodeToFunction is not set!");
         return nullptr;
     }
 
     if (code < FIRST_CALL_TRANSACTION ||
-        code - FIRST_CALL_TRANSACTION >= mTransactionCodeToFunctionLength) {
+        code - FIRST_CALL_TRANSACTION >= mTransactionCodeData.count) {
         ALOGE("Function name for requested code not found!");
         return nullptr;
     }
 
-    return mTransactionCodeToFunction[code - FIRST_CALL_TRANSACTION];
+    return mTransactionCodeData.names[code - FIRST_CALL_TRANSACTION];
 }
 
 AIBinder_Class* AIBinder_Class_define(const char* interfaceDescriptor,
@@ -504,9 +509,8 @@ void AIBinder_Class_setOnDump(AIBinder_Class* clazz, AIBinder_onDump onDump) {
     clazz->onDump = onDump;
 }
 
-void AIBinder_Class_setTransactionCodeToFunctionNameMap(AIBinder_Class* clazz,
-                                                        const char** transactionCodeToFunction,
-                                                        size_t length) {
+void AIBinder_Class_setTransactionCodeToFunctionNameMap(
+        AIBinder_Class* clazz, const char* const* transactionCodeToFunction, size_t length) {
     LOG_ALWAYS_FATAL_IF(clazz == nullptr || transactionCodeToFunction == nullptr,
                         "Valid clazz and transactionCodeToFunction are needed to set code to "
                         "function mapping.");
@@ -515,7 +519,7 @@ void AIBinder_Class_setTransactionCodeToFunctionNameMap(AIBinder_Class* clazz,
                         "transactionCodeToFunction already set?");
 }
 
-const char* AIBinder_Class_getFunctionName(AIBinder_Class* clazz, transaction_code_t code) {
+const char* AIBinder_Class_getFunctionName(const AIBinder_Class* clazz, transaction_code_t code) {
     LOG_ALWAYS_FATAL_IF(
             clazz == nullptr,
             "Valid clazz is needed to get function name for requested transaction code");
@@ -607,8 +611,8 @@ binder_status_t AIBinder_DeathRecipient::linkToDeath(const sp<IBinder>& binder, 
     }
     if (!mOnUnlinked && cookie) {
         ALOGW("AIBinder_linkToDeath is being called with a non-null cookie and no onUnlink "
-              "callback set. This might not be intended. AIBinder_DeathRecipient_setOnUnlinked "
-              "should be called first.");
+              "callback set. Use AIBinder_DeathRecipient_setOnUnlinked to manage the lifetime "
+              "of the cookie. This will become an abort.");
     }
 
     sp<TransferDeathRecipient> recipient =

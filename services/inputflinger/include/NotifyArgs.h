@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <string>
 #include <vector>
 
 #include <input/Input.h>
@@ -44,7 +45,7 @@ struct NotifyKeyArgs {
     int32_t id;
     nsecs_t eventTime;
 
-    int32_t deviceId;
+    DeviceId deviceId;
     uint32_t source;
     ui::LogicalDisplayId displayId{ui::LogicalDisplayId::INVALID};
     uint32_t policyFlags;
@@ -58,7 +59,7 @@ struct NotifyKeyArgs {
 
     inline NotifyKeyArgs() {}
 
-    NotifyKeyArgs(int32_t id, nsecs_t eventTime, nsecs_t readTime, int32_t deviceId,
+    NotifyKeyArgs(int32_t id, nsecs_t eventTime, nsecs_t readTime, DeviceId deviceId,
                   uint32_t source, ui::LogicalDisplayId displayId, uint32_t policyFlags,
                   int32_t action, int32_t flags, int32_t keyCode, int32_t scanCode,
                   int32_t metaState, nsecs_t downTime);
@@ -74,7 +75,7 @@ struct NotifyMotionArgs {
     int32_t id;
     nsecs_t eventTime;
 
-    int32_t deviceId;
+    DeviceId deviceId;
     uint32_t source;
     ui::LogicalDisplayId displayId{ui::LogicalDisplayId::INVALID};
     uint32_t policyFlags;
@@ -106,7 +107,7 @@ struct NotifyMotionArgs {
 
     inline NotifyMotionArgs() {}
 
-    NotifyMotionArgs(int32_t id, nsecs_t eventTime, nsecs_t readTime, int32_t deviceId,
+    NotifyMotionArgs(int32_t id, nsecs_t eventTime, nsecs_t readTime, DeviceId deviceId,
                      uint32_t source, ui::LogicalDisplayId displayId, uint32_t policyFlags,
                      int32_t action, int32_t actionButton, int32_t flags, int32_t metaState,
                      int32_t buttonState, MotionClassification classification,
@@ -130,7 +131,7 @@ struct NotifySensorArgs {
     int32_t id;
     nsecs_t eventTime;
 
-    int32_t deviceId;
+    DeviceId deviceId;
     uint32_t source;
     InputDeviceSensorType sensorType;
     InputDeviceSensorAccuracy accuracy;
@@ -140,7 +141,7 @@ struct NotifySensorArgs {
 
     inline NotifySensorArgs() {}
 
-    NotifySensorArgs(int32_t id, nsecs_t eventTime, int32_t deviceId, uint32_t source,
+    NotifySensorArgs(int32_t id, nsecs_t eventTime, DeviceId deviceId, uint32_t source,
                      InputDeviceSensorType sensorType, InputDeviceSensorAccuracy accuracy,
                      bool accuracyChanged, nsecs_t hwTimestamp, std::vector<float> values);
 
@@ -174,11 +175,11 @@ struct NotifyDeviceResetArgs {
     int32_t id;
     nsecs_t eventTime;
 
-    int32_t deviceId;
+    DeviceId deviceId;
 
     inline NotifyDeviceResetArgs() {}
 
-    NotifyDeviceResetArgs(int32_t id, nsecs_t eventTime, int32_t deviceId);
+    NotifyDeviceResetArgs(int32_t id, nsecs_t eventTime, DeviceId deviceId);
 
     NotifyDeviceResetArgs(const NotifyDeviceResetArgs& other) = default;
     NotifyDeviceResetArgs& operator=(const NotifyDeviceResetArgs&) = default;
@@ -206,12 +207,12 @@ struct NotifyVibratorStateArgs {
     int32_t id;
     nsecs_t eventTime;
 
-    int32_t deviceId;
+    DeviceId deviceId;
     bool isOn;
 
     inline NotifyVibratorStateArgs() {}
 
-    NotifyVibratorStateArgs(int32_t id, nsecs_t eventTIme, int32_t deviceId, bool isOn);
+    NotifyVibratorStateArgs(int32_t id, nsecs_t eventTIme, DeviceId deviceId, bool isOn);
 
     NotifyVibratorStateArgs(const NotifyVibratorStateArgs& other) = default;
     NotifyVibratorStateArgs& operator=(const NotifyVibratorStateArgs&) = default;
@@ -222,7 +223,7 @@ using NotifyArgs =
                      NotifySensorArgs, NotifySwitchArgs, NotifyDeviceResetArgs,
                      NotifyPointerCaptureChangedArgs, NotifyVibratorStateArgs>;
 
-const char* toString(const NotifyArgs& args);
+const std::string toString(const NotifyArgs& args);
 
 std::ostream& operator<<(std::ostream& out, const NotifyArgs& args);
 

@@ -239,9 +239,9 @@ void AIBinder_Class_setOnDump(AIBinder_Class* clazz, AIBinder_onDump onDump) __I
  * You can use nullptr if certain transaction codes are not used. Lifetime should be same as clazz.
  * \param length number of elements in the transactionCodeToFunctionMap
  */
-void AIBinder_Class_setTransactionCodeToFunctionNameMap(AIBinder_Class* clazz,
-                                                        const char** transactionCodeToFunctionMap,
-                                                        size_t length) __INTRODUCED_IN(36);
+void AIBinder_Class_setTransactionCodeToFunctionNameMap(
+        AIBinder_Class* clazz, const char* const* transactionCodeToFunctionMap, size_t length)
+        __INTRODUCED_IN(36);
 
 /**
  * Get function name associated with transaction code for given class
@@ -259,7 +259,7 @@ void AIBinder_Class_setTransactionCodeToFunctionNameMap(AIBinder_Class* clazz,
  * The value returned is valid for the lifetime of clazz. if transaction code is invalid or
  * transactionCodeToFunctionMap is not set, nullptr is returned.
  */
-const char* AIBinder_Class_getFunctionName(AIBinder_Class* clazz, transaction_code_t code)
+const char* AIBinder_Class_getFunctionName(const AIBinder_Class* clazz, transaction_code_t code)
         __INTRODUCED_IN(36);
 
 /**

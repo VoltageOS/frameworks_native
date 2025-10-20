@@ -247,11 +247,7 @@ status_t BufferQueueProducer::setMaxDequeuedBufferCount(int maxDequeuedBuffers,
         if (delta < 0) {
             listener = mCore->mConsumerListener;
         }
-#if COM_ANDROID_GRAPHICS_LIBGUI_FLAGS(BUFFER_RELEASE_CHANNEL)
         mCore->notifyBufferReleased();
-#else
-        mCore->mDequeueCondition.notify_all();
-#endif
     } // Autolock scope
 
     // Call back without lock held
@@ -303,11 +299,7 @@ status_t BufferQueueProducer::setAsyncMode(bool async) {
         }
         mCore->mAsyncMode = async;
         VALIDATE_CONSISTENCY();
-#if COM_ANDROID_GRAPHICS_LIBGUI_FLAGS(BUFFER_RELEASE_CHANNEL)
         mCore->notifyBufferReleased();
-#else
-        mCore->mDequeueCondition.notify_all();
-#endif
 
         if (delta < 0) {
             listener = mCore->mConsumerListener;
@@ -430,29 +422,16 @@ status_t BufferQueueProducer::waitForFreeSlotThenRelock(FreeSlotCaller caller,
                     (acquiredCount <= mCore->mMaxAcquiredBufferCount)) {
                 return WOULD_BLOCK;
             }
-#if COM_ANDROID_GRAPHICS_LIBGUI_FLAGS(BUFFER_RELEASE_CHANNEL)
             if (status_t status = waitForBufferRelease(lock, mDequeueTimeout);
                 status == TIMED_OUT) {
                 return TIMED_OUT;
             }
-#else
-            if (mDequeueTimeout >= 0) {
-                std::cv_status result = mCore->mDequeueCondition.wait_for(lock,
-                        std::chrono::nanoseconds(mDequeueTimeout));
-                if (result == std::cv_status::timeout) {
-                    return TIMED_OUT;
-                }
-            } else {
-                mCore->mDequeueCondition.wait(lock);
-            }
-#endif
         }
     } // while (tryAgain)
 
     return NO_ERROR;
 }
 
-#if COM_ANDROID_GRAPHICS_LIBGUI_FLAGS(BUFFER_RELEASE_CHANNEL)
 status_t BufferQueueProducer::waitForBufferRelease(std::unique_lock<std::mutex>& lock,
                                                    nsecs_t timeout) const {
     if (mDequeueTimeout >= 0) {
@@ -466,7 +445,6 @@ status_t BufferQueueProducer::waitForBufferRelease(std::unique_lock<std::mutex>&
     }
     return OK;
 }
-#endif
 
 status_t BufferQueueProducer::dequeueBuffer(int* outSlot, sp<android::Fence>* outFence,
                                             uint32_t width, uint32_t height, PixelFormat format,
@@ -828,11 +806,7 @@ status_t BufferQueueProducer::detachBuffer(int slot) {
         mCore->mActiveBuffers.erase(slot);
         mCore->mFreeSlots.insert(slot);
         mCore->clearBufferSlotLocked(slot);
-#if COM_ANDROID_GRAPHICS_LIBGUI_FLAGS(BUFFER_RELEASE_CHANNEL)
         mCore->notifyBufferReleased();
-#else
-        mCore->mDequeueCondition.notify_all();
-#endif
         VALIDATE_CONSISTENCY();
     }
 
@@ -1108,10 +1082,27 @@ status_t BufferQueueProducer::queueBuffer(int slot,
         item.mSlot = slot;
         item.mFence = acquireFence;
         item.mFenceTime = acquireFenceTime;
-        item.mIsDroppable = mCore->mAsyncMode ||
-                (mConsumerIsSurfaceFlinger && mCore->mQueueBufferCanDrop) ||
-                (mCore->mLegacyBufferDrop && mCore->mQueueBufferCanDrop) ||
-                (mCore->mSharedBufferMode && mCore->mSharedBufferSlot == slot);
+        if (mCore->mAsyncMode) {
+            item.mIsDroppable = true;
+            BQ_LOGV("queueBuffer: slot %d is droppable (mAsyncMode)", slot);
+        } else if (mConsumerIsSurfaceFlinger && mCore->mQueueBufferCanDrop) {
+            item.mIsDroppable = true;
+            BQ_LOGV("queueBuffer: slot %d is droppable (mConsumerIsSurfaceFlinger && "
+                    "mQueueBufferCanDrop)",
+                    slot);
+        } else if (mCore->mLegacyBufferDrop && mCore->mQueueBufferCanDrop) {
+            item.mIsDroppable = true;
+            BQ_LOGV("queueBuffer: slot %d is droppable (mLegacyBufferDrop && mQueueBufferCanDrop)",
+                    slot);
+        } else if (mCore->mSharedBufferMode && mCore->mSharedBufferSlot == slot) {
+            item.mIsDroppable = true;
+            BQ_LOGV("queueBuffer: slot %d is droppable (mSharedBufferMode && mSharedBufferSlot == "
+                    "slot)",
+                    slot);
+        } else {
+            item.mIsDroppable = false;
+        }
+
         item.mSurfaceDamage = surfaceDamage;
         item.mQueuedBuffer = true;
         item.mAutoRefresh = mCore->mSharedBufferMode && mCore->mAutoRefresh;
@@ -1178,11 +1169,7 @@ status_t BufferQueueProducer::queueBuffer(int slot,
         }
 
         mCore->mBufferHasBeenQueued = true;
-#if COM_ANDROID_GRAPHICS_LIBGUI_FLAGS(BUFFER_RELEASE_CHANNEL)
         mCore->notifyBufferReleased();
-#else
-        mCore->mDequeueCondition.notify_all();
-#endif
         mCore->mLastQueuedSlot = slot;
 
         output->width = mCore->mDefaultWidth;
@@ -1201,8 +1188,16 @@ status_t BufferQueueProducer::queueBuffer(int slot,
         VALIDATE_CONSISTENCY();
 
         connectedApi = mCore->mConnectedApi;
-        if (flags::bq_producer_throttles_only_async_mode()) {
-            enableEglCpuThrottling = mCore->mAsyncMode || mCore->mDequeueBufferCannotBlock;
+        if (com::android::graphics::libgui::flags::bq_producer_backpressure_control()) {
+            if (mCore->mProducerThrottlingEnabled) {
+                // throttling is enabled via setProducerThrottlingEnabled(true) [default]
+                enableEglCpuThrottling = true;
+            } else {
+                // throttling is disabled via setProducerThrottlingEnabled(false), in this case
+                // we disable it only if we're not in async mode (since async mode doesn't
+                // throttle in dequeueBuffer()) or if mDequeueBufferCannotBlock is set.
+                enableEglCpuThrottling = mCore->mAsyncMode || mCore->mDequeueBufferCannotBlock;
+            }
         }
         lastQueuedFence = std::move(mLastQueueBufferFence);
 
@@ -1318,11 +1313,7 @@ status_t BufferQueueProducer::cancelBuffer(int slot, const sp<Fence>& fence) {
             bufferId = gb->getId();
         }
         mSlots[slot].mFence = fence;
-#if COM_ANDROID_GRAPHICS_LIBGUI_FLAGS(BUFFER_RELEASE_CHANNEL)
         mCore->notifyBufferReleased();
-#else
-        mCore->mDequeueCondition.notify_all();
-#endif
         listener = mCore->mConsumerListener;
         VALIDATE_CONSISTENCY();
     }
@@ -1401,6 +1392,9 @@ int BufferQueueProducer::query(int what, int *outValue) {
 status_t BufferQueueProducer::connect(const sp<IProducerListener>& listener,
         int api, bool producerControlledByApp, QueueBufferOutput *output) {
     ATRACE_CALL();
+#if COM_ANDROID_GRAPHICS_LIBGUI_FLAGS(REMOVE_CONTROLLED_BY_APP)
+    producerControlledByApp = false;
+#endif
     std::lock_guard<std::mutex> lock(mCore->mMutex);
     mConsumerName = mCore->mConsumerName;
     BQ_LOGV("connect: api=%d producerControlledByApp=%s", api,
@@ -1563,11 +1557,7 @@ status_t BufferQueueProducer::disconnect(int api, DisconnectMode mode) {
                     mCore->mConnectedApi = BufferQueueCore::NO_CONNECTED_API;
                     mCore->mConnectedPid = -1;
                     mCore->mSidebandStream.clear();
-#if COM_ANDROID_GRAPHICS_LIBGUI_FLAGS(BUFFER_RELEASE_CHANNEL)
                     mCore->notifyBufferReleased();
-#else
-                    mCore->mDequeueCondition.notify_all();
-#endif
                     mCore->mAutoPrerotation = false;
 #if COM_ANDROID_GRAPHICS_LIBGUI_FLAGS(BQ_EXTENDEDALLOCATE)
                     mCore->mAdditionalOptions.clear();
@@ -1968,6 +1958,24 @@ status_t BufferQueueProducer::setFrameRate(float frameRate, int8_t compatibility
     if (listener != nullptr) {
         listener->onSetFrameRate(frameRate, compatibility, changeFrameRateStrategy);
     }
+    return NO_ERROR;
+}
+
+status_t BufferQueueProducer::setProducerThrottlingEnabled(bool enabled) {
+    ATRACE_FORMAT("%s(%s)", __func__, enabled ? "true" : "false");
+    BQ_LOGV("setProducerThrottlingEnabled: %s", enabled ? "true" : "false");
+    std::lock_guard<std::mutex> lock(mCore->mMutex);
+    mCore->mProducerThrottlingEnabled = enabled;
+    return NO_ERROR;
+}
+
+status_t BufferQueueProducer::isProducerThrottlingEnabled(bool* outEnabled) const {
+    ATRACE_FORMAT("%s(%p)", __func__, outEnabled);
+    if (!outEnabled) {
+        return BAD_VALUE;
+    }
+    std::lock_guard<std::mutex> lock(mCore->mMutex);
+    *outEnabled = mCore->mProducerThrottlingEnabled;
     return NO_ERROR;
 }
 

@@ -137,6 +137,12 @@ public:
      */
     static sp<Surface> from(ANativeWindow* anw);
 
+    /*
+     * Null-safe check of whether two surfaces represent the same underlying object. Roughly
+     * equivalent to ensuring the underlying binder objects are the same.
+     */
+    static bool areSurfacesEquivalent(const sp<Surface>& a, const sp<Surface>& b);
+
     /* getIGraphicBufferProducer() returns the IGraphicBufferProducer this
      * Surface was created with. Usually it's an error to use the
      * IGraphicBufferProducer while the Surface is connected.
@@ -280,6 +286,9 @@ public:
     status_t setAdditionalOptions(const std::vector<gui::AdditionalOptions>& options);
 #endif
 
+    status_t setProducerThrottlingEnabled(bool enabled);
+    status_t isProducerThrottlingEnabled(bool* outEnabled) const;
+
 protected:
     virtual ~Surface();
 
@@ -370,6 +379,8 @@ private:
     int dispatchGetLastQueuedBuffer2(va_list args);
     int dispatchSetFrameTimelineInfo(va_list args);
     int dispatchSetAdditionalOptions(va_list args);
+    int dispatchSetProducerThrottlingEnabled(va_list args);
+    int dispatchIsProducerThrottlingEnabled(va_list args);
 
 protected:
     virtual int dequeueBuffer(sp<GraphicBuffer>* buffer, int* fenceFd);
@@ -400,6 +411,7 @@ public:
     virtual int setAutoRefresh(bool autoRefresh);
     virtual int setAutoPrerotation(bool autoPrerotation);
     virtual int setBuffersDimensions(uint32_t width, uint32_t height);
+    virtual int setLegacyBufferDrop(bool legacyBufferDrop);
     virtual int lock(ANativeWindow_Buffer* outBuffer, ARect* inOutDirtyBounds);
     virtual int unlockAndPost();
     virtual int query(int what, int* value) const;

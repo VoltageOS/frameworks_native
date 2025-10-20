@@ -24,6 +24,13 @@
 
 namespace android::surfaceflinger::frontend {
 
+namespace caching {
+
+class MergeableHierarchyManager;
+class MergeableHierarchy;
+
+} // namespace caching
+
 // Walks through the layer hierarchy to build an ordered list
 // of LayerSnapshots that can be passed on to CompositionEngine.
 // This builder does a minimum amount of work to update
@@ -59,6 +66,7 @@ public:
         const std::unordered_map<std::string, uint32_t>& genericLayerMetadataKeyMap;
         bool skipRoundCornersWhenProtected = false;
         LayerSnapshot rootSnapshot = getRootSnapshot();
+        caching::MergeableHierarchyManager* mergeableHierarchyManager = nullptr;
     };
     LayerSnapshotBuilder();
 
@@ -94,6 +102,10 @@ public:
     // Visit each snapshot
     void forEachSnapshot(const ConstVisitor& visitor) const;
 
+    void forEachMergedSnapshot(const ConstVisitor& visitor) const;
+
+    bool hasMergedSnapshots() const { return !mMergedSnapshots.empty(); }
+
     // Visit each snapshot interesting to input reverse z-order
     void forEachInputSnapshot(const ConstVisitor& visitor) const;
 
@@ -102,6 +114,9 @@ public:
 
 private:
     friend class LayerSnapshotTest;
+
+    // For updateSnapshot
+    friend class caching::MergeableHierarchy;
 
     // return true if we were able to successfully update the snapshots via
     // the fast path.
@@ -121,12 +136,19 @@ private:
     static void updateRoundedCorner(LayerSnapshot& snapshot, const RequestedLayerState& layerState,
                                     const LayerSnapshot& parentSnapshot, const Args& args);
     static void scaleRadii(gui::CornerRadii& radii, float scaleX, float scaleY);
+
+    static bool shouldDisableCornerRounding(LayerSnapshot& snapshot,
+                                            const RequestedLayerState& requested);
+    static RoundedCornerState calculateLayerRoundedCornerSettings(
+            LayerSnapshot& snapshot, const RequestedLayerState& requested);
+    static RoundedCornerState calculateParentRoundedCornerSettings(
+            const LayerSnapshot& parentSnapshot, const LayerSnapshot& snapshot);
     static gui::CornerRadii getClippedClientRadii(const gui::CornerRadii& requestedRadii,
                                                   const FloatRect& layerCropRect,
                                                   const FloatRect& layerBounds);
-    static bool doesChildOverlapParentCornerRegion(const FloatRect& childCropRect,
-                                                   const FloatRect& parentCropRect,
-                                                   const gui::CornerRadii& parentRadii);
+    static bool childOverlapsParentCornerRegion(const FloatRect& childCropRect,
+                                                const FloatRect& parentCropRect,
+                                                const gui::CornerRadii& parentRadii);
     static void updateBoundsForEdgeExtension(LayerSnapshot& snapshot);
     void updateLayerBounds(LayerSnapshot& snapshot, const RequestedLayerState& layerState,
                            const LayerSnapshot& parentSnapshot, uint32_t displayRotationFlags);
@@ -160,6 +182,7 @@ private:
     std::unordered_set<LayerHierarchy::TraversalPath, LayerHierarchy::TraversalPathHash>
             mNeedsTouchableRegionCrop;
     std::vector<std::unique_ptr<LayerSnapshot>> mSnapshots;
+    std::vector<std::unique_ptr<LayerSnapshot>> mMergedSnapshots;
     bool mResortSnapshots = false;
     int mNumInterestingSnapshots = 0;
 };

@@ -1,0 +1,106 @@
+/*
+ * Copyright 2025 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#pragma once
+
+#include <memory>
+#include <vector>
+#include "FrontEnd/LayerSnapshotBuilder.h"
+#include "compositionengine/CompositionEngine.h"
+
+namespace android::surfaceflinger::frontend {
+
+class LayerHierarchy;
+struct LayerSnapshot;
+
+namespace caching {
+
+// Represents a set of LayerHierarchies that, combined, can form a new set of LayerHierarchies that
+// is visually equivalent to the first set of LayerHierarchies, such that if the new set of
+// LayerHierarchies replaced the old set, the overall layer graph would be simpler.
+//
+// The MergeableHierarchy is conceptually owned by exactly one LayerHierarchy. If that
+// LayerHierarchy is destroyed, then the entire MergeableHierarchy must also be destroyed. If any
+// other LayerHierarchy composing the MergeableHierarchy is destroyed or mutated, then the
+// MergeableHierarchy should also be invalidated.
+class MergeableHierarchy {
+public:
+    // Useful state of a hierarchy
+    struct HierarchyState {
+        uint32_t layerId;
+        const LayerHierarchy* hierarchy;
+    };
+
+    // Accumulates LayerHierarchies to construct an MergeableHierarchy.
+    class Accumulator {
+    public:
+        // Add a new LayerHierarchy to the equivalency. True if adding it was successful
+        bool add(const LayerHierarchy* hierarchy);
+
+        // True if building an MergeableHierarchy is possible
+        bool canBuild() { return !mHierarchies.empty(); }
+
+        // Builds an MergeableHierarchy, and ascribes an owner for it.
+        std::unique_ptr<MergeableHierarchy> build() {
+            mSnapshots.clear();
+            return std::make_unique<MergeableHierarchy>(std::move(mHierarchies));
+        }
+
+    private:
+        std::vector<HierarchyState> mHierarchies;
+        std::vector<LayerSnapshot*> mSnapshots;
+    };
+
+    MergeableHierarchy(std::vector<HierarchyState>&& hierarchies)
+          : mHierarchies(std::move(hierarchies)) {}
+
+    uint32_t getId() const { return getFirstLayer(); }
+
+    uint32_t getFirstLayer() const { return mHierarchies.front().layerId; }
+    uint32_t getLastLayer() const { return mHierarchies.back().layerId; }
+
+    bool hasLayer(uint32_t id) const {
+        return std::any_of(mHierarchies.cbegin(), mHierarchies.cend(),
+                           [=](const auto& hierarchy) { return hierarchy.layerId == id; });
+    }
+
+    void constructSnapshot(LayerSnapshotBuilder& builder, const LayerSnapshotBuilder::Args& args,
+                           compositionengine::CompositionEngine& compositionEngine);
+    void constructSnapshotForHierarchy(LayerSnapshotBuilder& builder,
+                                       const LayerSnapshotBuilder::Args& args,
+                                       const LayerHierarchy* hierarchy, const LayerSnapshot& parent,
+                                       std::vector<std::unique_ptr<LayerSnapshot>>& outSnapshots);
+
+    void materializeSnapshot(std::vector<std::unique_ptr<LayerSnapshot>> snapshots,
+                             compositionengine::CompositionEngine& compositionEngine);
+
+    std::unique_ptr<LayerSnapshot> getSnapshotCopy() {
+        if (!mSnapshot) {
+            return nullptr;
+        }
+
+        return std::make_unique<LayerSnapshot>(*mSnapshot);
+    };
+
+    void dump(std::ostream& out) const;
+
+private:
+    std::vector<HierarchyState> mHierarchies;
+    std::unique_ptr<LayerSnapshot> mSnapshot = nullptr;
+};
+
+} // namespace caching
+} // namespace android::surfaceflinger::frontend

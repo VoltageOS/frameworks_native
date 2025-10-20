@@ -11,7 +11,6 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
 package {
     default_team: "trendy_team_input_framework",
     // See: http://go/android-license-faq
@@ -58,7 +57,6 @@ cc_test {
         "FakeInputTracingBackend.cpp",
         "FakePointerController.cpp",
         "FocusResolver_test.cpp",
-        "GestureConverter_test.cpp",
         "HardwareProperties_test.cpp",
         "HardwareStateConverter_test.cpp",
         "InputDeviceMetricsCollector_test.cpp",
@@ -80,6 +78,7 @@ cc_test {
         "PointerChoreographer_test.cpp",
         "PreferStylusOverTouch_test.cpp",
         "PropertyProvider_test.cpp",
+        "RelativeModeGestureConverter_test.cpp",
         "RotaryEncoderInputMapper_test.cpp",
         "SensorInputMapper_test.cpp",
         "SlopController_test.cpp",
@@ -89,6 +88,7 @@ cc_test {
         "TimerProvider_test.cpp",
         "TouchpadInputMapper_test.cpp",
         "UinputDevice.cpp",
+        "UncapturedGestureConverter_test.cpp",
         "UnwantedInteractionBlocker_test.cpp",
         "VibratorInputMapper_test.cpp",
     ],
@@ -102,6 +102,7 @@ cc_test {
         android: {
             shared_libs: [
                 "libvintf",
+                "libc++",
             ],
         },
     },

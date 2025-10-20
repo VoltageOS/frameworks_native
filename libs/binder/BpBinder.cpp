@@ -45,13 +45,11 @@ namespace {
 #endif
     }
 
-    bool noFlushOnLastRef() {
-#if defined(LIBBINDER_NO_FLUSH_ON_LAST_REF)
-        return true;
+#if defined(LIBBINDER_BPBINDER_DECSTRONG_LAST)
+    constexpr bool kDecStrongLast = true;
 #else
-        return false;
+    constexpr bool kDecStrongLast = false;
 #endif
-    }
 }
 
 using android::binder::unique_fd;
@@ -651,8 +649,7 @@ status_t BpBinder::addFrozenStateChangeCallback(const wp<FrozenStateChangeCallba
             if (!mFrozen) {
                 std::ignore =
                         IPCThreadState::self()->removeFrozenStateChangeCallback(binderHandle(),
-                                                                                this,
-                                                                                /*flush=*/true);
+                                                                                this);
                 return NO_MEMORY;
             }
         }
@@ -688,8 +685,7 @@ status_t BpBinder::removeFrozenStateChangeCallback(const wp<FrozenStateChangeCal
                 }
                 status_t status =
                         IPCThreadState::self()->removeFrozenStateChangeCallback(binderHandle(),
-                                                                                this,
-                                                                                /*flush=*/true);
+                                                                                this);
                 if (status != NO_ERROR) {
                     ALOGE("Unexpected error from "
                           "IPCThreadState.removeFrozenStateChangeCallback: %s. "
@@ -858,33 +854,32 @@ void BpBinder::onLastStrongRef(const void* /*id*/) {
         printRefs();
     }
     IPCThreadState* ipc = IPCThreadState::self();
-    if (ipc) ipc->decStrongHandle(binderHandle());
+    if (ipc && !kDecStrongLast) ipc->decStrongHandle(binderHandle());
 
     mLock.lock();
     Vector<Obituary>* obits = mObituaries;
     if(obits != nullptr) {
         if (!obits->isEmpty()) {
-            ALOGI("onLastStrongRef automatically unlinking death recipients for descriptor: '%s'",
-                  BPBINDER_BEST_DESCRIPTOR_LOCKED);
+            ALOGI("onLastStrongRef automatically unlinking death recipients for binder (%p) with "
+                  "descriptor: '%s'",
+                  this, BPBINDER_BEST_DESCRIPTOR_LOCKED);
         }
 
         if (ipc) ipc->clearDeathNotification(binderHandle(), this);
         mObituaries = nullptr;
     }
     if (mFrozen != nullptr) {
-        bool flush = !noFlushOnLastRef();
         if (waitForFrozenListenerRemovalCompletion()) {
             if (!mFrozen->isPendingClear) {
                 std::ignore =
                         IPCThreadState::self()->removeFrozenStateChangeCallback(binderHandle(),
-                                                                                this, flush);
-                mFrozen->isPendingClear = true;
+                                                                                this);
             }
-            mFrozen->callbacks.clear();
+            *mFrozen = {};
+            mFrozen->isPendingClear = true;
         } else {
             std::ignore =
-                    IPCThreadState::self()->removeFrozenStateChangeCallback(binderHandle(), this,
-                                                                            flush);
+                    IPCThreadState::self()->removeFrozenStateChangeCallback(binderHandle(), this);
             mFrozen.reset();
         }
     }
@@ -896,6 +891,8 @@ void BpBinder::onLastStrongRef(const void* /*id*/) {
         // are no longer linked?
         delete obits;
     }
+
+    if (ipc && kDecStrongLast) ipc->decStrongHandle(binderHandle());
 }
 
 bool BpBinder::onIncStrongAttempted(uint32_t /*flags*/, const void* /*id*/)

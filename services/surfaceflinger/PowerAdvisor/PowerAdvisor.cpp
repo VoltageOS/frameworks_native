@@ -187,8 +187,7 @@ bool PowerAdvisor::supportsPowerHintSession() {
 }
 
 bool PowerAdvisor::shouldCreateSessionWithConfig() {
-    return mSessionConfigSupported && mBootFinished &&
-            FlagManager::getInstance().adpf_use_fmq_channel();
+    return mSessionConfigSupported && mBootFinished;
 }
 
 void PowerAdvisor::sendHintSessionHint(hal::SessionHint hint) {
@@ -226,9 +225,7 @@ bool PowerAdvisor::ensurePowerHintSessionRunning() {
                                                                  &mSessionConfig);
             if (ret.isOk()) {
                 mHintSession = ret.value();
-                if (FlagManager::getInstance().adpf_use_fmq_channel_fixed()) {
-                    setUpFmq();
-                }
+                setUpFmq();
             }
             // If it fails the first time we try, or ever returns unsupported, assume unsupported
             else if (mFirstConfigSupportCheck || ret.isUnsupported()) {
@@ -550,7 +547,7 @@ std::shared_ptr<SessionManager> PowerAdvisor::getSessionManager() {
 
 sp<IBinder> PowerAdvisor::getOrCreateSessionManagerForBinder(uid_t uid) {
     // Flag guards the creation of SessionManager
-    if (mSessionManager == nullptr && FlagManager::getInstance().adpf_native_session_manager()) {
+    if (mSessionManager == nullptr) {
         mSessionManager = ndk::SharedRefBase::make<SessionManager>(uid);
     }
     return AIBinder_toPlatformBinder(mSessionManager->asBinder().get());

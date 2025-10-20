@@ -55,6 +55,7 @@
 #include <gui/Surface.h>
 #include <gui/SurfaceComposerClient.h>
 #include <gui/WindowInfo.h>
+#include <gui/view/Surface.h>
 #include <private/gui/ParcelUtils.h>
 #include <ui/DisplayMode.h>
 #include <ui/DisplayState.h>
@@ -489,10 +490,10 @@ void TransactionCompletedListener::onTransactionCompleted(ListenerStats listener
          * for all the callbackIds to generate one super map that contains all the sp<IBinder> to
          * sp<SurfaceControl> that could possibly exist for the callbacks.
          */
-        callbacksMap = mCallbacks;
         for (const auto& transactionStats : listenerStats.transactionStats) {
             for (auto& callbackId : transactionStats.callbackIds) {
-                mCallbacks.erase(callbackId);
+                auto node = mCallbacks.extract(callbackId);
+                callbacksMap.insert(std::move(node));
             }
         }
     }
@@ -2408,7 +2409,7 @@ status_t SurfaceComposerClient::Transaction::setDisplaySurface(
         }
     }
     DisplayState& s(getDisplayState(token));
-    s.surface = bufferProducer;
+    s.surface.graphicBufferProducer = bufferProducer;
     s.what |= DisplayState::eSurfaceChanged;
     return NO_ERROR;
 }

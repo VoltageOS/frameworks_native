@@ -20,8 +20,11 @@
 
 #include "NotifyArgs.h"
 
+#include <string>
+
 #include <android-base/stringprintf.h>
 #include <android/log.h>
+#include <input/Input.h>
 #include <math.h>
 #include <utils/Trace.h>
 
@@ -37,7 +40,7 @@ NotifyInputDevicesChangedArgs::NotifyInputDevicesChangedArgs(int32_t id,
 
 // --- NotifyKeyArgs ---
 
-NotifyKeyArgs::NotifyKeyArgs(int32_t id, nsecs_t eventTime, nsecs_t readTime, int32_t deviceId,
+NotifyKeyArgs::NotifyKeyArgs(int32_t id, nsecs_t eventTime, nsecs_t readTime, DeviceId deviceId,
                              uint32_t source, ui::LogicalDisplayId displayId, uint32_t policyFlags,
                              int32_t action, int32_t flags, int32_t keyCode, int32_t scanCode,
                              int32_t metaState, nsecs_t downTime)
@@ -58,7 +61,7 @@ NotifyKeyArgs::NotifyKeyArgs(int32_t id, nsecs_t eventTime, nsecs_t readTime, in
 // --- NotifyMotionArgs ---
 
 NotifyMotionArgs::NotifyMotionArgs(
-        int32_t id, nsecs_t eventTime, nsecs_t readTime, int32_t deviceId, uint32_t source,
+        int32_t id, nsecs_t eventTime, nsecs_t readTime, DeviceId deviceId, uint32_t source,
         ui::LogicalDisplayId displayId, uint32_t policyFlags, int32_t action, int32_t actionButton,
         int32_t flags, int32_t metaState, int32_t buttonState, MotionClassification classification,
         uint32_t pointerCount, const PointerProperties* pointerProperties,
@@ -151,8 +154,8 @@ NotifySwitchArgs::NotifySwitchArgs(int32_t id, nsecs_t eventTime, uint32_t polic
 
 // --- NotifySensorArgs ---
 
-NotifySensorArgs::NotifySensorArgs(int32_t id, nsecs_t eventTime, int32_t deviceId, uint32_t source,
-                                   InputDeviceSensorType sensorType,
+NotifySensorArgs::NotifySensorArgs(int32_t id, nsecs_t eventTime, DeviceId deviceId,
+                                   uint32_t source, InputDeviceSensorType sensorType,
                                    InputDeviceSensorAccuracy accuracy, bool accuracyChanged,
                                    nsecs_t hwTimestamp, std::vector<float> values)
       : id(id),
@@ -167,13 +170,13 @@ NotifySensorArgs::NotifySensorArgs(int32_t id, nsecs_t eventTime, int32_t device
 
 // --- NotifyVibratorStateArgs ---
 
-NotifyVibratorStateArgs::NotifyVibratorStateArgs(int32_t id, nsecs_t eventTime, int32_t deviceId,
+NotifyVibratorStateArgs::NotifyVibratorStateArgs(int32_t id, nsecs_t eventTime, DeviceId deviceId,
                                                  bool isOn)
       : id(id), eventTime(eventTime), deviceId(deviceId), isOn(isOn) {}
 
 // --- NotifyDeviceResetArgs ---
 
-NotifyDeviceResetArgs::NotifyDeviceResetArgs(int32_t id, nsecs_t eventTime, int32_t deviceId)
+NotifyDeviceResetArgs::NotifyDeviceResetArgs(int32_t id, nsecs_t eventTime, DeviceId deviceId)
       : id(id), eventTime(eventTime), deviceId(deviceId) {}
 
 // --- NotifyPointerCaptureChangedArgs ---
@@ -189,18 +192,22 @@ struct Visitor : V... { using V::operator()...; };
 template <typename... V>
 Visitor(V...) -> Visitor<V...>;
 
-const char* toString(const NotifyArgs& args) {
+const std::string toString(const NotifyArgs& args) {
     Visitor toStringVisitor{
-            [&](const NotifyInputDevicesChangedArgs&) { return "NotifyInputDevicesChangedArgs"; },
-            [&](const NotifyKeyArgs&) { return "NotifyKeyArgs"; },
-            [&](const NotifyMotionArgs&) { return "NotifyMotionArgs"; },
-            [&](const NotifySensorArgs&) { return "NotifySensorArgs"; },
-            [&](const NotifySwitchArgs&) { return "NotifySwitchArgs"; },
-            [&](const NotifyDeviceResetArgs&) { return "NotifyDeviceResetArgs"; },
-            [&](const NotifyPointerCaptureChangedArgs&) {
+            [&](const NotifyInputDevicesChangedArgs&) -> std::string {
+                return "NotifyInputDevicesChangedArgs";
+            },
+            [&](const NotifyKeyArgs&) -> std::string { return "NotifyKeyArgs"; },
+            [&](const NotifyMotionArgs& motionArgs) { return motionArgs.dump(); },
+            [&](const NotifySensorArgs&) -> std::string { return "NotifySensorArgs"; },
+            [&](const NotifySwitchArgs&) -> std::string { return "NotifySwitchArgs"; },
+            [&](const NotifyDeviceResetArgs&) -> std::string { return "NotifyDeviceResetArgs"; },
+            [&](const NotifyPointerCaptureChangedArgs&) -> std::string {
                 return "NotifyPointerCaptureChangedArgs";
             },
-            [&](const NotifyVibratorStateArgs&) { return "NotifyVibratorStateArgs"; },
+            [&](const NotifyVibratorStateArgs&) -> std::string {
+                return "NotifyVibratorStateArgs";
+            },
     };
     return std::visit(toStringVisitor, args);
 }

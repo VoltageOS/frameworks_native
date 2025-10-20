@@ -21,13 +21,6 @@ flag {
 } # adpf_gpu_sf
 
 flag {
-  name: "adpf_native_session_manager"
-  namespace: "game"
-  description: "Controls ADPF SessionManager being enabled in SF"
-  bug: "367803904"
-} # adpf_sessionmanager
-
-flag {
   name: "anchor_list"
   namespace: "core_graphics"
   description: "Use an anchor list for frame rate selection"
@@ -69,16 +62,6 @@ flag {
 } # begone_bright_hlg
 
 flag {
-  name: "buffer_stuffing_fix"
-  namespace: "core_graphics"
-  description: "bug fix for buffer stuffing classification"
-  bug: "417070677"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
-} # buffer_stuffing_fix
-
-flag {
   name: "connected_display_hdr_v2"
   namespace: "desktop_display"
   description: "enable connected display hdr selection"
@@ -108,15 +91,15 @@ flag {
 } # deprecate_frame_tracker
 
 flag {
-  name: "deprecate_vsync_sf"
+  name: "deprecate_vsync_sf_v2"
   namespace: "core_graphics"
   description: "Depracate eVsyncSourceSurfaceFlinger and use vsync_app everywhere"
   bug: "162235855"
-  is_fixed_read_only: true
   metadata {
     purpose: PURPOSE_BUGFIX
   }
-} # deprecate_vsync_sf
+} # deprecate_vsync_sf_v2
+
 
 flag {
   name: "disable_synthetic_vsync_for_performance"
@@ -175,6 +158,20 @@ flag {
 } # follower_arbitrary_refresh_rate_selection
 
 flag {
+  name: "follower_display_backpressure"
+  namespace: "desktop_display"
+  description: "Skips presentation on a follower display if there is a pending present for the next follower vsync. Enables follower displays to present even when their refresh rate does not match the pacesetter display."
+  bug: "374072507"
+} # follower_display_backpressure
+
+flag {
+  name: "force_slower_follower_gpu_composition"
+  namespace: "desktop_display"
+  description: "Force slower connected displays to be GPU composited."
+  bug: "389982803"
+} # force_slower_follower_gpu_composition
+
+flag {
   name: "force_compile_graphite_renderengine"
   namespace: "core_graphics"
   description: "Compile Skia's Graphite Vulkan backend in RenderEngine, but do NOT enable it, unless graphite_renderengine is also set. It can also be enabled with the debug.renderengine.graphite system property for testing. In contrast, the graphite_renderengine flag both compiles AND enables Graphite in RenderEngine."
@@ -208,6 +205,13 @@ flag {
 } # graphite_renderengine_preview_rollout
 
 flag {
+  name: "graphite_renderengine_desktop_rollout"
+  namespace: "core_graphics"
+  description: "R/W flag to enable Skia's Graphite Vulkan backend in RenderEngine for Desktop devices, IF the debug.renderengine.graphite_desktop_optin sysprop is set to true."
+  bug: "436872839"
+} # graphite_renderengine_desktop_rollout
+
+flag {
   name: "hdcp_negotiation"
   namespace: "core_graphics"
   description: "detect secure layers to start HDCP negotiation"
@@ -225,12 +229,46 @@ flag {
 } # increase_missed_frame_jank_threshold
 
 flag {
+  name: "jank_classification_v2"
+  namespace: "core_graphics"
+  description: "Refined jank classification"
+  bug: "416904263"
+} # jank_classification_v2
+
+flag {
   name: "local_tonemap_screenshots"
   namespace: "core_graphics"
   description: "Enables local tonemapping when capturing screenshots"
   bug: "329464641"
   is_fixed_read_only: true
 } # local_tonemap_screenshots
+
+flag {
+  name: "md_degrade_hdr"
+  namespace: "core_graphics"
+  description: "Degrades displays from HDR to SDR during multidisplay mirroring"
+  bug: "443315364"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+} # md_degrade_hdr
+
+flag {
+  name: "mirror_uid_filtering"
+  namespace: "window_surfaces"
+  description: "Enables UID filtering when building layer snapshots of mirrors. Layers that have different UID from the mirror root's will be dropped "
+  bug: "437391557"
+} # mirror_uid_filtering
+
+flag {
+  name: "modeset_state_machine"
+  namespace: "core_graphics"
+  description: "Prevent data races causing modeset failures and deadlocks"
+  bug: "434757601"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+} # modeset_state_machine
 
 flag {
   name: "monitor_buffer_fences"
@@ -256,18 +294,31 @@ flag {
 } # offload_gpu_composition
 
 flag {
-  name: "pacesetter_selection"
-  namespace: "desktop_display"
-  description: "Moves pacesetter designation to the display with highest refresh rate. Prefers to keep the same display as pacesetter if there are multiple displays of the same highest refresh rate."
-  bug: "374072507"
-} # pacesetter_selection
-
-flag {
   name: "parse_edid_version_and_input_type"
   namespace: "desktop_display"
   description: "Extends the display information parsed and provided by SurfaceFlinger to include EDID version and input type."
   bug: "420767380"
 } # parse_edid_version_and_input_type
+
+flag {
+  name: "re_check_fence"
+  namespace: "core_graphics"
+  description: "Check fence status before waiting for fence in RenderEngine"
+  bug: "446240423"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+} # re_check_fence
+
+flag {
+  name: "re_powered_off_displays_inform_cache_budgets"
+  namespace: "core_graphics"
+  description: "Allow powered off displays to contribute to RenderEngine's cache budgets, since displays aren't fully initialized when cache budget calculations are needed during boot."
+  bug: "446658240"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+} # re_powered_off_displays_inform_cache_budgets
 
 flag {
   name: "readback_screenshot"
@@ -278,24 +329,14 @@ flag {
 } # readback_screenshot
 
 flag {
-  name: "reset_model_flushes_fence"
+  name: "resync_on_tx_separate_timer"
   namespace: "core_graphics"
-  description: "VsyncReactor flushes pending fence before calling to reset model"
-  bug: "272802278"
+  description: "Keep a seaprate resync timer for resync triggered by transactions"
+  bug: "439654802"
   metadata {
     purpose: PURPOSE_BUGFIX
   }
-} # reset_model_flushes_fence
-
-flag {
-  name: "resync_on_tx"
-  namespace: "core_graphics"
-  description: "Resync to vsync on an incoming transaction"
-  bug: "425994753"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
- } # resync_on_tx
+} # resync_on_tx_separate_timer
 
 flag {
   name: "set_client_drawn_corner_radii"
@@ -343,6 +384,16 @@ flag {
 } # stop_layer
 
 flag {
+    name: "supported_refresh_rate_update"
+    namespace: "core_graphics"
+    description: "Update the supported refresh rate list"
+    bug: "431061528"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+} # supported_refresh_rate_update
+
+flag {
   name: "synced_resolution_switch"
   namespace: "core_graphics"
   description: "Synchronize resolution modeset with framebuffer resizing"
@@ -358,24 +409,21 @@ flag {
 } # true_hdr_screenshots
 
 flag {
-    name: "unify_refresh_rate_callbacks"
+    name: "use_at_least_60_for_min_vote"
     namespace: "core_graphics"
-    description: "Unifies mode changed and FrameRateOverride callbacks"
-    bug: "399482301"
+    description: "Chooses the lowest >= 60 render rate when all voters want Min frame rate"
+    bug: "441896528"
     metadata {
         purpose: PURPOSE_BUGFIX
     }
-} # unify_refresh_rate_callbacks
+} # use_at_least_60_for_min_vote
 
 flag {
-  name: "vsync_predictor_predicts_within_threshold"
+  name: "wb_framebuffersurface2"
   namespace: "core_graphics"
-  description: "VSyncPredictor to ignore vsyncs before the given threshold for period and intercept calculation"
-  bug: "411593328"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
- } # vsync_predictor_predicts_within_threshold
+  description: "When enabled, use an updated FrameBufferSurface instead of the legacy one"
+  bug: "340933138"
+} # wb_framebuffersurface2
 
 flag {
   name: "wb_virtualdisplay2"

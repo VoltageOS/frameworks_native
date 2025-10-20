@@ -42,12 +42,17 @@
 #include <input/PrintTools.h>
 #include <linux/input.h>
 #include <sys/epoll.h>
+#include <utils/Timers.h>
 
 #include <cinttypes>
 #include <compare>
 #include <thread>
 #include <unordered_set>
 #include <vector>
+
+#include "ProtoLog.h"
+#include "perfetto/tracing/backend_type.h"
+#include "perfetto/tracing/tracing.h"
 
 using android::base::StringPrintf;
 using android::gui::FocusRequest;
@@ -71,8 +76,8 @@ namespace {
 static constexpr nsecs_t ARBITRARY_TIME = 1234;
 
 // An arbitrary device id.
-static constexpr int32_t DEVICE_ID = DEFAULT_DEVICE_ID;
-static constexpr int32_t SECOND_DEVICE_ID = 2;
+static constexpr DeviceId DEVICE_ID = DEFAULT_DEVICE_ID;
+static constexpr DeviceId SECOND_DEVICE_ID = 2;
 
 // An arbitrary display id.
 constexpr ui::LogicalDisplayId DISPLAY_ID = ui::LogicalDisplayId::DEFAULT;
@@ -174,6 +179,11 @@ protected:
     std::shared_ptr<input_trace::VerifyingTrace> mVerifyingTrace;
 
     void SetUp() override {
+        perfetto::TracingInitArgs args;
+        args.backends |= perfetto::kInProcessBackend;
+        perfetto::Tracing::Initialize(args);
+
+        protolog::Initialize();
         mVerifyingTrace = std::make_shared<input_trace::VerifyingTrace>();
         FakeWindowHandle::sOnEventReceivedCallback = [this](const auto& _1, const auto& _2) {
             handleEventReceivedByWindow(_1, _2);
@@ -6699,9 +6709,11 @@ TEST_F(InputDispatcherDisplayProjectionTest, InjectionWithTransformInLogicalDisp
     const vec2 expectedPoint{75, 55}; // The injected point in the logical display space.
     const vec2 untransformedPoint = injectedEventTransform.inverse().transform(expectedPoint);
 
+    const nsecs_t time = systemTime(SYSTEM_TIME_MONOTONIC);
     MotionEvent event = MotionEventBuilder(AMOTION_EVENT_ACTION_DOWN, AINPUT_SOURCE_TOUCHSCREEN)
                                 .displayId(ui::LogicalDisplayId::DEFAULT)
-                                .eventTime(systemTime(SYSTEM_TIME_MONOTONIC))
+                                .eventTime(time)
+                                .downTime(time)
                                 .pointer(PointerBuilder(/*id=*/0, ToolType::FINGER)
                                                  .x(untransformedPoint.x)
                                                  .y(untransformedPoint.y))
@@ -6861,7 +6873,7 @@ TEST_F(InputDispatcherDisplayProjectionTest,
     firstWindow->assertNoEvents();
 }
 
-TEST_F(InputDispatcherDisplayProjectionTest, SynthesizeHoverCancelationWithCorrectCoordinates) {
+TEST_F(InputDispatcherDisplayProjectionTest, SynthesizeHoverCancellationWithCorrectCoordinates) {
     auto [firstWindow, secondWindow] = setupScaledDisplayScenario();
 
     // Send hover enter to second window
@@ -6881,7 +6893,7 @@ TEST_F(InputDispatcherDisplayProjectionTest, SynthesizeHoverCancelationWithCorre
 
 // Same as above, but while the window is being mirrored.
 TEST_F(InputDispatcherDisplayProjectionTest,
-       SynthesizeHoverCancelationWithCorrectCoordinatesWhenMirrored) {
+       SynthesizeHoverCancellationWithCorrectCoordinatesWhenMirrored) {
     auto [firstWindow, secondWindow] = setupScaledDisplayScenario();
 
     const std::array<float, 9> matrix = {1.1, 2.2, 3.3, 4.4, 5.5, 6.6, 0.0, 0.0, 1.0};
@@ -6903,7 +6915,7 @@ TEST_F(InputDispatcherDisplayProjectionTest,
 
     mDispatcher->cancelCurrentTouch();
 
-    // Ensure the cancelation happens with the correct displayId and the correct coordinates.
+    // Ensure the cancellation happens with the correct displayId and the correct coordinates.
     secondWindow->consumeMotionEvent(AllOf(WithMotionAction(ACTION_HOVER_EXIT), WithCoords(100, 80),
                                            WithRawCoords(300, 880),
                                            WithDisplayId(ui::LogicalDisplayId::DEFAULT)));
@@ -9189,7 +9201,7 @@ protected:
         mWindow->consumeFocusEvent(true);
     }
 
-    void sendAndConsumeKeyDown(int32_t deviceId) {
+    void sendAndConsumeKeyDown(DeviceId deviceId) {
         NotifyKeyArgs keyArgs =
                 generateKeyArgs(AKEY_EVENT_ACTION_DOWN, ui::LogicalDisplayId::DEFAULT);
         keyArgs.deviceId = deviceId;
@@ -9206,7 +9218,7 @@ protected:
                 AllOf(WithKeyAction(AKEY_EVENT_ACTION_DOWN), WithRepeatCount(repeatCount)));
     }
 
-    void sendAndConsumeKeyUp(int32_t deviceId) {
+    void sendAndConsumeKeyUp(DeviceId deviceId) {
         NotifyKeyArgs keyArgs =
                 generateKeyArgs(AKEY_EVENT_ACTION_UP, ui::LogicalDisplayId::DEFAULT);
         keyArgs.deviceId = deviceId;
@@ -10000,9 +10012,11 @@ TEST_F(InputDispatcherOnPointerDownOutsideFocus, OnPointerDownOutsideFocus_OnAlr
 // Have two windows, one with focus. Injecting a trusted DOWN MotionEvent with the flag
 // NO_FOCUS_CHANGE on the unfocused window should not call the onPointerDownOutsideFocus callback.
 TEST_F(InputDispatcherOnPointerDownOutsideFocus, NoFocusChangeFlag) {
+    const nsecs_t time = systemTime(SYSTEM_TIME_MONOTONIC);
     const MotionEvent event =
             MotionEventBuilder(AMOTION_EVENT_ACTION_DOWN, AINPUT_SOURCE_MOUSE)
-                    .eventTime(systemTime(SYSTEM_TIME_MONOTONIC))
+                    .eventTime(time)
+                    .downTime(time)
                     .pointer(PointerBuilder(/*id=*/0, ToolType::FINGER).x(20).y(20))
                     .addFlag(MotionFlag::NO_FOCUS_CHANGE)
                     .build();
@@ -11828,11 +11842,14 @@ protected:
     static constexpr gui::Uid TOUCHED_APP_UID{10001};
     static constexpr gui::Uid APP_B_UID{10002};
     static constexpr gui::Uid APP_C_UID{10003};
+    static constexpr gui::Uid BOTTOM_APP_UID{10004};
 
     sp<FakeWindowHandle> mTouchWindow;
+    sp<FakeWindowHandle> mBottomWindow;
 
     virtual void SetUp() override {
         InputDispatcherTest::SetUp();
+        mBottomWindow = getWindow(BOTTOM_APP_UID, "Bottom");
         mTouchWindow = getWindow(TOUCHED_APP_UID, "Touched");
         mDispatcher->setMaximumObscuringOpacityForTouch(MAXIMUM_OBSCURING_OPACITY);
     }
@@ -12215,6 +12232,70 @@ TEST_F(InputDispatcherUntrustedTouchesTest,
     mTouchWindow->consumeAnyMotionDown();
 }
 
+/**
+ * If the touch window USE_OPACITY and it is translucent (alpha < 0.5), do not let it receive
+ * the touch event. The window below it also does not receive the touch event.
+ */
+TEST_F(InputDispatcherUntrustedTouchesTest, UseOpacity_BlocksWhenAlphaIsLow) {
+    mTouchWindow->editInfo()->touchOcclusionMode = TouchOcclusionMode::USE_OPACITY;
+    mTouchWindow->editInfo()->alpha = 0.4f; // Less than 0.5
+    mDispatcher->onWindowInfosChanged(
+            {{*mTouchWindow->getInfo(), *mBottomWindow->getInfo()}, {}, 0, 0});
+
+    touch();
+
+    mTouchWindow->assertNoEvents();
+    mBottomWindow->assertNoEvents();
+}
+
+/**
+ * If the touch window USE_OPACITY and it is visible (alpha > 0.5), it should receive
+ * the touch event. The window below it still does not receive the touch event.
+ */
+TEST_F(InputDispatcherUntrustedTouchesTest, UseOpacity_AllowsWhenAlphaIsSufficient) {
+    mTouchWindow->editInfo()->touchOcclusionMode = TouchOcclusionMode::USE_OPACITY;
+    mTouchWindow->editInfo()->alpha = 0.6f; // Greater than 0.5
+    mDispatcher->onWindowInfosChanged(
+            {{*mTouchWindow->getInfo(), *mBottomWindow->getInfo()}, {}, 0, 0});
+
+    touch();
+
+    mTouchWindow->consumeMotionDown();
+    mBottomWindow->assertNoEvents();
+}
+
+/**
+ * If the touch window USE_OPACITY and it is translucent at the threshold (alpha = 0.5),
+ * do not let it receive the touch event. The window below it also does not receive the touch event.
+ */
+TEST_F(InputDispatcherUntrustedTouchesTest, UseOpacity_AllowsWhenAlphaIsAtThreshold) {
+    mTouchWindow->editInfo()->touchOcclusionMode = TouchOcclusionMode::USE_OPACITY;
+    mTouchWindow->editInfo()->alpha = 0.5f; // Exactly at the threshold
+    mDispatcher->onWindowInfosChanged(
+            {{*mTouchWindow->getInfo(), *mBottomWindow->getInfo()}, {}, 0, 0});
+
+    touch();
+
+    mTouchWindow->consumeMotionDown();
+    mBottomWindow->assertNoEvents();
+}
+
+/**
+ * If the touch window does not USE_OPACITY and it is translucent (alpha < 0.4), let it receive
+ * the touch event. The window below it also does not receive the touch event.
+ */
+TEST_F(InputDispatcherUntrustedTouchesTest, OtherOcclusionMode_AllowsWhenAlphaIsLow) {
+    mTouchWindow->editInfo()->touchOcclusionMode = TouchOcclusionMode::BLOCK_UNTRUSTED;
+    mTouchWindow->editInfo()->alpha = 0.4f; // Less than 0.5, but mode is not USE_OPACITY
+    mDispatcher->onWindowInfosChanged(
+            {{*mTouchWindow->getInfo(), *mBottomWindow->getInfo()}, {}, 0, 0});
+
+    touch();
+
+    mTouchWindow->consumeMotionDown();
+    mBottomWindow->assertNoEvents();
+}
+
 class InputDispatcherDragTests : public InputDispatcherTest {
 protected:
     std::shared_ptr<FakeApplicationHandle> mApp;
@@ -12266,40 +12347,34 @@ protected:
                  0});
     }
 
-    void injectDown(int fromSource = AINPUT_SOURCE_TOUCHSCREEN,
-                    ui::LogicalDisplayId displayId = ui::LogicalDisplayId::DEFAULT) {
+    void injectDown(int fromSource, ui::LogicalDisplayId displayId) {
         bool consumeButtonPress = false;
-        const PointF location =
-                displayId == ui::LogicalDisplayId::DEFAULT ? PointF(50, 50) : PointF(50, 450);
+        const PointF location(50, 50);
         switch (fromSource) {
             case AINPUT_SOURCE_TOUCHSCREEN: {
-                ASSERT_EQ(InputEventInjectionResult::SUCCEEDED,
-                          injectMotionDown(*mDispatcher, AINPUT_SOURCE_TOUCHSCREEN, displayId,
-                                           location))
-                        << "Inject motion event should return InputEventInjectionResult::SUCCEEDED";
+                mDispatcher->notifyMotion(MotionArgsBuilder(ACTION_DOWN, fromSource)
+                                                  .displayId(displayId)
+                                                  .pointer(PointerBuilder(0, ToolType::FINGER)
+                                                                   .x(location.x)
+                                                                   .y(location.y))
+                                                  .build());
                 break;
             }
             case AINPUT_SOURCE_STYLUS: {
                 PointerBuilder pointer =
                         PointerBuilder(0, ToolType::STYLUS).x(location.x).y(location.y);
-                ASSERT_EQ(InputEventInjectionResult::SUCCEEDED,
-                          injectMotionEvent(*mDispatcher,
-                                            MotionEventBuilder(AMOTION_EVENT_ACTION_DOWN,
-                                                               AINPUT_SOURCE_STYLUS)
-                                                    .buttonState(
-                                                            AMOTION_EVENT_BUTTON_STYLUS_PRIMARY)
-                                                    .pointer(pointer)
-                                                    .build()));
-                ASSERT_EQ(InputEventInjectionResult::SUCCEEDED,
-                          injectMotionEvent(*mDispatcher,
-                                            MotionEventBuilder(AMOTION_EVENT_ACTION_BUTTON_PRESS,
-                                                               AINPUT_SOURCE_STYLUS)
-                                                    .actionButton(
-                                                            AMOTION_EVENT_BUTTON_STYLUS_PRIMARY)
-                                                    .buttonState(
-                                                            AMOTION_EVENT_BUTTON_STYLUS_PRIMARY)
-                                                    .pointer(pointer)
-                                                    .build()));
+                mDispatcher->notifyMotion(MotionArgsBuilder(ACTION_DOWN, AINPUT_SOURCE_STYLUS)
+                                                  .displayId(displayId)
+                                                  .buttonState(AMOTION_EVENT_BUTTON_STYLUS_PRIMARY)
+                                                  .pointer(pointer)
+                                                  .build());
+                mDispatcher->notifyMotion(
+                        MotionArgsBuilder(AMOTION_EVENT_ACTION_BUTTON_PRESS, AINPUT_SOURCE_STYLUS)
+                                .displayId(displayId)
+                                .actionButton(AMOTION_EVENT_BUTTON_STYLUS_PRIMARY)
+                                .buttonState(AMOTION_EVENT_BUTTON_STYLUS_PRIMARY)
+                                .pointer(pointer)
+                                .build());
                 consumeButtonPress = true;
                 break;
             }
@@ -12307,23 +12382,18 @@ protected:
                 PointerBuilder pointer = PointerBuilder(MOUSE_POINTER_ID, ToolType::MOUSE)
                                                  .x(location.x)
                                                  .y(location.y);
-                ASSERT_EQ(InputEventInjectionResult::SUCCEEDED,
-                          injectMotionEvent(*mDispatcher,
-                                            MotionEventBuilder(AMOTION_EVENT_ACTION_DOWN,
-                                                               AINPUT_SOURCE_MOUSE)
-                                                    .displayId(displayId)
-                                                    .buttonState(AMOTION_EVENT_BUTTON_PRIMARY)
-                                                    .pointer(pointer)
-                                                    .build()));
-                ASSERT_EQ(InputEventInjectionResult::SUCCEEDED,
-                          injectMotionEvent(*mDispatcher,
-                                            MotionEventBuilder(AMOTION_EVENT_ACTION_BUTTON_PRESS,
-                                                               AINPUT_SOURCE_MOUSE)
-                                                    .displayId(displayId)
-                                                    .actionButton(AMOTION_EVENT_BUTTON_PRIMARY)
-                                                    .buttonState(AMOTION_EVENT_BUTTON_PRIMARY)
-                                                    .pointer(pointer)
-                                                    .build()));
+                mDispatcher->notifyMotion(MotionArgsBuilder(ACTION_DOWN, AINPUT_SOURCE_MOUSE)
+                                                  .displayId(displayId)
+                                                  .buttonState(AMOTION_EVENT_BUTTON_PRIMARY)
+                                                  .pointer(pointer)
+                                                  .build());
+                mDispatcher->notifyMotion(
+                        MotionArgsBuilder(AMOTION_EVENT_ACTION_BUTTON_PRESS, AINPUT_SOURCE_MOUSE)
+                                .displayId(displayId)
+                                .actionButton(AMOTION_EVENT_BUTTON_PRIMARY)
+                                .buttonState(AMOTION_EVENT_BUTTON_PRIMARY)
+                                .pointer(pointer)
+                                .build());
                 consumeButtonPress = true;
                 break;
             }
@@ -12335,7 +12405,8 @@ protected:
         // Window should receive motion event.
         sp<FakeWindowHandle>& targetWindow =
                 displayId == ui::LogicalDisplayId::DEFAULT ? mWindow : mWindowOnSecondDisplay;
-        targetWindow->consumeMotionDown(displayId);
+        targetWindow->consumeMotionEvent(
+                AllOf(WithMotionAction(ACTION_DOWN), WithDisplayId(displayId)));
         if (consumeButtonPress) {
             targetWindow->consumeMotionEvent(WithMotionAction(AMOTION_EVENT_ACTION_BUTTON_PRESS));
         }
@@ -12394,36 +12465,36 @@ TEST_F(InputDispatcherDragTests, DragEnterAndDragExit) {
     startDrag();
 
     // Move on window.
-    ASSERT_EQ(InputEventInjectionResult::SUCCEEDED,
-              injectMotionEvent(*mDispatcher, AMOTION_EVENT_ACTION_MOVE, AINPUT_SOURCE_TOUCHSCREEN,
-                                ui::LogicalDisplayId::DEFAULT, {50, 50}))
-            << "Inject motion event should return InputEventInjectionResult::SUCCEEDED";
+    mDispatcher->notifyMotion(MotionArgsBuilder(ACTION_MOVE, AINPUT_SOURCE_TOUCHSCREEN)
+                                      .displayId(ui::LogicalDisplayId::DEFAULT)
+                                      .pointer(PointerBuilder(0, ToolType::FINGER).x(50).y(50))
+                                      .build());
     mDragWindow->consumeMotionMove(ui::LogicalDisplayId::DEFAULT, MotionFlag::NO_FOCUS_CHANGE);
     mWindow->consumeDragEvent(false, 50, 50);
     mSecondWindow->assertNoEvents();
 
     // Move to another window.
-    ASSERT_EQ(InputEventInjectionResult::SUCCEEDED,
-              injectMotionEvent(*mDispatcher, AMOTION_EVENT_ACTION_MOVE, AINPUT_SOURCE_TOUCHSCREEN,
-                                ui::LogicalDisplayId::DEFAULT, {150, 50}))
-            << "Inject motion event should return InputEventInjectionResult::SUCCEEDED";
+    mDispatcher->notifyMotion(MotionArgsBuilder(ACTION_MOVE, AINPUT_SOURCE_TOUCHSCREEN)
+                                      .displayId(ui::LogicalDisplayId::DEFAULT)
+                                      .pointer(PointerBuilder(0, ToolType::FINGER).x(150).y(50))
+                                      .build());
     mDragWindow->consumeMotionMove(ui::LogicalDisplayId::DEFAULT, MotionFlag::NO_FOCUS_CHANGE);
     mWindow->consumeDragEvent(true, 150, 50);
     mSecondWindow->consumeDragEvent(false, 50, 50);
 
     // Move back to original window.
-    ASSERT_EQ(InputEventInjectionResult::SUCCEEDED,
-              injectMotionEvent(*mDispatcher, AMOTION_EVENT_ACTION_MOVE, AINPUT_SOURCE_TOUCHSCREEN,
-                                ui::LogicalDisplayId::DEFAULT, {50, 50}))
-            << "Inject motion event should return InputEventInjectionResult::SUCCEEDED";
+    mDispatcher->notifyMotion(MotionArgsBuilder(ACTION_MOVE, AINPUT_SOURCE_TOUCHSCREEN)
+                                      .displayId(ui::LogicalDisplayId::DEFAULT)
+                                      .pointer(PointerBuilder(0, ToolType::FINGER).x(50).y(50))
+                                      .build());
     mDragWindow->consumeMotionMove(ui::LogicalDisplayId::DEFAULT, MotionFlag::NO_FOCUS_CHANGE);
     mWindow->consumeDragEvent(false, 50, 50);
     mSecondWindow->consumeDragEvent(true, -50, 50);
 
-    ASSERT_EQ(InputEventInjectionResult::SUCCEEDED,
-              injectMotionUp(*mDispatcher, AINPUT_SOURCE_TOUCHSCREEN, ui::LogicalDisplayId::DEFAULT,
-                             {50, 50}))
-            << "Inject motion event should return InputEventInjectionResult::SUCCEEDED";
+    mDispatcher->notifyMotion(MotionArgsBuilder(ACTION_UP, AINPUT_SOURCE_TOUCHSCREEN)
+                                      .displayId(ui::LogicalDisplayId::DEFAULT)
+                                      .pointer(PointerBuilder(0, ToolType::FINGER).x(50).y(50))
+                                      .build());
     mDragWindow->consumeMotionUp(ui::LogicalDisplayId::DEFAULT, MotionFlag::NO_FOCUS_CHANGE);
     mWindow->assertNoEvents();
     mSecondWindow->assertNoEvents();
@@ -12435,16 +12506,12 @@ TEST_F(InputDispatcherDragTests, DragEnterAndPointerDownPilfersPointers) {
     // No cancel event after drag start
     mSpyWindow->assertNoEvents();
 
-    const MotionEvent secondFingerDownEvent =
-            MotionEventBuilder(POINTER_1_DOWN, AINPUT_SOURCE_TOUCHSCREEN)
+    mDispatcher->notifyMotion(
+            MotionArgsBuilder(POINTER_1_DOWN, AINPUT_SOURCE_TOUCHSCREEN)
                     .eventTime(systemTime(SYSTEM_TIME_MONOTONIC))
                     .pointer(PointerBuilder(/*id=*/0, ToolType::FINGER).x(50).y(50))
                     .pointer(PointerBuilder(/*id=*/1, ToolType::FINGER).x(60).y(60))
-                    .build();
-    ASSERT_EQ(InputEventInjectionResult::SUCCEEDED,
-              injectMotionEvent(*mDispatcher, secondFingerDownEvent, INJECT_EVENT_TIMEOUT,
-                                InputEventInjectionSync::WAIT_FOR_RESULT))
-            << "Inject motion event should return InputEventInjectionResult::SUCCEEDED";
+                    .build());
 
     // Receives cancel for first pointer after next pointer down
     mSpyWindow->consumeMotionCancel();
@@ -12457,28 +12524,28 @@ TEST_F(InputDispatcherDragTests, DragAndDrop) {
     startDrag();
 
     // Move on window.
-    ASSERT_EQ(InputEventInjectionResult::SUCCEEDED,
-              injectMotionEvent(*mDispatcher, AMOTION_EVENT_ACTION_MOVE, AINPUT_SOURCE_TOUCHSCREEN,
-                                ui::LogicalDisplayId::DEFAULT, {50, 50}))
-            << "Inject motion event should return InputEventInjectionResult::SUCCEEDED";
+    mDispatcher->notifyMotion(MotionArgsBuilder(ACTION_MOVE, AINPUT_SOURCE_TOUCHSCREEN)
+                                      .displayId(ui::LogicalDisplayId::DEFAULT)
+                                      .pointer(PointerBuilder(0, ToolType::FINGER).x(50).y(50))
+                                      .build());
     mDragWindow->consumeMotionMove(ui::LogicalDisplayId::DEFAULT, MotionFlag::NO_FOCUS_CHANGE);
     mWindow->consumeDragEvent(false, 50, 50);
     mSecondWindow->assertNoEvents();
 
     // Move to another window.
-    ASSERT_EQ(InputEventInjectionResult::SUCCEEDED,
-              injectMotionEvent(*mDispatcher, AMOTION_EVENT_ACTION_MOVE, AINPUT_SOURCE_TOUCHSCREEN,
-                                ui::LogicalDisplayId::DEFAULT, {150, 50}))
-            << "Inject motion event should return InputEventInjectionResult::SUCCEEDED";
+    mDispatcher->notifyMotion(MotionArgsBuilder(ACTION_MOVE, AINPUT_SOURCE_TOUCHSCREEN)
+                                      .displayId(ui::LogicalDisplayId::DEFAULT)
+                                      .pointer(PointerBuilder(0, ToolType::FINGER).x(150).y(50))
+                                      .build());
     mDragWindow->consumeMotionMove(ui::LogicalDisplayId::DEFAULT, MotionFlag::NO_FOCUS_CHANGE);
     mWindow->consumeDragEvent(true, 150, 50);
     mSecondWindow->consumeDragEvent(false, 50, 50);
 
     // drop to another window.
-    ASSERT_EQ(InputEventInjectionResult::SUCCEEDED,
-              injectMotionUp(*mDispatcher, AINPUT_SOURCE_TOUCHSCREEN, ui::LogicalDisplayId::DEFAULT,
-                             {150, 50}))
-            << "Inject motion event should return InputEventInjectionResult::SUCCEEDED";
+    mDispatcher->notifyMotion(MotionArgsBuilder(ACTION_UP, AINPUT_SOURCE_TOUCHSCREEN)
+                                      .displayId(ui::LogicalDisplayId::DEFAULT)
+                                      .pointer(PointerBuilder(0, ToolType::FINGER).x(150).y(50))
+                                      .build());
     mDragWindow->consumeMotionUp(ui::LogicalDisplayId::DEFAULT, MotionFlag::NO_FOCUS_CHANGE);
     mFakePolicy->assertDropTargetEquals(*mDispatcher, mSecondWindow->getToken());
     mWindow->assertNoEvents();
@@ -12491,16 +12558,12 @@ TEST_F(InputDispatcherDragTests, DragAndDropNotCancelledIfSomeOtherPointerIsPilf
     // No cancel event after drag start
     mSpyWindow->assertNoEvents();
 
-    const MotionEvent secondFingerDownEvent =
-            MotionEventBuilder(POINTER_1_DOWN, AINPUT_SOURCE_TOUCHSCREEN)
+    mDispatcher->notifyMotion(
+            MotionArgsBuilder(POINTER_1_DOWN, AINPUT_SOURCE_TOUCHSCREEN)
                     .eventTime(systemTime(SYSTEM_TIME_MONOTONIC))
                     .pointer(PointerBuilder(/*id=*/0, ToolType::FINGER).x(50).y(50))
                     .pointer(PointerBuilder(/*id=*/1, ToolType::FINGER).x(60).y(60))
-                    .build();
-    ASSERT_EQ(InputEventInjectionResult::SUCCEEDED,
-              injectMotionEvent(*mDispatcher, secondFingerDownEvent, INJECT_EVENT_TIMEOUT,
-                                InputEventInjectionSync::WAIT_FOR_RESULT))
-            << "Inject motion event should return InputEventInjectionResult::SUCCEEDED";
+                    .build());
 
     // Receives cancel for first pointer after next pointer down
     mSpyWindow->consumeMotionEvent(WithMotionAction(ACTION_CANCEL));
@@ -12513,16 +12576,12 @@ TEST_F(InputDispatcherDragTests, DragAndDropNotCancelledIfSomeOtherPointerIsPilf
     EXPECT_EQ(OK, mDispatcher->pilferPointers(mSpyWindow->getToken()));
     mDragWindow->assertNoEvents();
 
-    const MotionEvent firstFingerMoveEvent =
-            MotionEventBuilder(ACTION_MOVE, AINPUT_SOURCE_TOUCHSCREEN)
+    mDispatcher->notifyMotion(
+            MotionArgsBuilder(ACTION_MOVE, AINPUT_SOURCE_TOUCHSCREEN)
                     .eventTime(systemTime(SYSTEM_TIME_MONOTONIC))
                     .pointer(PointerBuilder(/*id=*/0, ToolType::FINGER).x(60).y(60))
                     .pointer(PointerBuilder(/*id=*/1, ToolType::FINGER).x(60).y(60))
-                    .build();
-    ASSERT_EQ(InputEventInjectionResult::SUCCEEDED,
-              injectMotionEvent(*mDispatcher, firstFingerMoveEvent, INJECT_EVENT_TIMEOUT,
-                                InputEventInjectionSync::WAIT_FOR_RESULT))
-            << "Inject motion event should return InputEventInjectionResult::SUCCEEDED";
+                    .build());
 
     // Drag window should still receive the new event
     mDragWindow->consumeMotionEvent(
@@ -12540,16 +12599,12 @@ TEST_F(InputDispatcherDragTests, DragAndDropWithDoNotPilferSpy) {
     // No cancel event after drag start
     mSpyWindow->assertNoEvents();
 
-    const MotionEvent secondFingerDownEvent =
-            MotionEventBuilder(POINTER_1_DOWN, AINPUT_SOURCE_TOUCHSCREEN)
+    mDispatcher->notifyMotion(
+            MotionArgsBuilder(POINTER_1_DOWN, AINPUT_SOURCE_TOUCHSCREEN)
                     .eventTime(systemTime(SYSTEM_TIME_MONOTONIC))
                     .pointer(PointerBuilder(/*id=*/0, ToolType::FINGER).x(50).y(50))
                     .pointer(PointerBuilder(/*id=*/1, ToolType::FINGER).x(60).y(60))
-                    .build();
-    ASSERT_EQ(InputEventInjectionResult::SUCCEEDED,
-              injectMotionEvent(*mDispatcher, secondFingerDownEvent, INJECT_EVENT_TIMEOUT,
-                                InputEventInjectionSync::WAIT_FOR_RESULT))
-            << "Inject motion event should return InputEventInjectionResult::SUCCEEDED";
+                    .build());
 
     // Since the spy window sets the DO_NOT_PILFER flag, the drag pointer does
     // not get canceled for the spy window.
@@ -12558,16 +12613,12 @@ TEST_F(InputDispatcherDragTests, DragAndDropWithDoNotPilferSpy) {
 
     mSpyWindow->assertNoEvents();
 
-    const MotionEvent firstFingerMoveEvent =
-            MotionEventBuilder(ACTION_MOVE, AINPUT_SOURCE_TOUCHSCREEN)
+    mDispatcher->notifyMotion(
+            MotionArgsBuilder(ACTION_MOVE, AINPUT_SOURCE_TOUCHSCREEN)
                     .eventTime(systemTime(SYSTEM_TIME_MONOTONIC))
                     .pointer(PointerBuilder(/*id=*/0, ToolType::FINGER).x(60).y(60))
                     .pointer(PointerBuilder(/*id=*/1, ToolType::FINGER).x(60).y(60))
-                    .build();
-    ASSERT_EQ(InputEventInjectionResult::SUCCEEDED,
-              injectMotionEvent(*mDispatcher, firstFingerMoveEvent, INJECT_EVENT_TIMEOUT,
-                                InputEventInjectionSync::WAIT_FOR_RESULT))
-            << "Inject motion event should return InputEventInjectionResult::SUCCEEDED";
+                    .build());
 
     // Drag window should not receive the new event
     mDragWindow->consumeMotionEvent(
@@ -12582,48 +12633,36 @@ TEST_F(InputDispatcherDragTests, StylusDragAndDrop) {
     startDrag(true, AINPUT_SOURCE_STYLUS);
 
     // Move on window and keep button pressed.
-    ASSERT_EQ(InputEventInjectionResult::SUCCEEDED,
-              injectMotionEvent(*mDispatcher,
-                                MotionEventBuilder(AMOTION_EVENT_ACTION_MOVE, AINPUT_SOURCE_STYLUS)
-                                        .buttonState(AMOTION_EVENT_BUTTON_STYLUS_PRIMARY)
-                                        .pointer(PointerBuilder(0, ToolType::STYLUS).x(50).y(50))
-                                        .build()))
-            << "Inject motion event should return InputEventInjectionResult::SUCCEEDED";
+    mDispatcher->notifyMotion(MotionArgsBuilder(AMOTION_EVENT_ACTION_MOVE, AINPUT_SOURCE_STYLUS)
+                                      .buttonState(AMOTION_EVENT_BUTTON_STYLUS_PRIMARY)
+                                      .pointer(PointerBuilder(0, ToolType::STYLUS).x(50).y(50))
+                                      .build());
     mDragWindow->consumeMotionMove(ui::LogicalDisplayId::DEFAULT, MotionFlag::NO_FOCUS_CHANGE);
     mWindow->consumeDragEvent(false, 50, 50);
     mSecondWindow->assertNoEvents();
 
     // Move to another window and release button, expect to drop item.
-    ASSERT_EQ(InputEventInjectionResult::SUCCEEDED,
-              injectMotionEvent(*mDispatcher,
-                                MotionEventBuilder(AMOTION_EVENT_ACTION_BUTTON_RELEASE,
-                                                   AINPUT_SOURCE_STYLUS)
-                                        .actionButton(AMOTION_EVENT_BUTTON_STYLUS_PRIMARY)
-                                        .buttonState(0)
-                                        .pointer(PointerBuilder(0, ToolType::STYLUS).x(150).y(50))
-                                        .build()))
-            << "Inject motion event should return InputEventInjectionResult::SUCCEEDED";
+    mDispatcher->notifyMotion(
+            MotionArgsBuilder(AMOTION_EVENT_ACTION_BUTTON_RELEASE, AINPUT_SOURCE_STYLUS)
+                    .actionButton(AMOTION_EVENT_BUTTON_STYLUS_PRIMARY)
+                    .buttonState(0)
+                    .pointer(PointerBuilder(0, ToolType::STYLUS).x(150).y(50))
+                    .build());
     mDragWindow->consumeMotionEvent(WithMotionAction(AMOTION_EVENT_ACTION_BUTTON_RELEASE));
-    ASSERT_EQ(InputEventInjectionResult::SUCCEEDED,
-              injectMotionEvent(*mDispatcher,
-                                MotionEventBuilder(AMOTION_EVENT_ACTION_MOVE, AINPUT_SOURCE_STYLUS)
-                                        .buttonState(0)
-                                        .pointer(PointerBuilder(0, ToolType::STYLUS).x(150).y(50))
-                                        .build()))
-            << "Inject motion event should return InputEventInjectionResult::SUCCEEDED";
+    mDispatcher->notifyMotion(MotionArgsBuilder(AMOTION_EVENT_ACTION_MOVE, AINPUT_SOURCE_STYLUS)
+                                      .buttonState(0)
+                                      .pointer(PointerBuilder(0, ToolType::STYLUS).x(150).y(50))
+                                      .build());
     mDragWindow->consumeMotionMove(ui::LogicalDisplayId::DEFAULT, MotionFlag::NO_FOCUS_CHANGE);
     mWindow->assertNoEvents();
     mSecondWindow->assertNoEvents();
     mFakePolicy->assertDropTargetEquals(*mDispatcher, mSecondWindow->getToken());
 
     // nothing to the window.
-    ASSERT_EQ(InputEventInjectionResult::SUCCEEDED,
-              injectMotionEvent(*mDispatcher,
-                                MotionEventBuilder(AMOTION_EVENT_ACTION_UP, AINPUT_SOURCE_STYLUS)
-                                        .buttonState(0)
-                                        .pointer(PointerBuilder(0, ToolType::STYLUS).x(150).y(50))
-                                        .build()))
-            << "Inject motion event should return InputEventInjectionResult::SUCCEEDED";
+    mDispatcher->notifyMotion(MotionArgsBuilder(AMOTION_EVENT_ACTION_UP, AINPUT_SOURCE_STYLUS)
+                                      .buttonState(0)
+                                      .pointer(PointerBuilder(0, ToolType::STYLUS).x(150).y(50))
+                                      .build());
     mDragWindow->consumeMotionUp(ui::LogicalDisplayId::DEFAULT, MotionFlag::NO_FOCUS_CHANGE);
     mWindow->assertNoEvents();
     mSecondWindow->assertNoEvents();
@@ -12638,28 +12677,30 @@ TEST_F(InputDispatcherDragTests, DragAndDropOnInvalidWindow) {
             {{*mDragWindow->getInfo(), *mWindow->getInfo(), *mSecondWindow->getInfo()}, {}, 0, 0});
 
     // Move on window.
-    ASSERT_EQ(InputEventInjectionResult::SUCCEEDED,
-              injectMotionEvent(*mDispatcher, AMOTION_EVENT_ACTION_MOVE, AINPUT_SOURCE_TOUCHSCREEN,
-                                ui::LogicalDisplayId::DEFAULT, {50, 50}))
-            << "Inject motion event should return InputEventInjectionResult::SUCCEEDED";
+    mDispatcher->notifyMotion(
+            MotionArgsBuilder(AMOTION_EVENT_ACTION_MOVE, AINPUT_SOURCE_TOUCHSCREEN)
+                    .displayId(ui::LogicalDisplayId::DEFAULT)
+                    .pointer(PointerBuilder(0, ToolType::FINGER).x(50).y(50))
+                    .build());
     mDragWindow->consumeMotionMove(ui::LogicalDisplayId::DEFAULT, MotionFlag::NO_FOCUS_CHANGE);
     mWindow->consumeDragEvent(false, 50, 50);
     mSecondWindow->assertNoEvents();
 
     // Move to another window.
-    ASSERT_EQ(InputEventInjectionResult::SUCCEEDED,
-              injectMotionEvent(*mDispatcher, AMOTION_EVENT_ACTION_MOVE, AINPUT_SOURCE_TOUCHSCREEN,
-                                ui::LogicalDisplayId::DEFAULT, {150, 50}))
-            << "Inject motion event should return InputEventInjectionResult::SUCCEEDED";
+    mDispatcher->notifyMotion(
+            MotionArgsBuilder(AMOTION_EVENT_ACTION_MOVE, AINPUT_SOURCE_TOUCHSCREEN)
+                    .displayId(ui::LogicalDisplayId::DEFAULT)
+                    .pointer(PointerBuilder(0, ToolType::FINGER).x(150).y(50))
+                    .build());
     mDragWindow->consumeMotionMove(ui::LogicalDisplayId::DEFAULT, MotionFlag::NO_FOCUS_CHANGE);
     mWindow->consumeDragEvent(true, 150, 50);
     mSecondWindow->assertNoEvents();
 
     // drop to another window.
-    ASSERT_EQ(InputEventInjectionResult::SUCCEEDED,
-              injectMotionUp(*mDispatcher, AINPUT_SOURCE_TOUCHSCREEN, ui::LogicalDisplayId::DEFAULT,
-                             {150, 50}))
-            << "Inject motion event should return InputEventInjectionResult::SUCCEEDED";
+    mDispatcher->notifyMotion(MotionArgsBuilder(AMOTION_EVENT_ACTION_UP, AINPUT_SOURCE_TOUCHSCREEN)
+                                      .displayId(ui::LogicalDisplayId::DEFAULT)
+                                      .pointer(PointerBuilder(0, ToolType::FINGER).x(150).y(50))
+                                      .build());
     mDragWindow->consumeMotionUp(ui::LogicalDisplayId::DEFAULT, MotionFlag::NO_FOCUS_CHANGE);
     mFakePolicy->assertDropTargetEquals(*mDispatcher, nullptr);
     mWindow->assertNoEvents();
@@ -12761,13 +12802,10 @@ TEST_F(InputDispatcherDragTests, DragAndDropWhenMultiDisplays) {
              0});
 
     // Let second display has a touch state.
-    ASSERT_EQ(InputEventInjectionResult::SUCCEEDED,
-              injectMotionEvent(*mDispatcher,
-                                MotionEventBuilder(AMOTION_EVENT_ACTION_DOWN,
-                                                   AINPUT_SOURCE_TOUCHSCREEN)
-                                        .displayId(SECOND_DISPLAY_ID)
-                                        .pointer(PointerBuilder(0, ToolType::FINGER).x(100).y(100))
-                                        .build()));
+    mDispatcher->notifyMotion(MotionArgsBuilder(ACTION_DOWN, AINPUT_SOURCE_TOUCHSCREEN)
+                                      .displayId(SECOND_DISPLAY_ID)
+                                      .pointer(PointerBuilder(0, ToolType::FINGER).x(100).y(100))
+                                      .build());
     windowInSecondary->consumeMotionDown(SECOND_DISPLAY_ID, /*expectedFlag=*/{});
     // Update window again.
     mDispatcher->onWindowInfosChanged(
@@ -12778,28 +12816,28 @@ TEST_F(InputDispatcherDragTests, DragAndDropWhenMultiDisplays) {
              0});
 
     // Move on window.
-    ASSERT_EQ(InputEventInjectionResult::SUCCEEDED,
-              injectMotionEvent(*mDispatcher, AMOTION_EVENT_ACTION_MOVE, AINPUT_SOURCE_TOUCHSCREEN,
-                                ui::LogicalDisplayId::DEFAULT, {50, 50}))
-            << "Inject motion event should return InputEventInjectionResult::SUCCEEDED";
+    mDispatcher->notifyMotion(MotionArgsBuilder(ACTION_MOVE, AINPUT_SOURCE_TOUCHSCREEN)
+                                      .displayId(ui::LogicalDisplayId::DEFAULT)
+                                      .pointer(PointerBuilder(0, ToolType::FINGER).x(50).y(50))
+                                      .build());
     mDragWindow->consumeMotionMove(ui::LogicalDisplayId::DEFAULT, MotionFlag::NO_FOCUS_CHANGE);
     mWindow->consumeDragEvent(false, 50, 50);
     mSecondWindow->assertNoEvents();
 
     // Move to another window.
-    ASSERT_EQ(InputEventInjectionResult::SUCCEEDED,
-              injectMotionEvent(*mDispatcher, AMOTION_EVENT_ACTION_MOVE, AINPUT_SOURCE_TOUCHSCREEN,
-                                ui::LogicalDisplayId::DEFAULT, {150, 50}))
-            << "Inject motion event should return InputEventInjectionResult::SUCCEEDED";
+    mDispatcher->notifyMotion(MotionArgsBuilder(ACTION_MOVE, AINPUT_SOURCE_TOUCHSCREEN)
+                                      .displayId(ui::LogicalDisplayId::DEFAULT)
+                                      .pointer(PointerBuilder(0, ToolType::FINGER).x(150).y(50))
+                                      .build());
     mDragWindow->consumeMotionMove(ui::LogicalDisplayId::DEFAULT, MotionFlag::NO_FOCUS_CHANGE);
     mWindow->consumeDragEvent(true, 150, 50);
     mSecondWindow->consumeDragEvent(false, 50, 50);
 
     // drop to another window.
-    ASSERT_EQ(InputEventInjectionResult::SUCCEEDED,
-              injectMotionUp(*mDispatcher, AINPUT_SOURCE_TOUCHSCREEN, ui::LogicalDisplayId::DEFAULT,
-                             {150, 50}))
-            << "Inject motion event should return InputEventInjectionResult::SUCCEEDED";
+    mDispatcher->notifyMotion(MotionArgsBuilder(ACTION_UP, AINPUT_SOURCE_TOUCHSCREEN)
+                                      .displayId(ui::LogicalDisplayId::DEFAULT)
+                                      .pointer(PointerBuilder(0, ToolType::FINGER).x(150).y(50))
+                                      .build());
     mDragWindow->consumeMotionUp(ui::LogicalDisplayId::DEFAULT, MotionFlag::NO_FOCUS_CHANGE);
     mFakePolicy->assertDropTargetEquals(*mDispatcher, mSecondWindow->getToken());
     mWindow->assertNoEvents();
@@ -12809,55 +12847,38 @@ TEST_F(InputDispatcherDragTests, DragAndDropWhenMultiDisplays) {
 TEST_F(InputDispatcherDragTests, MouseDragAndDrop) {
     startDrag(true, AINPUT_SOURCE_MOUSE);
     // Move on window.
-    ASSERT_EQ(InputEventInjectionResult::SUCCEEDED,
-              injectMotionEvent(*mDispatcher,
-                                MotionEventBuilder(AMOTION_EVENT_ACTION_MOVE, AINPUT_SOURCE_MOUSE)
-                                        .buttonState(AMOTION_EVENT_BUTTON_PRIMARY)
-                                        .pointer(PointerBuilder(MOUSE_POINTER_ID, ToolType::MOUSE)
-                                                         .x(50)
-                                                         .y(50))
-                                        .build()))
-            << "Inject motion event should return InputEventInjectionResult::SUCCEEDED";
+    mDispatcher->notifyMotion(
+            MotionArgsBuilder(ACTION_MOVE, AINPUT_SOURCE_MOUSE)
+                    .buttonState(AMOTION_EVENT_BUTTON_PRIMARY)
+                    .pointer(PointerBuilder(MOUSE_POINTER_ID, ToolType::MOUSE).x(50).y(50))
+                    .build());
     mDragWindow->consumeMotionMove(ui::LogicalDisplayId::DEFAULT, MotionFlag::NO_FOCUS_CHANGE);
     mWindow->consumeDragEvent(false, 50, 50);
     mSecondWindow->assertNoEvents();
 
     // Move to another window.
-    ASSERT_EQ(InputEventInjectionResult::SUCCEEDED,
-              injectMotionEvent(*mDispatcher,
-                                MotionEventBuilder(AMOTION_EVENT_ACTION_MOVE, AINPUT_SOURCE_MOUSE)
-                                        .buttonState(AMOTION_EVENT_BUTTON_PRIMARY)
-                                        .pointer(PointerBuilder(MOUSE_POINTER_ID, ToolType::MOUSE)
-                                                         .x(150)
-                                                         .y(50))
-                                        .build()))
-            << "Inject motion event should return InputEventInjectionResult::SUCCEEDED";
+    mDispatcher->notifyMotion(
+            MotionArgsBuilder(ACTION_MOVE, AINPUT_SOURCE_MOUSE)
+                    .buttonState(AMOTION_EVENT_BUTTON_PRIMARY)
+                    .pointer(PointerBuilder(MOUSE_POINTER_ID, ToolType::MOUSE).x(150).y(50))
+                    .build());
     mDragWindow->consumeMotionMove(ui::LogicalDisplayId::DEFAULT, MotionFlag::NO_FOCUS_CHANGE);
     mWindow->consumeDragEvent(true, 150, 50);
     mSecondWindow->consumeDragEvent(false, 50, 50);
 
     // drop to another window.
-    ASSERT_EQ(InputEventInjectionResult::SUCCEEDED,
-              injectMotionEvent(*mDispatcher,
-                                MotionEventBuilder(AMOTION_EVENT_ACTION_BUTTON_RELEASE,
-                                                   AINPUT_SOURCE_MOUSE)
-                                        .actionButton(AMOTION_EVENT_BUTTON_PRIMARY)
-                                        .buttonState(0)
-                                        .pointer(PointerBuilder(MOUSE_POINTER_ID, ToolType::MOUSE)
-                                                         .x(150)
-                                                         .y(50))
-                                        .build()))
-            << "Inject motion event should return InputEventInjectionResult::SUCCEEDED";
+    mDispatcher->notifyMotion(
+            MotionArgsBuilder(AMOTION_EVENT_ACTION_BUTTON_RELEASE, AINPUT_SOURCE_MOUSE)
+                    .actionButton(AMOTION_EVENT_BUTTON_PRIMARY)
+                    .buttonState(0)
+                    .pointer(PointerBuilder(MOUSE_POINTER_ID, ToolType::MOUSE).x(150).y(50))
+                    .build());
     mDragWindow->consumeMotionEvent(WithMotionAction(AMOTION_EVENT_ACTION_BUTTON_RELEASE));
-    ASSERT_EQ(InputEventInjectionResult::SUCCEEDED,
-              injectMotionEvent(*mDispatcher,
-                                MotionEventBuilder(AMOTION_EVENT_ACTION_UP, AINPUT_SOURCE_MOUSE)
-                                        .buttonState(0)
-                                        .pointer(PointerBuilder(MOUSE_POINTER_ID, ToolType::MOUSE)
-                                                         .x(150)
-                                                         .y(50))
-                                        .build()))
-            << "Inject motion event should return InputEventInjectionResult::SUCCEEDED";
+    mDispatcher->notifyMotion(
+            MotionArgsBuilder(AMOTION_EVENT_ACTION_UP, AINPUT_SOURCE_MOUSE)
+                    .buttonState(0)
+                    .pointer(PointerBuilder(MOUSE_POINTER_ID, ToolType::MOUSE).x(150).y(50))
+                    .build());
     mDragWindow->consumeMotionUp(ui::LogicalDisplayId::DEFAULT, MotionFlag::NO_FOCUS_CHANGE);
     mFakePolicy->assertDropTargetEquals(*mDispatcher, mSecondWindow->getToken());
     mWindow->assertNoEvents();
@@ -14741,7 +14762,8 @@ TEST_F(InputDispatcherTest, FocusedDisplayChangeIsNotified) {
 }
 
 TEST_F(InputDispatcherTest, DispatchSimultaneousActionOutsideAndHoverExit) {
-    SCOPED_FLAG_OVERRIDE(simultaneous_outside_and_hover_fix, true);
+    SCOPED_FLAG_OVERRIDE(enable_multi_device_same_window_stream, true);
+
     std::shared_ptr<FakeApplicationHandle> application = std::make_shared<FakeApplicationHandle>();
     // Aim of this test is to create a situation where a window will receive simultaneous
     // ACTION_OUTSIDE and HOVER_EXIT event.
@@ -14779,6 +14801,20 @@ TEST_F(InputDispatcherTest, DispatchSimultaneousActionOutsideAndHoverExit) {
 
     left->consumeMotionEvent(WithMotionAction(ACTION_HOVER_ENTER));
     spy->consumeMotionEvent(WithMotionAction(ACTION_HOVER_ENTER));
+
+    // hover move into the right window with a different device
+    mDispatcher->notifyMotion(
+            MotionArgsBuilder(ACTION_HOVER_MOVE, AINPUT_SOURCE_MOUSE)
+                    .pointer(PointerBuilder(/*id=*/0, ToolType::MOUSE).x(150).y(50))
+                    .rawXCursorPosition(150)
+                    .rawYCursorPosition(50)
+                    .deviceId(SECOND_DEVICE_ID)
+                    .build());
+    // TODO(b/313689709): At present following behavior is incorrect, as both devices are
+    // controlling the same cursor, both spy and left windows should have received hover-exit here.
+    left->assertNoEvents();
+    right->consumeMotionEvent(WithMotionAction(ACTION_HOVER_ENTER));
+    spy->assertNoEvents();
 
     // click on right window, which is outside both spy and left window.
     mDispatcher->notifyMotion(MotionArgsBuilder(ACTION_DOWN, AINPUT_SOURCE_MOUSE)
@@ -15588,8 +15624,6 @@ TEST_P(InputDispatcherCrossDisplayGestureTestFixture, InputDispatcherCrossDispla
     // Topology values are defined in DP units.
     const bool isSourceDisplayRotated = sourceDisplayOrientation == ui::ROTATION_90 ||
             sourceDisplayOrientation == ui::ROTATION_270;
-    const int32_t sourceDisplayLogicalWidthDp =
-            pxToDp(isSourceDisplayRotated ? DISPLAY_HEIGHT : DISPLAY_WIDTH, sourceDisplayDensity);
     const int32_t sourceDisplayLogicalHeightDp =
             pxToDp(isSourceDisplayRotated ? DISPLAY_WIDTH : DISPLAY_HEIGHT, sourceDisplayDensity);
 

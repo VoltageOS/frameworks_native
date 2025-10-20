@@ -84,6 +84,14 @@ struct InputDeviceViewBehavior {
      * Empty optional if the device has not specified the default smooth scroll behavior.
      */
     std::optional<bool> shouldSmoothScroll;
+
+    /**
+     * The primary directional motion axis, if defined by the device. This is one of the AXIS_*
+     * constants defined in MotionEvent (AMOTION_EVENT_AXIS_X, AMOTION_EVENT_AXIS_Y, etc.).
+     * Empty optional if the device has not specified a default primary directional
+     * motion axis.
+     */
+    std::optional<int32_t> primaryDirectionalMotionAxis;
 };
 
 /* Types of input device sensors. Keep sync with core/java/android/hardware/Sensor.java */
@@ -149,7 +157,7 @@ struct InputDeviceSensorInfo {
                                    float maxRange, float resolution, float power, int32_t minDelay,
                                    int32_t fifoReservedEventCount, int32_t fifoMaxEventCount,
                                    std::string stringType, int32_t maxDelay, int32_t flags,
-                                   int32_t id)
+                                   DeviceId id)
           : name(name),
             vendor(vendor),
             version(version),
@@ -196,7 +204,7 @@ struct InputDeviceSensorInfo {
     // Sensor flags
     int32_t flags;
     // Sensor id, same as the input device ID it belongs to.
-    int32_t id;
+    DeviceId id;
 };
 
 struct BrightnessLevel : ftl::DefaultConstructible<BrightnessLevel, std::uint8_t>,
@@ -280,13 +288,13 @@ public:
         float resolution;
     };
 
-    void initialize(int32_t id, int32_t generation, int32_t controllerNumber,
+    void initialize(DeviceId id, int32_t generation, int32_t controllerNumber,
                     const InputDeviceIdentifier& identifier, const std::string& alias,
                     bool isExternal, bool isVirtualDevice, bool hasMic,
                     ui::LogicalDisplayId associatedDisplayId,
                     InputDeviceViewBehavior viewBehavior = {{}}, bool enabled = true);
 
-    inline int32_t getId() const { return mId; }
+    inline DeviceId getId() const { return mId; }
     inline int32_t getControllerNumber() const { return mControllerNumber; }
     inline int32_t getGeneration() const { return mGeneration; }
     inline const InputDeviceIdentifier& getIdentifier() const { return mIdentifier; }
@@ -353,7 +361,7 @@ public:
     inline bool isEnabled() const { return mEnabled; }
 
 private:
-    int32_t mId;
+    DeviceId mId;
     int32_t mGeneration;
     int32_t mControllerNumber;
     InputDeviceIdentifier mIdentifier;
@@ -418,7 +426,7 @@ extern std::string getInputDeviceConfigurationFilePathByDeviceIdentifier(
 extern std::string getInputDeviceConfigurationFilePathByName(
         const std::string& name, InputDeviceConfigurationFileType type);
 
-enum ReservedInputDeviceId : int32_t {
+enum ReservedInputDeviceId : RawDeviceId {
     // Device id representing an invalid device
     INVALID_INPUT_DEVICE_ID = android::os::IInputConstants::INVALID_INPUT_DEVICE_ID,
     // Device id of a special "virtual" keyboard that is always present.

@@ -34,6 +34,7 @@
 
 #include "AutoBackendTexture.h"
 #include "BoxShadowUtils.h"
+#include "RenderDocUtils.h"
 #include "android-base/macros.h"
 #include "compat/SkiaGpuContext.h"
 #include "debug/SkiaCapture.h"
@@ -94,7 +95,7 @@ protected:
     virtual bool supportsForwardPixelKill() const { return false; }
     virtual bool supportsFastRotatedClipRRectAA() const { return true; }
     virtual bool useProtectedContextImpl(GrProtected isProtected) = 0;
-    virtual void waitFence(SkiaGpuContext* context, base::borrowed_fd fenceFd) = 0;
+    virtual void waitFenceImpl(SkiaGpuContext* context, base::borrowed_fd fenceFd) = 0;
     virtual base::unique_fd flushAndSubmit(SkiaGpuContext* context,
                                            sk_sp<SkSurface> dstSurface) = 0;
     virtual void appendBackendSpecificInfoToDump(std::string& result) = 0;
@@ -105,6 +106,8 @@ protected:
     SkiaGpuContext* getActiveContext();
 
     bool isProtected() const { return mInProtectedContext; }
+
+    void rdocCaptureNextFrame() override { mRenderDocCaptureNextFrame = true; }
 
     // Implements PersistentCache as a way to monitor what SkSL shaders Skia has
     // cached.
@@ -164,6 +167,8 @@ private:
             float hdrSdrRatio, ui::Dataspace dataspace, const std::shared_ptr<ExternalTexture>& sdr,
             const std::shared_ptr<ExternalTexture>& gainmap) override final;
 
+    void waitFence(SkiaGpuContext* context, base::borrowed_fd fenceFd);
+
     void dump(std::string& result) override final;
 
     // If requiresLinearEffect is true or the layer has a stretchEffect a new shader is returned.
@@ -221,6 +226,9 @@ private:
 
     bool mInitializedDiskCache = false;
     SkSLCacheMonitor mSkSLCacheMonitor;
+
+    std::atomic<bool> mRenderDocCaptureNextFrame;
+    RenderDocUtils mRenderDoc;
 };
 
 } // namespace skia

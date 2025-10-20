@@ -183,13 +183,8 @@ RefreshRateOverlay::RefreshRateOverlay(ConstructorTag, FpsRange fpsRange,
 
 RefreshRateOverlay::~RefreshRateOverlay() {
     for (const auto& pair : mBufferCache) {
-        const std::vector<sp<GraphicBuffer>>& buffers = pair.second;
-        for (const sp<GraphicBuffer>& buffer : buffers) {
-            if (buffer != nullptr) {
-                const uint64_t bufferId = buffer->getId();
-                android::SurfaceComposerClient::getDefault()->removeBufferFromLocalCache(bufferId);
-                android::SurfaceComposerClient::getDefault()->doUncacheBufferTransaction(bufferId);
-            }
+        for (const sp<GraphicBuffer>& buffer : pair.second) {
+            android::removeBufferFromLocalCache(buffer);
         }
     }
 

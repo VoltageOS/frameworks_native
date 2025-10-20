@@ -190,7 +190,7 @@ bool LayerInfo::isLayerActive(nsecs_t threshold) const {
 }
 
 bool LayerInfo::isVrrDisplay() const {
-    return mLayerProps->refreshRateSelector && mLayerProps->refreshRateSelector->isVrrDevice();
+    return mLayerProps->refreshRateSelector && mLayerProps->refreshRateSelector->isVrrDisplay();
 }
 
 bool LayerInfo::isAnimating(nsecs_t now) const {
@@ -499,15 +499,6 @@ Fps LayerInfo::RefreshRateHistory::selectRefreshRate(const RefreshRateSelector& 
 
     const auto maxClosestRate = selector.findClosestKnownFrameRate(max->refreshRate);
     const bool consistent = [&](Fps maxFps, Fps minFps) {
-        if (FlagManager::getInstance().use_known_refresh_rate_for_fps_consistency()) {
-            if (maxFps.getValue() - minFps.getValue() <
-                MARGIN_CONSISTENT_FPS_FOR_CLOSEST_REFRESH_RATE) {
-                const auto minClosestRate = selector.findClosestKnownFrameRate(minFps);
-                using fps_approx_ops::operator==;
-                return maxClosestRate == minClosestRate;
-            }
-            return false;
-        }
         return maxFps.getValue() - minFps.getValue() < MARGIN_CONSISTENT_FPS;
     }(max->refreshRate, min->refreshRate);
 

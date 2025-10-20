@@ -15,6 +15,7 @@
  */
 
 // #define LOG_NDEBUG 0
+#include "FrontEnd/LayerCreationArgs.h"
 #define ATRACE_TAG ATRACE_TAG_GRAPHICS
 #include "FrontEnd/LayerSnapshot.h"
 #include "ui/Transform.h"
@@ -433,6 +434,17 @@ void LayerSnapshotBuilder::updateSnapshots(const Args& args) {
         }
     }
 
+    mMergedSnapshots.clear();
+
+    if (args.mergeableHierarchyManager) {
+        const auto hierarchy =
+                args.mergeableHierarchyManager->getOwnedHierarchy(UNASSIGNED_LAYER_ID);
+        if (hierarchy) {
+            auto mergedSnapshot = hierarchy->getSnapshotCopy();
+            mMergedSnapshots.emplace_back(std::move(mergedSnapshot));
+        }
+    }
+
     LayerHierarchy::TraversalPath root = LayerHierarchy::TraversalPath::ROOT;
     if (args.root.getLayer()) {
         // The hierarchy can have a root layer when used for screenshots otherwise, it will have
@@ -540,6 +552,19 @@ const LayerSnapshot& LayerSnapshotBuilder::updateSnapshotsInHierarchy(
             resetRelativeState(*snapshot);
         }
         updateSnapshot(*snapshot, args, *layer, parentSnapshot, traversalPath);
+    }
+
+    if (args.mergeableHierarchyManager) {
+        const auto hierarchy = args.mergeableHierarchyManager->getOwnedHierarchy(layer->id);
+        if (hierarchy) {
+            auto mergedSnapshot = hierarchy->getSnapshotCopy();
+            updateSnapshot(*mergedSnapshot, args, *layer, parentSnapshot, traversalPath);
+            mMergedSnapshots.emplace_back(std::move(mergedSnapshot));
+        }
+
+        if (!args.mergeableHierarchyManager->isMemberOfAnyHierarchy(layer->id)) {
+            mMergedSnapshots.emplace_back(std::make_unique<LayerSnapshot>(*snapshot));
+        }
     }
 
     bool childHasValidFrameRate = false;
@@ -1011,74 +1036,92 @@ void LayerSnapshotBuilder::updateRoundedCorner(LayerSnapshot& snapshot,
         snapshot.roundedCorner = RoundedCornerState();
         return;
     }
-    snapshot.roundedCorner = RoundedCornerState();
-    RoundedCornerState parentRoundedCorner;
-    if (parentSnapshot.roundedCorner.hasRequestedRadius()) {
-        parentRoundedCorner = parentSnapshot.roundedCorner;
-        ui::Transform t = snapshot.localTransform.inverse();
-        parentRoundedCorner.cropRect = t.transform(parentRoundedCorner.cropRect);
-        parentRoundedCorner.radii.transform(t);
-        parentRoundedCorner.requestedRadii.transform(t);
-    }
 
-    FloatRect layerCropRect = snapshot.croppedBufferSize;
-    const gui::CornerRadii requestedRadii(requested.cornerRadii);
-    const gui::CornerRadii clientDrawnRadii(requested.clientDrawnCornerRadii);
+    RoundedCornerState finalSettings = RoundedCornerState();
 
-    RoundedCornerState layerSettings;
-    layerSettings.cropRect = layerCropRect;
-    layerSettings.requestedRadii = requestedRadii;
-    layerSettings.clientDrawnRadii = clientDrawnRadii;
+    // Populate parent settings to inherit
+    RoundedCornerState parentSettings =
+            calculateParentRoundedCornerSettings(parentSnapshot, snapshot);
+    const bool parentSettingsValid = !parentSettings.radii.isEmpty();
 
-    const bool layerSettingsValid = layerSettings.hasRequestedRadius() && !layerCropRect.isEmpty();
-    const bool parentRoundedCornerValid = parentRoundedCorner.hasRequestedRadius();
+    // Populate layer settings
+    RoundedCornerState layerSettings = calculateLayerRoundedCornerSettings(snapshot, requested);
+    const bool layerSettingsValid =
+            layerSettings.hasRequestedRadius() && !layerSettings.cropRect.isEmpty();
 
-    if (layerSettingsValid && parentRoundedCornerValid) {
+    if (layerSettingsValid && parentSettingsValid) {
         // If the parent and the layer have rounded corner settings, use the parent settings if
         // the parent crop is entirely inside the layer crop. This has limitations and cause
         // rendering artifacts. See b/200300845 for correct fix.
-        if (parentRoundedCorner.cropRect.left > layerCropRect.left &&
-            parentRoundedCorner.cropRect.top > layerCropRect.top &&
-            parentRoundedCorner.cropRect.right < layerCropRect.right &&
-            parentRoundedCorner.cropRect.bottom < layerCropRect.bottom) {
-            snapshot.roundedCorner = parentRoundedCorner;
+        if (parentSettings.cropRect.left > layerSettings.cropRect.left &&
+            parentSettings.cropRect.top > layerSettings.cropRect.top &&
+            parentSettings.cropRect.right < layerSettings.cropRect.right &&
+            parentSettings.cropRect.bottom < layerSettings.cropRect.bottom) {
+            finalSettings = parentSettings;
         } else {
-            snapshot.roundedCorner = layerSettings;
+            finalSettings = layerSettings;
         }
     } else if (layerSettingsValid) {
-        snapshot.roundedCorner = layerSettings;
-    } else if (parentRoundedCornerValid) {
-        if (doesChildOverlapParentCornerRegion(layerCropRect, parentRoundedCorner.cropRect,
-                                               parentRoundedCorner.requestedRadii)) {
-            snapshot.roundedCorner = parentRoundedCorner;
-        }
+        finalSettings = layerSettings;
+    } else if (parentSettingsValid &&
+               childOverlapsParentCornerRegion(snapshot.geomLayerBounds, parentSettings.cropRect,
+                                               parentSettings.radii)) {
+        finalSettings = parentSettings;
     }
 
-    snapshot.roundedCorner.croppedRequestedRadii =
-            getClippedClientRadii(snapshot.roundedCorner.requestedRadii,
-                                  snapshot.roundedCorner.cropRect, snapshot.sourceBounds());
+    snapshot.roundedCorner = finalSettings;
 
-    if (!clientDrawnRadii.isEmpty() &&
-        clientDrawnRadii == snapshot.roundedCorner.croppedRequestedRadii &&
-        snapshot.geomLayerBounds == requested.clientDrawnCornerRadiusCrop) {
-        // If the client drawn radius matches the inherited/requested radius
-        // and the geometric layer bounds match the client crop then surfaceflinger
-        // does not need to draw rounded corners for this layer
+    snapshot.roundedCorner.effectiveRadii = snapshot.roundedCorner.radii;
+    snapshot.roundedCorner.clientDrawnRadii = requested.clientDrawnCornerRadii;
+    snapshot.roundedCorner.reportedRadii =
+            getClippedClientRadii(snapshot.roundedCorner.radii, snapshot.roundedCorner.cropRect,
+                                  snapshot.sourceBounds());
+
+    if (shouldDisableCornerRounding(snapshot, requested)) {
         snapshot.roundedCorner.radii = gui::CornerRadii(0.f);
-    } else {
-        snapshot.roundedCorner.radii = snapshot.roundedCorner.requestedRadii;
     }
 }
 
-bool LayerSnapshotBuilder::doesChildOverlapParentCornerRegion(const FloatRect& childCropRect,
-                                                              const FloatRect& parentCropRect,
-                                                              const gui::CornerRadii& parentRadii) {
+bool LayerSnapshotBuilder::shouldDisableCornerRounding(LayerSnapshot& snapshot,
+                                                       const RequestedLayerState& requested) {
+    bool radiiMatch = requested.clientDrawnCornerRadii == snapshot.roundedCorner.reportedRadii;
+    bool boundsMatch = snapshot.geomLayerBounds == requested.clientDrawnCornerRadiusCrop;
+    return !requested.clientDrawnCornerRadii.isEmpty() && radiiMatch && boundsMatch;
+}
+
+RoundedCornerState LayerSnapshotBuilder::calculateLayerRoundedCornerSettings(
+        LayerSnapshot& snapshot, const RequestedLayerState& requested) {
+    RoundedCornerState layerSettings;
+    layerSettings.radii = requested.cornerRadii;
+    layerSettings.requestedRadii = requested.cornerRadii;
+    layerSettings.cropRect = snapshot.croppedBufferSize;
+    return layerSettings;
+}
+
+RoundedCornerState LayerSnapshotBuilder::calculateParentRoundedCornerSettings(
+        const LayerSnapshot& parentSnapshot, const LayerSnapshot& snapshot) {
+    RoundedCornerState parentSettings;
+
+    const auto& parentRoundedCorner = parentSnapshot.roundedCorner;
+    if (parentRoundedCorner.hasRoundedCorners()) {
+        ui::Transform t = snapshot.localTransform.inverse();
+        parentSettings.cropRect = t.transform(parentRoundedCorner.cropRect);
+        parentSettings.radii = parentRoundedCorner.effectiveRadii;
+        parentSettings.radii.transform(t);
+    }
+    return parentSettings;
+}
+
+bool LayerSnapshotBuilder::childOverlapsParentCornerRegion(const FloatRect& childCropRect,
+                                                           const FloatRect& parentCropRect,
+                                                           const gui::CornerRadii& parentRadii) {
     if (childCropRect.isEmpty()) {
         // If either child crop is empty then assume there is overlap
         // so that child can inherit parent rounded corner state. Otherwise, the
         // overlap computation will return false.
         return true;
     }
+    // TODO(452272969): refactor to compute corner region in separate function
     FloatRect parentCornerRegionTL(parentCropRect.left, parentCropRect.top,
                                    parentCropRect.left + parentRadii.topLeft.x,
                                    parentCropRect.top + parentRadii.topLeft.y);
@@ -1110,9 +1153,10 @@ gui::CornerRadii LayerSnapshotBuilder::getClippedClientRadii(const gui::CornerRa
     auto calculateClippedCorner = [&](const android::gui::Vec2& cornerRadius, float left, float top,
                                       float right, float bottom) {
         FloatRect cornerRegion(left, top, right, bottom);
-        return layerBounds.contains(cornerRegion) ? cornerRadius : zeroVec;
+        return layerBounds.intersect(cornerRegion).isEmpty() ? zeroVec : cornerRadius;
     };
 
+    // TODO(452272969): refactor to compute corner region in separate function
     clippedRadii.topLeft =
             calculateClippedCorner(requestedRadii.topLeft, layerCropRect.left, layerCropRect.top,
                                    layerCropRect.left + requestedRadii.topLeft.x,
@@ -1215,7 +1259,6 @@ void LayerSnapshotBuilder::updateLayerBounds(LayerSnapshot& snapshot,
     snapshot.transformedBoundsWithoutTransparentRegion =
             snapshot.geomLayerTransform.transform(geomLayerBoundsWithoutTransparentRegion);
     snapshot.parentTransform = parentSnapshot.geomLayerTransform;
-
     if (requested.potentialCursor) {
         // Subtract the transparent region and snap to the bounds
         const Rect bounds = RequestedLayerState::reduce(Rect(snapshot.croppedBufferSize),
@@ -1403,6 +1446,12 @@ void LayerSnapshotBuilder::forEachNonNullSnapshot(const Visitor& visitor,
 
 void LayerSnapshotBuilder::forEachSnapshot(const ConstVisitor& visitor) const {
     for (auto& snapshot : mSnapshots) {
+        visitor(*snapshot);
+    }
+}
+
+void LayerSnapshotBuilder::forEachMergedSnapshot(const ConstVisitor& visitor) const {
+    for (auto& snapshot : mMergedSnapshots) {
         visitor(*snapshot);
     }
 }

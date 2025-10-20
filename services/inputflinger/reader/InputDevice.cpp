@@ -18,7 +18,6 @@
 
 #include "InputDevice.h"
 
-#include <algorithm>
 #include <string>
 
 #include <android/sysprop/InputProperties.sysprop.h>
@@ -41,7 +40,7 @@
 
 namespace android {
 
-InputDevice::InputDevice(InputReaderContext* context, int32_t id, int32_t generation,
+InputDevice::InputDevice(InputReaderContext* context, DeviceId id, int32_t generation,
                          const InputDeviceIdentifier& identifier)
       : mContext(context),
         mId(id),
@@ -199,7 +198,7 @@ void InputDevice::dump(std::string& dump, const std::string& eventHubDevStr) {
     }
 }
 
-void InputDevice::addEmptyEventHubDevice(int32_t eventHubId) {
+void InputDevice::addEmptyEventHubDevice(RawDeviceId eventHubId) {
     if (mDevices.find(eventHubId) != mDevices.end()) {
         return;
     }
@@ -210,7 +209,7 @@ void InputDevice::addEmptyEventHubDevice(int32_t eventHubId) {
 }
 
 [[nodiscard]] std::list<NotifyArgs> InputDevice::addEventHubDevice(
-        nsecs_t when, int32_t eventHubId, const InputReaderConfiguration& readerConfig) {
+        nsecs_t when, RawDeviceId eventHubId, const InputReaderConfiguration& readerConfig) {
     if (mDevices.find(eventHubId) != mDevices.end()) {
         return {};
     }
@@ -234,7 +233,7 @@ void InputDevice::addEmptyEventHubDevice(int32_t eventHubId) {
     return out;
 }
 
-void InputDevice::removeEventHubDevice(int32_t eventHubId) {
+void InputDevice::removeEventHubDevice(RawDeviceId eventHubId) {
     if (mController != nullptr && mController->getEventHubId() == eventHubId) {
         // Delete mController, since the corresponding eventhub device is going away
         mController = nullptr;
@@ -298,6 +297,20 @@ std::list<NotifyArgs> InputDevice::configureInternal(nsecs_t when,
                     getValueByKey(readerConfig.deviceTypeAssociations, mIdentifier.location);
             mIsWaking = mConfiguration.getBool("device.wake").value_or(false);
             mShouldSmoothScroll = mConfiguration.getBool("device.viewBehavior_smoothScroll");
+            auto primaryDirectionalMotionAxisLabel =
+                mConfiguration.getString("device.viewBehavior_primaryDirectionalMotionAxis");
+
+            if (primaryDirectionalMotionAxisLabel.has_value()) {
+                const std::string& label = primaryDirectionalMotionAxisLabel.value();
+                mPrimaryDirectionalMotionAxis = MotionEvent::getAxisFromLabel(label.c_str());
+                if (!mPrimaryDirectionalMotionAxis.has_value()) {
+                    LOG_ALWAYS_FATAL("InputDevice %s: Invalid value '%s' for "
+                                     "'device.viewBehavior_primaryDirectionalMotionAxis'",
+                                     getName().c_str(), label.c_str());
+                }
+            } else {
+                mPrimaryDirectionalMotionAxis = std::nullopt;
+            }
         }
 
         if (!changes.any() || changes.test(Change::VIRTUAL_DEVICES)) {
@@ -326,6 +339,7 @@ std::list<NotifyArgs> InputDevice::configureInternal(nsecs_t when,
             mAssociatedDisplayPort = std::nullopt;
             mAssociatedDisplayUniqueIdByPort = std::nullopt;
             mAssociatedViewport = std::nullopt;
+            mAssociatedDisplayUniqueIdByDescriptor = std::nullopt;
             // Find the display port that corresponds to the current input device descriptor
             const std::string& inputDeviceDescriptor = mIdentifier.descriptor;
             if (!inputDeviceDescriptor.empty()) {
@@ -414,10 +428,24 @@ std::list<NotifyArgs> InputDevice::configureInternal(nsecs_t when,
                     (mSources & AINPUT_SOURCE_KEYBOARD) == AINPUT_SOURCE_KEYBOARD;
             const bool isFullKeyboard = isKeyboard && (mKeyboardType == KeyboardType::ALPHABETIC);
             const bool isPhysicalKeyboard = isKeyboard && !mIsVirtualDevice;
+            std::map<int32_t /* fromKeyCode */, int32_t /* toKeyCode */> keyRemapping;
             if (isPhysicalKeyboard && isFullKeyboard) {
-                for_each_subdevice([&readerConfig](auto& context) {
-                    context.setKeyRemapping(readerConfig.keyRemapping);
-                });
+                for (const auto& [fromKeyCode, toKeyCode] : readerConfig.keyRemapping) {
+                    keyRemapping.insert_or_assign(fromKeyCode, toKeyCode);
+                }
+            }
+            const bool isPhysicalButtonDevice = !mIsVirtualDevice &&
+                    (mSources & AINPUT_SOURCE_CLASS_BUTTON) == AINPUT_SOURCE_CLASS_BUTTON;
+            if (isPhysicalButtonDevice && readerConfig.keyRemappingPerDevice.contains(mId)) {
+                const auto& keyRemappingForDevice = readerConfig.keyRemappingPerDevice.at(mId);
+                for (const auto& [fromKeyCode, toKeyCode] : keyRemappingForDevice) {
+                    keyRemapping.insert_or_assign(fromKeyCode, toKeyCode);
+                }
+            }
+            if (mKeyRemapping != keyRemapping) {
+                mKeyRemapping = keyRemapping;
+                for_each_subdevice(
+                        [this](auto& context) { context.setKeyRemapping(mKeyRemapping); });
                 bumpGeneration();
             }
         }
@@ -506,7 +534,7 @@ InputDeviceInfo InputDevice::getDeviceInfo() {
     outDeviceInfo.initialize(mId, mGeneration, mControllerNumber, mIdentifier, mAlias, mIsExternal,
                              mIsVirtualDevice, mHasMic,
                              getAssociatedDisplayId().value_or(ui::LogicalDisplayId::INVALID),
-                             {mShouldSmoothScroll}, isEnabled());
+                             {mShouldSmoothScroll, mPrimaryDirectionalMotionAxis}, isEnabled());
     outDeviceInfo.setKeyboardType(static_cast<int32_t>(mKeyboardType));
 
     for_each_mapper(
@@ -797,7 +825,7 @@ bool InputDevice::setKernelWakeEnabled(bool enabled) {
     return success;
 }
 
-InputDeviceContext::InputDeviceContext(InputDevice& device, int32_t eventHubId)
+InputDeviceContext::InputDeviceContext(InputDevice& device, RawDeviceId eventHubId)
       : mDevice(device),
         mContext(device.getContext()),
         mEventHub(device.getContext()->getEventHub()),
