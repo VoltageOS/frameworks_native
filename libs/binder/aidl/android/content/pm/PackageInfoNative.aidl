@@ -39,7 +39,13 @@ parcelable PackageInfoNative {
     @nullable SigningInfoNative signingInfo;
 
     /**
-     * Source directory of this application package.
+     * Full path to the base APK for this application.
      */
     @nullable String sourceDir;
+
+    /**
+     * Full paths to split APKs.
+     * May be null if no splits are installed.
+     */
+    @nullable String[] splitSourceDirs;
 }
