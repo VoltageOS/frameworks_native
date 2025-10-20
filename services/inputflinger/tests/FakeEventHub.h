@@ -230,6 +230,8 @@ private:
             RawDeviceId deviceId, int32_t lightId) const override;
     std::filesystem::path getSysfsRootPath(RawDeviceId deviceId) const override;
     void sysfsNodeChanged(const std::string& sysfsNodePath) override;
+    void setAxisRemapping(RawDeviceId deviceId,
+                          const std::unordered_map<int32_t, int32_t>& axisRemapping) override {}
     void dump(std::string&) const override {}
     void monitor() const override {}
     void requestReopenDevices() override {}

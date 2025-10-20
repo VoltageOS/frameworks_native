@@ -347,6 +347,10 @@ public:
         mEventHub->setKeyRemapping(mId, keyRemapping);
     }
 
+    inline void setAxisRemapping(const std::unordered_map<int32_t, int32_t>& axisRemapping) {
+        mEventHub->setAxisRemapping(mId, axisRemapping);
+    }
+
     inline status_t mapKey(int32_t scanCode, int32_t usageCode, int32_t metaState,
                            int32_t* outKeycode, int32_t* outMetaState, uint32_t* outFlags) const {
         return mEventHub->mapKey(mId, scanCode, usageCode, metaState, outKeycode, outMetaState,
