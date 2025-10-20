@@ -103,7 +103,8 @@ public:
     MOCK_METHOD(bool, hasInputProperty, (int32_t deviceId, int property), (const));
     MOCK_METHOD(bool, hasMscEvent, (int32_t deviceId, int mscEvent), (const));
     MOCK_METHOD(void, setKeyRemapping,
-                (int32_t deviceId, (const std::map<int32_t, int32_t>& keyRemapping)), (const));
+                (int32_t deviceId, (const std::unordered_map<int32_t, int32_t>& keyRemapping)),
+                (override));
     MOCK_METHOD(void, setAxisRemapping,
                 (int32_t deviceId, (const std::unordered_map<int32_t, int32_t>& axisRemapping)),
                 (override));
