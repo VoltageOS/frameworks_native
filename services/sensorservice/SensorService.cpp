@@ -1639,7 +1639,7 @@ sp<ISensorEventConnection> SensorService::createSensorEventConnection(const Stri
             (packageName == "") ? String8::format("unknown_package_pid_%d", pid) : packageName;
     String16 connOpPackageName =
             (opPackageName == String16("")) ? String16(connPackageName) : opPackageName;
-    sp<SensorEventConnection> result(new SensorEventConnection(this, uid, connPackageName,
+    sp<SensorEventConnection> result(new SensorEventConnection(this, uid, pid, connPackageName,
                                                                isInjectionMode(requestedMode),
                                                                connOpPackageName, attributionTag));
     if (isInjectionMode(requestedMode)) {
@@ -1908,16 +1908,35 @@ void SensorService::ClientStateRecipient::onStateChanged(const wp<IBinder>& /*wh
     if (!android::hardware::flags::suspend_sensor_event_delivery_on_frozen_pid()) {
         return;
     }
+    bool isFrozen = (state == IBinder::FrozenStateChangeCallback::State::FROZEN);
 
     Mutex::Autolock _l(mFrozenStateLock);
-    if (state == IBinder::FrozenStateChangeCallback::State::FROZEN) {
-        ALOGI("Client process for listener (pid=%d, uid=%d) is now FROZEN.", mPid, mUid);
-        mIsFrozen = true;
-        // TODO: Implement logic to pause or flush events for this listener
-    } else if (state == IBinder::FrozenStateChangeCallback::State::UNFROZEN) {
-        ALOGI("Client process for listener (pid=%d, uid=%d) is now UNFROZEN.", mPid, mUid);
-        mIsFrozen = false;
-        // TODO: Implement logic to resume or flush events for this listener
+    if (mIsFrozen == isFrozen) {
+        return;
+    }
+    mIsFrozen = isFrozen;
+    sp<SensorService> service = mService.promote();
+    if (service != nullptr) {
+        sp<MessageHandler> handler = new FrozenStateChangeHandler(mService, mPid, isFrozen);
+        service->mLooper->sendMessage(handler, Message(0));
+    } else {
+        ALOGW("SensorService already destroyed, cannot process client state change.");
+    }
+
+}
+
+void SensorService::onClientFrozenStateChange(pid_t pid, bool isFrozen) {
+    if (!android::hardware::flags::suspend_sensor_event_delivery_on_frozen_pid()) {
+        return;
+    }
+    SensorDevice& dev(SensorDevice::getInstance());
+    std::vector<void*> connectionIdents;
+
+    ConnectionSafeAutolock connLock = mConnectionHolder.lock(mLock);
+    for (const sp<SensorEventConnection>& conn : connLock.getActiveConnections()) {
+        if (conn->getPid() == pid) {
+            dev.setFrozenStateForConnection(conn.get(), isFrozen);
+        }
     }
 }
 
@@ -2006,6 +2025,16 @@ status_t SensorService::unregisterClientListener(
     }
 
     return OK;
+}
+
+bool SensorService::isPidFrozen(pid_t pid) {
+    Mutex::Autolock _l(mBinderStateRecipientsLock);
+    for (const auto& it : mBinderStateRecipients) {
+        if (it.second->getPid() == pid) {
+            return it.second->isFrozen();
+        }
+    }
+    return false;
 }
 
 status_t SensorService::resetToNormalMode() {

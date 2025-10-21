@@ -363,6 +363,24 @@ private:
         }
 
     private:
+        class FrozenStateChangeHandler : public MessageHandler {
+        public:
+            FrozenStateChangeHandler(wp<SensorService> service, uid_t pid, bool isFrozen)
+                  : mService(service), mPid(pid), mIsFrozen(isFrozen) {}
+
+            void handleMessage(const Message& /*message*/) override {
+                sp<SensorService> service = mService.promote();
+                if (service != nullptr) {
+                    service->onClientFrozenStateChange(mPid, mIsFrozen);
+                }
+            }
+
+        private:
+            wp<SensorService> mService;
+            const pid_t mPid;
+            bool mIsFrozen;
+        };
+
         wp<SensorService> mService;
         sp<hardware::sensor::ISensorClientListener> mListener;
         const pid_t mPid;
@@ -390,8 +408,11 @@ private:
      * SensorService::cleanupConnection(SensorEventConnection* c).
      */
     void onClientDied(const sp<hardware::sensor::ISensorClientListener>& listener);
+    void onClientFrozenStateChange(pid_t pid, bool isFrozen);
     status_t unregisterClientListener(
             const sp<android::hardware::sensor::ISensorClientListener>& listener);
+
+    bool isPidFrozen(pid_t pid);
 
     // Sensor privacy allows a user to disable access to all sensors on the device. When
     // enabled sensor privacy will prevent all apps, including active apps, from accessing
