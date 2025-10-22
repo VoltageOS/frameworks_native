@@ -194,7 +194,7 @@ bool LayerSnapshot::hasEffect() const {
 }
 
 bool LayerSnapshot::hasSomethingToDraw() const {
-    return hasEffect() || hasBufferOrSidebandStream();
+    return hasEffect() || hasBufferOrSidebandStream() || renderCommandBufferConsumer != nullptr;
 }
 
 bool LayerSnapshot::isContentOpaque() const {
@@ -575,6 +575,11 @@ void LayerSnapshot::merge(const RequestedLayerState& requested, bool forceUpdate
     if (forceUpdate || requested.what & layer_state_t::eLutsChanged) {
         luts = requested.luts;
     }
+
+    if (forceUpdate || requested.what & layer_state_t::eRenderCommandBufferChanged) {
+        renderCommandBufferConsumer = requested.renderCommandBufferConsumer;
+    }
+    forceClientComposition = (renderCommandBufferConsumer != nullptr);
 }
 
 char LayerSnapshot::classifyCompositionForDebug(

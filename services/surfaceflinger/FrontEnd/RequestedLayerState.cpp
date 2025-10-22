@@ -184,6 +184,11 @@ void RequestedLayerState::merge(const ResolvedComposerState& resolvedComposerSta
         }
     }
 
+    if (clientState.what & layer_state_t::eRenderCommandBufferChanged) {
+        changes |= RequestedLayerState::Changes::Input | RequestedLayerState::Changes::Geometry |
+                RequestedLayerState::Changes::Buffer;
+    }
+
     if (clientState.what & layer_state_t::eBufferChanged) {
         externalTexture = resolvedComposerState.externalTexture;
         const bool hasBuffer = externalTexture != nullptr;
