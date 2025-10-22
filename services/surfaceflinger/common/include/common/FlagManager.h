@@ -62,6 +62,7 @@ public:
     bool disable_transparent_region_hint() const;
     bool filter_refresh_rates_within_config_group() const;
     bool frontend_caching_v0() const;
+    bool get_display_known_vsync_sample_enabled() const;
     bool graphite_renderengine_preview_rollout() const;
     bool graphite_renderengine_desktop_rollout() const;
     bool increase_missed_frame_jank_threshold() const;
