@@ -175,6 +175,7 @@ struct layer_state_t {
         ACCESS_SURFACE_FLINGER = 0x1,
         ROTATE_SURFACE_FLINGER = 0x2,
         INTERNAL_SYSTEM_WINDOW = 0x4,
+        READ_FRAME_BUFFER = 0x8,
     };
 
     enum {

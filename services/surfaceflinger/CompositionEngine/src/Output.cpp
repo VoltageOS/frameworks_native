@@ -54,6 +54,7 @@
 #pragma clang diagnostic pop // ignored "-Wconversion"
 
 #include <android-base/properties.h>
+#include <gui/LayerState.h>
 #include <ui/DebugUtils.h>
 #include <ui/HdrCapabilities.h>
 
@@ -782,10 +783,20 @@ void Output::ensureOutputLayerIfVisible(sp<compositionengine::LayerFE>& layerFE,
     // one, or create a new one if we do not.
     auto outputLayer = ensureOutputLayer(prevOutputLayerIndex, layerFE);
 
-    coverage.aboveBlurRequests += static_cast<int32_t>(layerFEState->backgroundBlurRadius > 0);
-    // Each blur region can contain a separate blur radius so we need to count each region
-    // as a separate request.
-    coverage.aboveBlurRequests += static_cast<int32_t>(layerFEState->blurRegions.size());
+    auto ownerIsPrivileged = ((layerFEState->permissions &
+                               layer_state_t::Permission::ACCESS_SURFACE_FLINGER) != 0) ||
+            ((layerFEState->permissions & layer_state_t::Permission::ROTATE_SURFACE_FLINGER) !=
+             0) ||
+            ((layerFEState->permissions & layer_state_t::Permission::INTERNAL_SYSTEM_WINDOW) !=
+             0) ||
+            ((layerFEState->permissions & layer_state_t::Permission::READ_FRAME_BUFFER) != 0);
+
+    if (!ownerIsPrivileged) {
+        coverage.aboveBlurRequests += static_cast<int32_t>(layerFEState->backgroundBlurRadius > 0);
+        // Each blur region can contain a separate blur radius so we need to count each region
+        // as a separate request.
+        coverage.aboveBlurRequests += static_cast<int32_t>(layerFEState->blurRegions.size());
+    }
 
     // Store the layer coverage information into the layer state as some of it
     // is useful later.
@@ -805,7 +816,8 @@ void Output::ensureOutputLayerIfVisible(sp<compositionengine::LayerFE>& layerFE,
     // See b/399120953: blurs are so expensive that they may be susceptible to compression side
     // channel attacks
     static constexpr auto kMaxBlurRequests = 10;
-    outputLayerState.ignoreBlur = coverage.aboveBlurRequests > kMaxBlurRequests;
+    outputLayerState.ignoreBlur =
+            coverage.aboveBlurRequests > kMaxBlurRequests && !ownerIsPrivileged;
     if (CC_UNLIKELY(computeAboveCoveredExcludingOverlays)) {
         outputLayerState.coveredRegionExcludingDisplayOverlays =
                 std::move(coveredRegionExcludingDisplayOverlays);
