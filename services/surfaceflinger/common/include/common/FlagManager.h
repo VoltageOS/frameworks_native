@@ -73,6 +73,7 @@ public:
     bool readback_screenshot() const;
     bool refresh_rate_overlay_on_external_display() const;
     bool resync_on_tx_separate_timer() const;
+    bool sf_disable_producer_throttling_for_client_composition() const;
     bool supported_refresh_rate_update() const;
     bool use_at_least_60_for_min_vote() const;
 
