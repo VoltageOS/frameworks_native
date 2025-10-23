@@ -281,7 +281,10 @@ private:
                       bool filterFramesBeforeTraceStarts) const;
     void classifyJankLocked(int32_t displayFrameJankType, const Fps& refreshRate,
                             Fps displayFrameRenderRate, nsecs_t* outDeadlineDelta,
-                            nsecs_t* outPresentDelta) REQUIRES(mMutex);
+                            nsecs_t* outPresentDelay) REQUIRES(mMutex);
+    void classifyJankLegacyLocked(int32_t displayFrameJankType, const Fps& refreshRate,
+                                  Fps displayFrameRenderRate, nsecs_t* outDeadlineDelta,
+                                  nsecs_t* outPresentDelay) REQUIRES(mMutex);
 
     const int64_t mToken;
     const int32_t mInputEventId;
@@ -301,9 +304,9 @@ private:
     nsecs_t mDropTime GUARDED_BY(mMutex) = 0;
     mutable std::mutex mMutex;
     // Bitmask for the type of jank
-    int32_t mJankType GUARDED_BY(mMutex) = JankType::None;
+    int32_t mJankTypeLegacy GUARDED_BY(mMutex) = JankType::None;
     // Enum for the severity of jank
-    JankSeverityType mJankSeverityType GUARDED_BY(mMutex) = JankSeverityType::None;
+    JankSeverityType mJankSeverityTypeLegacy GUARDED_BY(mMutex) = JankSeverityType::None;
     // Indicates if this frame was composited by the GPU or not
     bool mGpuComposition GUARDED_BY(mMutex) = false;
     // Refresh rate for this frame.
@@ -311,10 +314,12 @@ private:
     // Rendering rate for this frame.
     std::optional<Fps> mRenderRate GUARDED_BY(mMutex);
     // Enum for the type of present
-    FramePresentMetadata mFramePresentMetadata GUARDED_BY(mMutex) =
+    FramePresentMetadata mFramePresentMetadataLegacy GUARDED_BY(mMutex) =
             FramePresentMetadata::UnknownPresent;
     // Enum for the type of finish
-    FrameReadyMetadata mFrameReadyMetadata GUARDED_BY(mMutex) = FrameReadyMetadata::UnknownFinish;
+    FrameReadyMetadata mFrameReadyMetadataLegacy GUARDED_BY(mMutex) =
+            FrameReadyMetadata::UnknownFinish;
+
     // Time when the previous buffer from the same layer was latched by SF, togther with the
     // expected present time for that buffer. This is used in checking for BufferStuffing where
     // the current buffer is expected to be ready but the previous buffer was latched instead.
@@ -471,10 +476,12 @@ public:
         TimelineItem getActuals() const { return mSurfaceFlingerActuals; };
         TimelineItem getPredictions() const { return mSurfaceFlingerPredictions; };
         FrameStartMetadata getFrameStartMetadata() const { return mFrameStartMetadata; };
-        FramePresentMetadata getFramePresentMetadata() const { return mFramePresentMetadata; };
+        FramePresentMetadata getFramePresentMetadata() const {
+            return mFramePresentMetadataLegacy;
+        };
         FrameReadyMetadata getFrameReadyMetadata() const { return mFrameReadyMetadata; };
-        int32_t getJankType() const { return mJankType; }
-        JankSeverityType getJankSeverityType() const { return mJankSeverityType; }
+        int32_t getJankType() const { return mJankTypeLegacy; }
+        JankSeverityType getJankSeverityType() const { return mJankSeverityTypeLegacy; }
         const std::vector<std::shared_ptr<SurfaceFrame>>& getSurfaceFrames() const {
             return mSurfaceFrames;
         }
@@ -490,6 +497,8 @@ public:
                              bool filterFramesBeforeTraceStarts) const;
         void classifyJank(nsecs_t& deadlineDelta, nsecs_t& deltaToVsync,
                           nsecs_t previousPresentTime);
+        void classifyJankLegacy(nsecs_t presentDelay, nsecs_t deltaToVsync,
+                                nsecs_t previousPresentTime);
 
         int64_t mToken = FrameTimelineInfo::INVALID_VSYNC_ID;
 
@@ -508,13 +517,13 @@ public:
 
         PredictionState mPredictionState = PredictionState::None;
         // Bitmask for the type of jank
-        int32_t mJankType = JankType::None;
+        int32_t mJankTypeLegacy = JankType::None;
         // Enum for the severity of jank
-        JankSeverityType mJankSeverityType = JankSeverityType::None;
+        JankSeverityType mJankSeverityTypeLegacy = JankSeverityType::None;
         // A valid gpu fence indicates that the DisplayFrame was composited by the GPU
         std::shared_ptr<FenceTime> mGpuFence = FenceTime::NO_FENCE;
         // Enum for the type of present
-        FramePresentMetadata mFramePresentMetadata = FramePresentMetadata::UnknownPresent;
+        FramePresentMetadata mFramePresentMetadataLegacy = FramePresentMetadata::UnknownPresent;
         // Enum for the type of finish
         FrameReadyMetadata mFrameReadyMetadata = FrameReadyMetadata::UnknownFinish;
         // Enum for the type of start
