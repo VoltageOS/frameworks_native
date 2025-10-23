@@ -123,6 +123,10 @@ std::string jankTypeBitmaskToString(int32_t jankType) {
         janks.emplace_back("App Deadline Missed");
         jankType &= ~JankType::AppDeadlineMissed;
     }
+    if (jankType & JankType::AppResyncedJitter) {
+        janks.emplace_back("App Resynced Jitter");
+        jankType &= ~JankType::AppResyncedJitter;
+    }
     if (jankType & JankType::PredictionError) {
         janks.emplace_back("Prediction Error");
         jankType &= ~JankType::PredictionError;
@@ -146,6 +150,10 @@ std::string jankTypeBitmaskToString(int32_t jankType) {
     if (jankType & JankType::Dropped) {
         janks.emplace_back("Dropped Frame");
         jankType &= ~JankType::Dropped;
+    }
+    if (jankType & JankType::NonAnimating) {
+        janks.emplace_back("Non Animating");
+        jankType &= ~JankType::NonAnimating;
     }
 
     // jankType should be 0 if all types of jank were checked for.
@@ -251,6 +259,10 @@ int32_t jankTypeBitmaskToProto(int32_t jankType) {
         protoJank |= FrameTimelineEvent::JANK_APP_DEADLINE_MISSED;
         jankType &= ~JankType::AppDeadlineMissed;
     }
+    if (jankType & JankType::AppResyncedJitter) {
+        protoJank |= FrameTimelineEvent::JANK_APP_RESYNCED_JITTER;
+        jankType &= ~JankType::AppResyncedJitter;
+    }
     if (jankType & JankType::PredictionError) {
         protoJank |= FrameTimelineEvent::JANK_PREDICTION_ERROR;
         jankType &= ~JankType::PredictionError;
@@ -275,6 +287,10 @@ int32_t jankTypeBitmaskToProto(int32_t jankType) {
         // Jank dropped does not append to other janks, it fully overrides.
         protoJank |= FrameTimelineEvent::JANK_DROPPED;
         jankType &= ~JankType::Dropped;
+    }
+    if (jankType & JankType::NonAnimating) {
+        protoJank |= FrameTimelineEvent::JANK_NON_ANIMATING;
+        jankType &= ~JankType::NonAnimating;
     }
 
     // jankType should be 0 if all types of jank were checked for.
@@ -440,7 +456,8 @@ bool SurfaceFrame::isSelfJanky() const {
         return false;
     }
 
-    int32_t jankBitmask = JankType::AppDeadlineMissed | JankType::Unknown;
+    int32_t jankBitmask =
+            JankType::AppDeadlineMissed | JankType::Unknown | JankType::AppResyncedJitter;
     if (jankType & jankBitmask) {
         return true;
     }
