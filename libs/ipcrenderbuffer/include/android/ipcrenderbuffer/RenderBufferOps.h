@@ -19,6 +19,7 @@
 #include <SkRect.h>
 #include <gui/RenderCommandBuffer.h>
 #include <gui/RenderCommandBufferConsumer.h>
+#include <ui/GraphicBuffer.h>
 
 #include <SkAndroidFrameworkUtils.h>
 #include <SkCanvas.h>
@@ -72,8 +73,23 @@
 
 namespace android {
 
-struct IPCResourceCache {
+struct IPCClientBitmap {
+    uint64_t id;
+    sp<GraphicBuffer> buffer;
+};
+
+struct IPCClientResourceCache {
+    std::map<uint32_t, IPCClientBitmap> bitmaps;
+};
+
+struct IPCServerBitmap {
+    sp<GraphicBuffer> buffer;
+    sk_sp<SkImage> image;
+};
+
+struct IPCServerResourceCache {
     sk_sp<SkFontMgr> fontManager;
+    std::map<uint64_t, IPCServerBitmap> bitmaps;
 };
 
 // Derived from RecordingCanvas.cpp
@@ -333,28 +349,36 @@ struct DrawPictureOp final : IPCRenderBufferOp {
 
 struct DrawImageOp final : IPCRenderBufferOp {
     static const auto kType = TYPE_DRAWIMAGE;
+    uint64_t bitmapId;
+    SkScalar x;
+    SkScalar y;
+    SkSamplingOptions sampling;
+    ShmemPaint paint;
+    bool hasPaint;
 
-    static DrawImageOp* Create(RenderCommandBuffer* commandBuffer, const SkImage* image, SkScalar x,
+    static DrawImageOp* Create(RenderCommandBuffer* commandBuffer, uint64_t bitmapId, SkScalar x,
                                SkScalar y, const SkSamplingOptions& sampling, const SkPaint* paint);
-    void draw(SkCanvas* c, const SkMatrix&);
+    void draw(SkCanvas* c, const SkMatrix&, IPCServerResourceCache& resourceCache);
     std::string toString() const;
 };
 
 // TODO(b/448196792): Implement hardware bitmap support
 struct DrawImageRectOp final : IPCRenderBufferOp {
     static const auto kType = TYPE_DRAWIMAGERECT;
-    int offset;
-    SkRect srcRect;
-    SkRect dstRect;
+    uint64_t bitmapId;
+    SkRect src;
+    SkRect dst;
     SkSamplingOptions sampling;
     ShmemPaint paint;
-    int constraint;
     bool hasPaint;
-    int uniqueId;
-    bool isHardware;
+    SkCanvas::SrcRectConstraint constraint;
 
-    void draw(SkCanvas* c, const SkMatrix&);
-    virtual std::string toString() const;
+    static DrawImageRectOp* Create(RenderCommandBuffer* commandBuffer, uint64_t bitmapId,
+                                   const SkRect& src, const SkRect& dst,
+                                   const SkSamplingOptions& sampling, const SkPaint* paint,
+                                   SkCanvas::SrcRectConstraint constraint);
+    void draw(SkCanvas* c, const SkMatrix&, IPCServerResourceCache& resourceCache);
+    std::string toString() const;
 };
 
 struct ShmemTypeface {
