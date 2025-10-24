@@ -236,6 +236,8 @@ public:
     }
     void setKeyRemapping(int32_t deviceId,
                          const std::map<int32_t, int32_t>& keyRemapping) const override {}
+    void setAxisRemapping(int32_t deviceId,
+                          const std::unordered_map<int32_t, int32_t>& axisRemapping) override {}
     int32_t getKeyCodeForKeyLocation(int32_t deviceId, int32_t locationKeyCode) const override {
         return mFdp->ConsumeIntegral<int32_t>();
     }
