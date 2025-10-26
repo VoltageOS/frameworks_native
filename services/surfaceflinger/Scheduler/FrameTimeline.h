@@ -373,8 +373,8 @@ public:
 
     // The first function called by SF for the current DisplayFrame. Fetches SF predictions based on
     // the token and sets the actualSfWakeTime for the current DisplayFrame.
-    virtual void setSfWakeUp(int64_t token, nsecs_t wakeupTime, Fps refreshRate,
-                             Fps renderRate) = 0;
+    virtual void setSfWakeUp(int64_t token, nsecs_t wakeupTime, Fps refreshRate, Fps renderRate,
+                             bool displayOn = true) = 0;
 
     // Sets the sfPresentTime and finalizes the current DisplayFrame. Tracks the
     // given present fence until it's signaled, and updates the present timestamps of all presented
@@ -466,7 +466,8 @@ public:
                       bool filterFramesBeforeTraceStarts) const;
         // Sets the token, vsyncPeriod, predictions and SF start time.
         void onSfWakeUp(int64_t token, Fps refreshRate, Fps renderRate,
-                        std::optional<TimelineItem> predictions, nsecs_t wakeUpTime);
+                        std::optional<TimelineItem> predictions, nsecs_t wakeUpTime,
+                        bool displayOn);
         // Sets the appropriate metadata and classifies the jank.
         void onPresent(nsecs_t signalTime, nsecs_t previousPredictedPresentTime,
                        nsecs_t previousActualPresentTime);
@@ -555,6 +556,7 @@ public:
                 FramePresentMetadata::UnknownPresent;
         nsecs_t mPresentDelay = 0;
         float mJankSeverityScore = 0.0f;
+        bool mDisplayOn = true;
     };
 
     FrameTimeline(std::shared_ptr<TimeStats> timeStats, pid_t surfaceFlingerPid,
@@ -568,7 +570,8 @@ public:
             int32_t layerId, std::string layerName, std::string debugName, bool isBuffer,
             GameMode) override;
     void addSurfaceFrame(std::shared_ptr<scheduler::SurfaceFrame> surfaceFrame) override;
-    void setSfWakeUp(int64_t token, nsecs_t wakeupTime, Fps refreshRate, Fps renderRate) override;
+    void setSfWakeUp(int64_t token, nsecs_t wakeupTime, Fps refreshRate, Fps renderRate,
+                     bool displayOn = true) override;
     void setSfPresent(nsecs_t sfPresentTime, const std::shared_ptr<FenceTime>& presentFence,
                       const std::shared_ptr<FenceTime>& gpuFence = FenceTime::NO_FENCE) override;
     void onCommitNotComposited() override;

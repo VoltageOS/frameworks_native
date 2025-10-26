@@ -53,6 +53,8 @@ enum JankType {
     NonAnimating = 0x400,
     // Frame vsync time was modified by the app.
     AppResyncedJitter = 0x800,
+    // Display is not on (off or doze).
+    DisplayNotOn = 0x1000,
 };
 
 // Jank severity type tracked by SurfaceFlinger(SF) for Perfetto tracing and telemetry.

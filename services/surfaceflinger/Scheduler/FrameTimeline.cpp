@@ -156,6 +156,11 @@ std::string jankTypeBitmaskToString(int32_t jankType) {
         jankType &= ~JankType::NonAnimating;
     }
 
+    if (jankType & JankType::DisplayNotOn) {
+        janks.emplace_back("Display not ON");
+        jankType &= ~JankType::DisplayNotOn;
+    }
+
     // jankType should be 0 if all types of jank were checked for.
     LOG_ALWAYS_FATAL_IF(jankType != 0, "Unrecognized jank type value 0x%x", jankType);
     return std::accumulate(janks.begin(), janks.end(), std::string(),
@@ -291,6 +296,10 @@ int32_t jankTypeBitmaskToProto(int32_t jankType) {
     if (jankType & JankType::NonAnimating) {
         protoJank |= FrameTimelineEvent::JANK_NON_ANIMATING;
         jankType &= ~JankType::NonAnimating;
+    }
+    if (jankType & JankType::DisplayNotOn) {
+        protoJank |= FrameTimelineEvent::JANK_DISPLAY_NOT_ON;
+        jankType &= ~JankType::DisplayNotOn;
     }
 
     // jankType should be 0 if all types of jank were checked for.
@@ -737,6 +746,11 @@ void SurfaceFrame::classifyJankLocked(int32_t displayFrameJankTypeLegacy,
         // Cannot do any classification for invalid present time.
         mJankTypeLegacy = JankType::Unknown;
         mJankTypeExperimental = mJankTypeLegacy;
+        if (FlagManager::getInstance().jank_classification_v2()) {
+            if (displayFrameJankTypeExperimental & JankType::DisplayNotOn) {
+                mJankTypeExperimental = JankType::DisplayNotOn;
+            }
+        }
         mJankSeverityTypeLegacy = JankSeverityType::Unknown;
         if (outDeadlineDelta) {
             *outDeadlineDelta = -1;
@@ -754,6 +768,11 @@ void SurfaceFrame::classifyJankLocked(int32_t displayFrameJankTypeLegacy,
         mJankTypeLegacy = mPresentState != PresentState::Presented ? JankType::Dropped
                                                                    : JankType::AppDeadlineMissed;
         mJankTypeExperimental = mJankTypeLegacy;
+        if (FlagManager::getInstance().jank_classification_v2()) {
+            if (displayFrameJankTypeExperimental & JankType::DisplayNotOn) {
+                mJankTypeExperimental = JankType::DisplayNotOn;
+            }
+        }
         mJankSeverityTypeLegacy = JankSeverityType::Unknown;
         if (outDeadlineDelta) {
             *outDeadlineDelta = -1;
@@ -861,6 +880,11 @@ void SurfaceFrame::classifyJankLocked(int32_t displayFrameJankTypeLegacy,
                 }
             }
         }
+    }
+
+    if (displayFrameJankTypeExperimental & JankType::DisplayNotOn) {
+        mJankTypeExperimental = JankType::DisplayNotOn;
+        return;
     }
 
     if (mFramePresentMetadataExperimental == FramePresentMetadata::OnTimePresent) {
@@ -1251,12 +1275,13 @@ void FrameTimeline::addSurfaceFrame(std::shared_ptr<SurfaceFrame> surfaceFrame) 
     mCurrentDisplayFrame->addSurfaceFrame(surfaceFrame);
 }
 
-void FrameTimeline::setSfWakeUp(int64_t token, nsecs_t wakeUpTime, Fps refreshRate,
-                                Fps renderRate) {
+void FrameTimeline::setSfWakeUp(int64_t token, nsecs_t wakeUpTime, Fps refreshRate, Fps renderRate,
+                                bool displayOn) {
     SFTRACE_CALL();
     std::scoped_lock lock(mMutex);
     mCurrentDisplayFrame->onSfWakeUp(token, refreshRate, renderRate,
-                                     mTokenManager.getPredictionsForToken(token), wakeUpTime);
+                                     mTokenManager.getPredictionsForToken(token), wakeUpTime,
+                                     displayOn);
 }
 
 void FrameTimeline::setSfPresent(nsecs_t sfPresentTime,
@@ -1286,7 +1311,7 @@ void FrameTimeline::DisplayFrame::addSurfaceFrame(std::shared_ptr<SurfaceFrame> 
 
 void FrameTimeline::DisplayFrame::onSfWakeUp(int64_t token, Fps refreshRate, Fps renderRate,
                                              std::optional<TimelineItem> predictions,
-                                             nsecs_t wakeUpTime) {
+                                             nsecs_t wakeUpTime, bool displayOn) {
     mToken = token;
     mRefreshRate = refreshRate;
     mRenderRate = renderRate;
@@ -1297,6 +1322,7 @@ void FrameTimeline::DisplayFrame::onSfWakeUp(int64_t token, Fps refreshRate, Fps
         mSurfaceFlingerPredictions = *predictions;
     }
     mSurfaceFlingerActuals.startTime = wakeUpTime;
+    mDisplayOn = displayOn;
 }
 
 void FrameTimeline::DisplayFrame::setPredictions(PredictionState predictionState,
@@ -1418,7 +1444,9 @@ void FrameTimeline::DisplayFrame::classifyJank(nsecs_t& deadlineDelta,
             mJankTypeLegacy |= JankType::DisplayHAL;
         }
 
-        mJankTypeExperimental = mJankTypeLegacy;
+        mJankTypeExperimental = !FlagManager::getInstance().jank_classification_v2() || mDisplayOn
+                ? mJankTypeLegacy
+                : JankType::DisplayNotOn;
         return;
     }
 
@@ -1497,6 +1525,11 @@ void FrameTimeline::DisplayFrame::classifyJank(nsecs_t& deadlineDelta,
                 mFramePresentMetadataExperimental = FramePresentMetadata::UnknownPresent;
             }
         }
+    }
+
+    if (!mDisplayOn) {
+        mJankTypeExperimental = JankType::DisplayNotOn;
+        return;
     }
 
     if (mFramePresentMetadataExperimental == FramePresentMetadata::OnTimePresent) {
@@ -1754,8 +1787,15 @@ void FrameTimeline::DisplayFrame::traceActuals(pid_t surfaceFlingerPid, nsecs_t 
         FrameTimelineDataSource::Trace([&](FrameTimelineDataSource::TraceContext ctx) {
             auto packet = ctx.NewTracePacket();
             packet->set_timestamp_clock_id(perfetto::protos::pbzero::BUILTIN_CLOCK_BOOTTIME);
-            packet->set_timestamp(
-                    static_cast<uint64_t>(mSurfaceFlingerActuals.presentTime + monoBootOffset));
+            auto presentTime = mSurfaceFlingerActuals.presentTime;
+            if (FlagManager::getInstance().jank_classification_v2()) {
+                if (presentTime <= mSurfaceFlingerActuals.startTime) {
+                    // this can happen when the display is off and we use a stale fence
+                    presentTime = mSurfaceFlingerActuals.startTime + ms2ns(4);
+                }
+            }
+
+            packet->set_timestamp(static_cast<uint64_t>(presentTime + monoBootOffset));
 
             auto* event = packet->set_frame_timeline_event();
             auto* actualDisplayFrameEndEvent = event->set_frame_end();
