@@ -11,16 +11,6 @@ flag {
   is_fixed_read_only: true
 }
 
-# This file is locked and should not be changed. Use surfaceflinger_flags_new.aconfig
-
-flag {
-  name: "enable_layer_command_batching"
-  namespace: "core_graphics"
-  description: "This flag controls batching on createLayer/destroyLayer command with executeCommand."
-  bug: "290685621"
-  is_fixed_read_only: true
-}
-
 flag {
   name: "multithreaded_present"
   namespace: "core_graphics"
