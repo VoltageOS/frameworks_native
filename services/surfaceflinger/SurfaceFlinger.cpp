@@ -2591,9 +2591,9 @@ void SurfaceFlinger::updateLayerHistory(nsecs_t now) {
             continue;
         }
 
-        const bool updateSmallDirty = FlagManager::getInstance().enable_small_area_detection() &&
-                ((snapshot->clientChanges & layer_state_t::eSurfaceDamageRegionChanged) ||
-                 snapshot->changes.any(Changes::Geometry));
+        const bool updateSmallDirty =
+                (snapshot->clientChanges & layer_state_t::eSurfaceDamageRegionChanged) ||
+                snapshot->changes.any(Changes::Geometry);
 
         const bool hasChanges =
                 snapshot->changes.any(Changes::FrameRate | Changes::Buffer | Changes::Animation |
@@ -4966,9 +4966,7 @@ void SurfaceFlinger::initScheduler(const sp<const DisplayDevice>& display) {
     const auto defaultContentDetectionValue = sysprop::enable_frame_rate_override(true);
     if (sysprop::use_content_detection_for_refresh_rate(defaultContentDetectionValue)) {
         features |= Feature::kContentDetection;
-        if (FlagManager::getInstance().enable_small_area_detection()) {
-            features |= Feature::kSmallDirtyContentDetection;
-        }
+        features |= Feature::kSmallDirtyContentDetection;
     }
     if (base::GetBoolProperty("debug.sf.show_predicted_vsync"s, false)) {
         features |= Feature::kTracePredictedVsync;
