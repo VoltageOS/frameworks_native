@@ -178,6 +178,13 @@ flag {
 } # frontend_caching_v0
 
 flag {
+  name: "get_display_known_vsync_sample_enabled"
+  namespace: "core_graphics"
+  description: "Enables querying the last known vsync timestamp from the hwc service."
+  bug: "441162952"
+} # get_display_known_vsync_sample_enabled
+
+flag {
   name: "graphite_renderengine_preview_rollout"
   namespace: "core_graphics"
   description: "R/W flag to enable Skia's Graphite Vulkan backend in RenderEngine, IF it is already compiled with force_compile_graphite_renderengine, AND the debug.renderengine.graphite_preview_optin sysprop is set to true."
