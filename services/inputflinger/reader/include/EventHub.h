@@ -286,6 +286,9 @@ public:
                             int32_t metaState, int32_t* outKeycode, int32_t* outMetaState,
                             uint32_t* outFlags) const = 0;
 
+    virtual void setAxisRemapping(RawDeviceId deviceId,
+                                  const std::unordered_map<int32_t, int32_t>& axisRemapping) = 0;
+
     virtual status_t mapAxis(RawDeviceId deviceId, int32_t scanCode,
                              AxisInfo* outAxisInfo) const = 0;
 
@@ -516,6 +519,9 @@ public:
     status_t mapKey(RawDeviceId deviceId, int32_t scanCode, int32_t usageCode, int32_t metaState,
                     int32_t* outKeycode, int32_t* outMetaState,
                     uint32_t* outFlags) const override final;
+
+    void setAxisRemapping(RawDeviceId deviceId,
+                          const std::unordered_map<int32_t, int32_t>& axisRemapping) override final;
 
     status_t mapAxis(RawDeviceId deviceId, int32_t scanCode,
                      AxisInfo* outAxisInfo) const override final;

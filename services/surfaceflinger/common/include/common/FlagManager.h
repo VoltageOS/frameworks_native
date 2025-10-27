@@ -53,14 +53,12 @@ public:
 
     /// Trunk stable server (R/W) flags ///
     /// IMPORTANT - please keep alphabetized to reduce merge conflicts
-    bool add_first_vsync_to_tracker() const;
     bool adpf_gpu_sf() const;
     bool anchor_list() const;
     bool connected_displays_cursor() const;
     bool correct_virtual_display_power_state() const;
     bool deprecate_vsync_sf_v2() const;
     bool disable_transparent_region_hint() const;
-    bool filter_refresh_rates_within_config_group() const;
     bool frontend_caching_v0() const;
     bool graphite_renderengine_preview_rollout() const;
     bool graphite_renderengine_desktop_rollout() const;
@@ -75,6 +73,7 @@ public:
     bool readback_screenshot() const;
     bool refresh_rate_overlay_on_external_display() const;
     bool resync_on_tx_separate_timer() const;
+    bool sf_disable_producer_throttling_for_client_composition() const;
     bool supported_refresh_rate_update() const;
     bool use_at_least_60_for_min_vote() const;
 
