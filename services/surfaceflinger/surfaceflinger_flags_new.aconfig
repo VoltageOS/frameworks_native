@@ -347,6 +347,16 @@ flag {
 } # shader_disk_cache
 
 flag {
+  name: "set_power_mode_async"
+  namespace: "window_surfaces"
+  description: "Run power mode hardware transitions asynchronously"
+  bug: "339477240"
+  metadata {
+    purpose: PURPOSE_FEATURE
+  }
+} # set_power_mode_async
+
+flag {
   name: "skip_invisible_windows_in_input"
   namespace: "window_surfaces"
   description: "Only send visible windows to input list"
