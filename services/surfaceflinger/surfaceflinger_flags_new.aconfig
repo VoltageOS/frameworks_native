@@ -409,6 +409,13 @@ flag {
 } # use_at_least_60_for_min_vote
 
 flag {
+    name: "use_experimental_jank_classification"
+    namespace: "core_graphics"
+    description: "Use experimental jank classification"
+    bug: "416904263"
+} # use_experimental_jank_classification
+
+flag {
   name: "wb_framebuffersurface2"
   namespace: "core_graphics"
   description: "When enabled, use an updated FrameBufferSurface instead of the legacy one"

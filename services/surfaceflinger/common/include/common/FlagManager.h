@@ -76,6 +76,7 @@ public:
     bool sf_disable_producer_throttling_for_client_composition() const;
     bool supported_refresh_rate_update() const;
     bool use_at_least_60_for_min_vote() const;
+    bool use_experimental_jank_classification() const;
 
     /// Trunk stable readonly flags ///
     /// IMPORTANT - please keep alphabetized to reduce merge conflicts
