@@ -81,7 +81,6 @@ public:
 
     /// Trunk stable readonly flags ///
     /// IMPORTANT - please keep alphabetized to reduce merge conflicts
-    bool begone_bright_hlg() const;
     bool cache_when_source_crop_layer_only_moved() const;
     bool connected_display_hdr_v2() const;
     bool correct_dpi_with_display_size() const;
