@@ -214,10 +214,11 @@ struct InputReaderConfiguration {
     bool stylusPointerIconEnabled;
 
     // Keycodes to be remapped.
-    std::map<int32_t /* fromKeyCode */, int32_t /* toKeyCode */> keyRemapping;
+    std::unordered_map<int32_t /* fromKeyCode */, int32_t /* toKeyCode */> keyRemapping;
 
     // Keycodes to be remapped for device.
-    std::map<DeviceId, std::map<int32_t /* fromKeyCode */, int32_t /* toKeyCode */>>
+    std::unordered_map<DeviceId,
+                       std::unordered_map<int32_t /* fromKeyCode */, int32_t /* toKeyCode */>>
             keyRemappingPerDevice;
 
     // Per-device axis remapping: Only applied for joystick devices
