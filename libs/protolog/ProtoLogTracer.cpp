@@ -185,18 +185,25 @@ inline void WriteLogMessage(ProtoLogDataSource::TraceContext& ctx, uint64_t mess
 ProtoLogTracer* gTracer = nullptr;
 std::mutex gTracerMutex;
 
+// The ProtoLogTracer is a singleton that can be accessed from multiple threads.
+// To ensure thread-safe initialization without performance overhead on every
+// call, we use a function-local static variable ("magic static").
+//
+// The C++11 standard guarantees that the initialization of a block-scope static
+// variable happens only once and is thread-safe. The first time Get() is called,
+// the 'instance' is constructed. Subsequent calls will just return the pointer
+// to the existing instance, which is fast and lock-free.
+//
+// This prevents a race condition where the tracer might be used before it is
+// initialized, which was the cause of a null pointer exception without the
+// overhead of a mutex.
 ProtoLogTracer* ProtoLogTracer::Get() {
-    return gTracer;
+    static ProtoLogTracer instance;
+    return &instance;
 }
 
 void ProtoLogTracer::Initialize() {
-    std::lock_guard<std::mutex> lock(gTracerMutex);
-
-    if (gTracer) {
-        return;
-    }
-
-    gTracer = new ProtoLogTracer();
+    Get();
 }
 
 void ProtoLogTracer::Destroy() {
