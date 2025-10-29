@@ -3760,8 +3760,7 @@ void SurfaceFlinger::onCompositionPresented(PhysicalDisplayId pacesetterId,
                                         : snapshot.desiredHdrSdrRatio;
 
                                 float desiredRatio = desiredHdrSdrRatio;
-                                if (FlagManager::getInstance().begone_bright_hlg() &&
-                                    desiredHdrSdrRatio == std::numeric_limits<float>::infinity()) {
+                                if (desiredHdrSdrRatio == std::numeric_limits<float>::infinity()) {
                                     desiredRatio = getIdealizedMaxHeadroom(snapshot.dataspace);
                                 }
 
@@ -10686,8 +10685,7 @@ void SurfaceFlinger::updateHdrInfos(
                                 : snapshot->desiredHdrSdrRatio;
 
                         float desiredRatio = desiredHdrSdrRatio;
-                        if (FlagManager::getInstance().begone_bright_hlg() &&
-                            desiredHdrSdrRatio == std::numeric_limits<float>::infinity()) {
+                        if (desiredHdrSdrRatio == std::numeric_limits<float>::infinity()) {
                             desiredRatio = getIdealizedMaxHeadroom(snapshot->dataspace);
                         }
 

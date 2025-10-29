@@ -36,14 +36,6 @@ flag {
 } # arr_surfacecontrol_setframerate_api
 
 flag {
-  name: "begone_bright_hlg"
-  namespace: "core_graphics"
-  description: "Caps HLG brightness relative to SDR"
-  bug: "362510107"
-  is_fixed_read_only: true
-} # begone_bright_hlg
-
-flag {
   name: "connected_display_hdr_v2"
   namespace: "desktop_display"
   description: "enable connected display hdr selection"
