@@ -102,9 +102,9 @@ const std::shared_ptr<FakeApplicationHandle> APP = std::make_shared<FakeApplicat
 
 } // namespace
 
-// --- DISABLED_InputDispatcherTracingTest ---
+// --- InputDispatcherTracingTest ---
 
-class DISABLED_InputDispatcherTracingTest : public testing::Test {
+class InputDispatcherTracingTest : public testing::Test {
 protected:
     std::unique_ptr<FakeInputDispatcherPolicy> mFakePolicy;
     std::unique_ptr<InputDispatcher> mDispatcher;
@@ -191,7 +191,7 @@ private:
     std::function<void()> mRequestTracerIdle;
 };
 
-TEST_F(DISABLED_InputDispatcherTracingTest, EmptyConfigTracesNothing) {
+TEST_F(InputDispatcherTracingTest, EmptyConfigTracesNothing) {
     InputTraceSession s{[](auto& config) {}};
 
     auto window = sp<FakeWindowHandle>::make(APP, mDispatcher, "Window", DISPLAY_ID);
@@ -205,7 +205,7 @@ TEST_F(DISABLED_InputDispatcherTracingTest, EmptyConfigTracesNothing) {
     waitForTracerIdle();
 }
 
-TEST_F(DISABLED_InputDispatcherTracingTest, TraceAll) {
+TEST_F(InputDispatcherTracingTest, TraceAll) {
     InputTraceSession s{
             [](auto& config) { config->set_mode(AndroidInputEventConfig::TRACE_MODE_TRACE_ALL); }};
 
@@ -220,7 +220,7 @@ TEST_F(DISABLED_InputDispatcherTracingTest, TraceAll) {
     waitForTracerIdle();
 }
 
-TEST_F(DISABLED_InputDispatcherTracingTest, NoRulesTracesNothing) {
+TEST_F(InputDispatcherTracingTest, NoRulesTracesNothing) {
     InputTraceSession s{[](auto& config) {
         config->set_trace_dispatcher_input_events(true);
         config->set_trace_dispatcher_window_dispatch(true);
@@ -238,7 +238,7 @@ TEST_F(DISABLED_InputDispatcherTracingTest, NoRulesTracesNothing) {
     waitForTracerIdle();
 }
 
-TEST_F(DISABLED_InputDispatcherTracingTest, EmptyRuleMatchesEverything) {
+TEST_F(InputDispatcherTracingTest, EmptyRuleMatchesEverything) {
     InputTraceSession s{[](auto& config) {
         config->set_trace_dispatcher_input_events(true);
         config->set_trace_dispatcher_window_dispatch(true);
@@ -259,7 +259,7 @@ TEST_F(DISABLED_InputDispatcherTracingTest, EmptyRuleMatchesEverything) {
     waitForTracerIdle();
 }
 
-TEST_F(DISABLED_InputDispatcherTracingTest, UnspecifiedTracelLevel) {
+TEST_F(InputDispatcherTracingTest, UnspecifiedTracelLevel) {
     InputTraceSession s{[](auto& config) {
         config->set_trace_dispatcher_input_events(true);
         config->set_trace_dispatcher_window_dispatch(true);
@@ -280,7 +280,7 @@ TEST_F(DISABLED_InputDispatcherTracingTest, UnspecifiedTracelLevel) {
     waitForTracerIdle();
 }
 
-TEST_F(DISABLED_InputDispatcherTracingTest, MatchSecureWindow) {
+TEST_F(InputDispatcherTracingTest, MatchSecureWindow) {
     InputTraceSession s{[](auto& config) {
         config->set_trace_dispatcher_input_events(true);
         config->set_trace_dispatcher_window_dispatch(true);
@@ -324,7 +324,7 @@ TEST_F(DISABLED_InputDispatcherTracingTest, MatchSecureWindow) {
     waitForTracerIdle();
 }
 
-TEST_F(DISABLED_InputDispatcherTracingTest, MatchImeConnectionActive) {
+TEST_F(InputDispatcherTracingTest, MatchImeConnectionActive) {
     InputTraceSession s{[](auto& config) {
         config->set_trace_dispatcher_input_events(true);
         config->set_trace_dispatcher_window_dispatch(true);
@@ -354,7 +354,7 @@ TEST_F(DISABLED_InputDispatcherTracingTest, MatchImeConnectionActive) {
     waitForTracerIdle();
 }
 
-TEST_F(DISABLED_InputDispatcherTracingTest, MatchAllPackages) {
+TEST_F(InputDispatcherTracingTest, MatchAllPackages) {
     InputTraceSession s{[](auto& config) {
         config->set_trace_dispatcher_input_events(true);
         config->set_trace_dispatcher_window_dispatch(true);
@@ -414,7 +414,7 @@ TEST_F(DISABLED_InputDispatcherTracingTest, MatchAllPackages) {
     waitForTracerIdle();
 }
 
-TEST_F(DISABLED_InputDispatcherTracingTest, MatchAnyPackages) {
+TEST_F(InputDispatcherTracingTest, MatchAnyPackages) {
     InputTraceSession s{[](auto& config) {
         config->set_trace_dispatcher_input_events(true);
         config->set_trace_dispatcher_window_dispatch(true);
@@ -468,7 +468,7 @@ TEST_F(DISABLED_InputDispatcherTracingTest, MatchAnyPackages) {
     waitForTracerIdle();
 }
 
-TEST_F(DISABLED_InputDispatcherTracingTest, MultipleMatchersInOneRule) {
+TEST_F(InputDispatcherTracingTest, MultipleMatchersInOneRule) {
     InputTraceSession s{[](auto& config) {
         config->set_trace_dispatcher_input_events(true);
         config->set_trace_dispatcher_window_dispatch(true);
@@ -532,7 +532,7 @@ TEST_F(DISABLED_InputDispatcherTracingTest, MultipleMatchersInOneRule) {
     waitForTracerIdle();
 }
 
-TEST_F(DISABLED_InputDispatcherTracingTest, MultipleRulesMatchInOrder) {
+TEST_F(InputDispatcherTracingTest, MultipleRulesMatchInOrder) {
     InputTraceSession s{[](auto& config) {
         config->set_trace_dispatcher_input_events(true);
         config->set_trace_dispatcher_window_dispatch(true);
@@ -586,7 +586,7 @@ TEST_F(DISABLED_InputDispatcherTracingTest, MultipleRulesMatchInOrder) {
     waitForTracerIdle();
 }
 
-TEST_F(DISABLED_InputDispatcherTracingTest, TraceInboundEvents) {
+TEST_F(InputDispatcherTracingTest, TraceInboundEvents) {
     InputTraceSession s{[](auto& config) {
         // Only trace inbounds events - don't trace window dispatch
         config->set_trace_dispatcher_input_events(true);
@@ -622,7 +622,7 @@ TEST_F(DISABLED_InputDispatcherTracingTest, TraceInboundEvents) {
     waitForTracerIdle();
 }
 
-TEST_F(DISABLED_InputDispatcherTracingTest, TraceWindowDispatch) {
+TEST_F(InputDispatcherTracingTest, TraceWindowDispatch) {
     InputTraceSession s{[](auto& config) {
         // Only trace window dispatch - don't trace event details
         config->set_trace_dispatcher_window_dispatch(true);
@@ -658,7 +658,7 @@ TEST_F(DISABLED_InputDispatcherTracingTest, TraceWindowDispatch) {
 }
 
 // TODO(b/336097719): Investigate flakiness and re-enable this test.
-TEST_F(DISABLED_InputDispatcherTracingTest, DISABLED_SimultaneousTracingSessions) {
+TEST_F(InputDispatcherTracingTest, DISABLED_SimultaneousTracingSessions) {
     auto s1 = std::make_unique<InputTraceSession>(
             [](auto& config) { config->set_mode(AndroidInputEventConfig::TRACE_MODE_TRACE_ALL); });
 
@@ -811,7 +811,7 @@ private:
     bool mOldFlagValue;
 };
 
-TEST_F(InputReaderTracingTest, DISABLED_TraceEvdevEvents) {
+TEST_F(InputReaderTracingTest, TraceEvdevEvents) {
     InputTraceSession s{[](auto& config) {}};
 
     std::unique_ptr<UinputKeyboard> keyboard =
