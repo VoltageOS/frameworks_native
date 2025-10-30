@@ -5957,7 +5957,8 @@ status_t SurfaceFlinger::createLayer(LayerCreationArgs& args, gui::CreateSurface
         return result;
     }
 
-    args.addToRoot = args.addToRoot && callingThreadHasUnscopedSurfaceFlingerAccess();
+    args.addToRoot = args.addToRoot && (args.flags & ISurfaceComposerClient::eNotAddToRoot) == 0 &&
+            callingThreadHasUnscopedSurfaceFlingerAccess();
     // We can safely promote the parent layer in binder thread because we have a strong reference
     // to the layer's handle inside this scope.
     sp<Layer> parent = LayerHandle::getLayer(args.parentHandle.promote());
