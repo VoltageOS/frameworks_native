@@ -2974,7 +2974,8 @@ bool SurfaceFlinger::commit(PhysicalDisplayId pacesetterId,
     bool mustComposite = mMustComposite.exchange(false);
     {
         const bool pacesetterPoweredOn =
-                FTL_FAKE_GUARD(mStateLock, getDisplayDeviceLocked(pacesetterId))->isPoweredOn();
+                FTL_FAKE_GUARD(mStateLock, getDisplayDeviceLocked(pacesetterId))->getPowerMode()
+                    == hal::PowerMode::ON;
         mFrameTimeline->setSfWakeUp(ftl::to_underlying(vsyncId),
                                     pacesetterFrameTarget.frameBeginTime().ns(),
                                     Fps::fromPeriodNsecs(vsyncPeriod.ns()),
