@@ -159,7 +159,6 @@ void FlagManager::dump(std::string& result) const {
     DUMP_ACONFIG_FLAG(disable_synthetic_vsync_for_performance);
     DUMP_ACONFIG_FLAG(display_command_modeset);
     DUMP_ACONFIG_FLAG(enable_small_area_detection);
-    DUMP_ACONFIG_FLAG(flush_buffer_slots_to_uncache);
     DUMP_ACONFIG_FLAG(follower_arbitrary_refresh_rate_selection);
     DUMP_ACONFIG_FLAG(follower_display_backpressure);
     DUMP_ACONFIG_FLAG(force_slower_follower_gpu_composition);
@@ -266,7 +265,6 @@ FLAG_MANAGER_ACONFIG_FLAG(deprecate_frame_tracker, "");
 FLAG_MANAGER_ACONFIG_FLAG(disable_synthetic_vsync_for_performance, "");
 FLAG_MANAGER_ACONFIG_FLAG(display_command_modeset, "debug.sf.display_command_modeset")
 FLAG_MANAGER_ACONFIG_FLAG(enable_small_area_detection, "")
-FLAG_MANAGER_ACONFIG_FLAG(flush_buffer_slots_to_uncache, "");
 FLAG_MANAGER_ACONFIG_FLAG(follower_arbitrary_refresh_rate_selection,
                           "debug.sf.follower_arbitrary_refresh_rate_selection");
 FLAG_MANAGER_ACONFIG_FLAG(follower_display_backpressure, "debug.sf.follower_display_backpressure");

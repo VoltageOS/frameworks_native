@@ -89,7 +89,6 @@ public:
     bool disable_synthetic_vsync_for_performance() const;
     bool display_command_modeset() const;
     bool enable_small_area_detection() const;
-    bool flush_buffer_slots_to_uncache() const;
     bool follower_arbitrary_refresh_rate_selection() const;
     bool follower_display_backpressure() const;
     bool force_slower_follower_gpu_composition() const;
