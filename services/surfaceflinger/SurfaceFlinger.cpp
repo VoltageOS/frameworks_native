@@ -8869,6 +8869,7 @@ void SurfaceFlinger::onLayerDestroyed(Layer* layer) {
         mTransactionTracing->onLayerRemoved(layer->getSequence());
     }
     mScheduler->onLayerDestroyed(layer);
+    mFrameTimeline->onLayerDestroyed(layer->getSequence());
 }
 
 void SurfaceFlinger::onLayerUpdate() {

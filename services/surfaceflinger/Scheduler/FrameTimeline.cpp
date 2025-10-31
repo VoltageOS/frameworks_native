@@ -1267,12 +1267,12 @@ void FrameTimeline::addSurfaceFrame(std::shared_ptr<SurfaceFrame> surfaceFrame) 
     std::scoped_lock lock(mMutex);
 
     if (FlagManager::getInstance().jank_classification_v2()) {
-        if (const auto it = mPreviousSurfaceFrame.find(surfaceFrame->getLayerId());
-            it != mPreviousSurfaceFrame.end()) {
+        if (const auto it = mPreviousSurfaceFrames.find(surfaceFrame->getLayerId());
+            it != mPreviousSurfaceFrames.end()) {
             surfaceFrame->setPreviousSurfaceFrame(it->second);
         }
 
-        mPreviousSurfaceFrame[surfaceFrame->getLayerId()] = surfaceFrame;
+        mPreviousSurfaceFrames[surfaceFrame->getLayerId()] = surfaceFrame;
     }
 
     mCurrentDisplayFrame->addSurfaceFrame(surfaceFrame);
@@ -2106,6 +2106,11 @@ void FrameTimeline::setMaxDisplayFrames(uint32_t size) {
 
 void FrameTimeline::reset() {
     setMaxDisplayFrames(kDefaultMaxDisplayFrames);
+}
+
+void FrameTimeline::onLayerDestroyed(int32_t layerId) {
+    std::scoped_lock lock(mMutex);
+    mPreviousSurfaceFrames.erase(layerId);
 }
 
 } // namespace impl
