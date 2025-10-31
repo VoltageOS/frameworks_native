@@ -7226,7 +7226,11 @@ status_t SurfaceFlinger::onTransact(uint32_t code, const Parcel& data, Parcel* r
             case 1014: {
                 Mutex::Autolock _l(mStateLock);
                 // daltonize
+                mDaltonizer.setUseUpdatedAlgorithm(
+                        FlagManager::getInstance().enable_color_correction_bugfix());
                 n = data.readInt32();
+                // frameworks/native/services/surfaceflinger/common/include/common/FlagManager.h
+                // to get which type of cc to use.
                 mDaltonizer.setLevel(data.readInt32());
                 switch (n % 10) {
                     case 1:
