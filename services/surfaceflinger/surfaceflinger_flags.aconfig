@@ -19,14 +19,6 @@ flag {
   is_fixed_read_only: true
 }
 
-flag {
-  name: "enable_small_area_detection"
-  namespace: "core_graphics"
-  description: "Feature flag for SmallAreaDetection"
-  bug: "283055450"
-  is_fixed_read_only: true
-}
-
 # This file is locked and should not be changed. Use surfaceflinger_flags_new.aconfig
 
 flag {
