@@ -4373,7 +4373,8 @@ std::unique_ptr<MotionEntry> InputDispatcher::splitMotionEvent(
     const auto& result =
             MotionEvent::split(originalMotionEntry.action, originalMotionEntry.flags,
                                /*historySize=*/0, originalMotionEntry.pointerProperties,
-                               originalMotionEntry.pointerCoords, pointerIds);
+                               originalMotionEntry.pointerCoords, pointerIds,
+                               [&]() { return originalMotionEntry.getDescription(); });
     if (!result.ok()) {
         logDispatchStateLocked();
         LOG(FATAL) << "Could not split motion: " << originalMotionEntry
