@@ -2481,8 +2481,8 @@ int Surface::setMaxDequeuedBufferCount(int maxDequeuedBuffers) {
         return err;
     }
 
-    if (maxDequeuedBuffers > (int)mSlots.size()) {
-        int newSlotCount = minUndequeuedBuffers + maxDequeuedBuffers;
+    int newSlotCount = minUndequeuedBuffers + maxDequeuedBuffers;
+    if (newSlotCount > (int)mSlots.size()) {
         err = mGraphicBufferProducer->extendSlotCount(newSlotCount);
         if (err != OK) {
             SURF_LOGE("IGraphicBufferProducer::extendSlotCount(%d) returned %s", newSlotCount,
