@@ -529,7 +529,7 @@ private:
     // ISurfaceComposer implementation:
     sp<IBinder> createVirtualDisplay(const std::string& displayName, bool isSecure,
                                      gui::ISurfaceComposer::OptimizationPolicy optimizationPolicy,
-                                     const std::string& uniqueId,
+                                     const std::string& uniqueId, uid_t ownerUid,
                                      float requestedRefreshRate = 0.0f);
     status_t destroyVirtualDisplay(const sp<IBinder>& displayToken);
     std::vector<PhysicalDisplayId> getPhysicalDisplayIds() const EXCLUDES(mStateLock) {
@@ -576,9 +576,7 @@ private:
     void setAutoLowLatencyMode(const sp<IBinder>& displayToken, bool on);
     void setGameContentType(const sp<IBinder>& displayToken, bool on);
     status_t getMaxLayerPictureProfiles(const sp<IBinder>& displayToken, int32_t* outMaxProfiles);
-    // TODO b/339477240 - Remove.
     void setPowerMode(const sp<IBinder>& displayToken, int mode);
-    void setPowerModeAsync(const sp<IBinder>& displayToken, int mode);
     status_t overrideHdrTypes(const sp<IBinder>& displayToken,
                               const std::vector<ui::Hdr>& hdrTypes);
     status_t onPullAtom(const int32_t atomId, std::vector<uint8_t>* pulledData, bool* success);
@@ -1737,7 +1735,7 @@ public:
     binder::Status createVirtualDisplay(
             const std::string& displayName, bool isSecure,
             gui::ISurfaceComposer::OptimizationPolicy optimizationPolicy,
-            const std::string& uniqueId, float requestedRefreshRate,
+            const std::string& uniqueId, int32_t ownerUid, float requestedRefreshRate,
             sp<IBinder>* outDisplay) override;
     binder::Status destroyVirtualDisplay(const sp<IBinder>& displayToken) override;
     binder::Status getPhysicalDisplayIds(std::vector<int64_t>* outDisplayIds) override;

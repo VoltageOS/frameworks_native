@@ -170,13 +170,6 @@ flag {
 }
 
 flag {
-  name: "rotary_input_telemetry"
-  namespace: "wear_frameworks"
-  description: "Enable telemetry for rotary input"
-  bug: "370353565"
-}
-
-flag {
   name: "set_input_device_kernel_wake"
   namespace: "input"
   description: "Set input device's power/wakeup sysfs node"
@@ -198,16 +191,6 @@ flag {
   namespace: "lse_desktop_experience"
   description: "Allow cursor to transition across multiple connected displays"
   bug: "362719483"
-}
-
-flag {
-  name: "connected_displays_associated_display_cursor_bugfix"
-  namespace: "lse_desktop_experience"
-  description: "Apply some rules to define associated display cursor behavior in connected displays"
-  bug: "396568321"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
 }
 
 flag {

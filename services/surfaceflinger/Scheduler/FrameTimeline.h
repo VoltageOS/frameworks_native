@@ -24,6 +24,7 @@
 #include <optional>
 #include <string>
 
+#include <common/FlagManager.h>
 #include <gui/ISurfaceComposer.h>
 #include <gui/JankInfo.h>
 #include <gui/LayerMetadata.h>
@@ -153,6 +154,40 @@ private:
     friend class android::scheduler::FrameTimelineTest;
 
     std::atomic<int64_t> mTraceCookie = 0;
+};
+
+/*
+ * Helper class to hold two values for a variable, and use one of them based on a flag.
+ * This is used to experiment with new jank classification.
+ */
+template <typename T>
+class Experimental {
+public:
+    explicit Experimental(T value) : mLegacyValue(value), mExperimentalValue(value) {}
+    T& legacy() { return mLegacyValue; }
+    T& experimental() { return mExperimentalValue; }
+
+    T value() const {
+        const bool useExperimental = FlagManager::getInstance().jank_classification_v2() &&
+                FlagManager::getInstance().use_experimental_jank_classification();
+        if (useExperimental) {
+            return mExperimentalValue;
+        }
+        return mLegacyValue;
+    }
+
+    T altValue() const {
+        const bool useExperimental = FlagManager::getInstance().jank_classification_v2() &&
+                FlagManager::getInstance().use_experimental_jank_classification();
+        if (useExperimental) {
+            return mLegacyValue;
+        }
+        return mExperimentalValue;
+    }
+
+private:
+    T mLegacyValue;
+    T mExperimentalValue;
 };
 
 class SurfaceFrame {
@@ -306,7 +341,7 @@ private:
     nsecs_t mDropTime GUARDED_BY(mMutex) = 0;
     mutable std::mutex mMutex;
     // Bitmask for the type of jank
-    int32_t mJankTypeLegacy GUARDED_BY(mMutex) = JankType::None;
+    Experimental<int32_t> mJankType GUARDED_BY(mMutex) = Experimental<int32_t>{JankType::None};
     // Enum for the severity of jank
     JankSeverityType mJankSeverityTypeLegacy GUARDED_BY(mMutex) = JankSeverityType::None;
     // Indicates if this frame was composited by the GPU or not
@@ -316,11 +351,11 @@ private:
     // Rendering rate for this frame.
     std::optional<Fps> mRenderRate GUARDED_BY(mMutex);
     // Enum for the type of present
-    FramePresentMetadata mFramePresentMetadataLegacy GUARDED_BY(mMutex) =
-            FramePresentMetadata::UnknownPresent;
+    Experimental<FramePresentMetadata> mFramePresentMetadata GUARDED_BY(mMutex) =
+            Experimental<FramePresentMetadata>{FramePresentMetadata::UnknownPresent};
     // Enum for the type of finish
-    FrameReadyMetadata mFrameReadyMetadataLegacy GUARDED_BY(mMutex) =
-            FrameReadyMetadata::UnknownFinish;
+    Experimental<FrameReadyMetadata> mFrameReadyMetadata GUARDED_BY(mMutex) =
+            Experimental<FrameReadyMetadata>{FrameReadyMetadata::UnknownFinish};
 
     // Time when the previous buffer from the same layer was latched by SF, togther with the
     // expected present time for that buffer. This is used in checking for BufferStuffing where
@@ -338,12 +373,7 @@ private:
     std::weak_ptr<SurfaceFrame> mPreviousSurfaceFrame GUARDED_BY(mMutex);
 
     // Alternative jank classification, Experimental for now.
-    int32_t mJankTypeExperimental GUARDED_BY(mMutex) = JankType::None;
     float mJankSeverityScore GUARDED_BY(mMutex) = 0.0f;
-    FramePresentMetadata mFramePresentMetadataExperimental GUARDED_BY(mMutex) =
-            FramePresentMetadata::UnknownPresent;
-    FrameReadyMetadata mFrameReadyMetadataExperimental GUARDED_BY(mMutex) =
-            FrameReadyMetadata::UnknownFinish;
     nsecs_t mPresentDelay GUARDED_BY(mMutex) = 0;
 };
 
@@ -406,6 +436,9 @@ public:
 
     // Restores the max number of display frames to default. Called by SF backdoor.
     virtual void reset() = 0;
+
+    // Called when a layer is destroyed. Used for data cleanup.
+    virtual void onLayerDestroyed(int32_t layerId) = 0;
 };
 
 namespace impl {
@@ -490,10 +523,10 @@ public:
         TimelineItem getPredictions() const { return mSurfaceFlingerPredictions; };
         FrameStartMetadata getFrameStartMetadata() const { return mFrameStartMetadata; };
         FramePresentMetadata getFramePresentMetadata() const {
-            return mFramePresentMetadataLegacy;
+            return mFramePresentMetadata.value();
         };
         FrameReadyMetadata getFrameReadyMetadata() const { return mFrameReadyMetadata; };
-        int32_t getJankType() const { return mJankTypeLegacy; }
+        int32_t getJankType() const { return mJankType.value(); }
         JankSeverityType getJankSeverityType() const { return mJankSeverityTypeLegacy; }
         const std::vector<std::shared_ptr<SurfaceFrame>>& getSurfaceFrames() const {
             return mSurfaceFrames;
@@ -529,13 +562,14 @@ public:
 
         PredictionState mPredictionState = PredictionState::None;
         // Bitmask for the type of jank
-        int32_t mJankTypeLegacy = JankType::None;
+        Experimental<int32_t> mJankType{JankType::None};
         // Enum for the severity of jank
         JankSeverityType mJankSeverityTypeLegacy = JankSeverityType::None;
         // A valid gpu fence indicates that the DisplayFrame was composited by the GPU
         std::shared_ptr<FenceTime> mGpuFence = FenceTime::NO_FENCE;
         // Enum for the type of present
-        FramePresentMetadata mFramePresentMetadataLegacy = FramePresentMetadata::UnknownPresent;
+        Experimental<FramePresentMetadata> mFramePresentMetadata{
+                FramePresentMetadata::UnknownPresent};
         // Enum for the type of finish
         FrameReadyMetadata mFrameReadyMetadata = FrameReadyMetadata::UnknownFinish;
         // Enum for the type of start
@@ -551,9 +585,6 @@ public:
         TraceCookieCounter& mTraceCookieCounter;
 
         // Alternative jank classification, Experimental for now.
-        int32_t mJankTypeExperimental = JankType::None;
-        FramePresentMetadata mFramePresentMetadataExperimental =
-                FramePresentMetadata::UnknownPresent;
         nsecs_t mPresentDelay = 0;
         float mJankSeverityScore = 0.0f;
         bool mDisplayOn = true;
@@ -580,6 +611,7 @@ public:
     float computeFps(const std::unordered_set<int32_t>& layerIds) override;
     void generateFrameStats(int32_t layer, size_t count, FrameStats* outStats) const override;
     void reset() override;
+    void onLayerDestroyed(int32_t layerId) override;
 
     // Sets up the perfetto tracing backend and data source.
     void onBootFinished() override;
@@ -625,7 +657,7 @@ private:
     // internal vector resizing that happens with push_back.
     static constexpr uint32_t kNumSurfaceFramesInitial = 10;
 
-    std::unordered_map<int32_t /*layerId*/, std::weak_ptr<SurfaceFrame>> mPreviousSurfaceFrame
+    std::unordered_map<int32_t /*layerId*/, std::weak_ptr<SurfaceFrame>> mPreviousSurfaceFrames
             GUARDED_BY(mMutex);
 };
 

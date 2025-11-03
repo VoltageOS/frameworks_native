@@ -60,6 +60,7 @@ public:
     bool deprecate_vsync_sf_v2() const;
     bool disable_transparent_region_hint() const;
     bool frontend_caching_v0() const;
+    bool get_display_known_vsync_sample_enabled() const;
     bool graphite_renderengine_preview_rollout() const;
     bool graphite_renderengine_desktop_rollout() const;
     bool increase_missed_frame_jank_threshold() const;
@@ -73,23 +74,20 @@ public:
     bool readback_screenshot() const;
     bool refresh_rate_overlay_on_external_display() const;
     bool resync_on_tx_separate_timer() const;
+    bool set_power_mode_async() const;
     bool sf_disable_producer_throttling_for_client_composition() const;
     bool supported_refresh_rate_update() const;
     bool use_at_least_60_for_min_vote() const;
+    bool use_experimental_jank_classification() const;
 
     /// Trunk stable readonly flags ///
     /// IMPORTANT - please keep alphabetized to reduce merge conflicts
-    bool arr_setframerate_gte_enum() const;
-    bool begone_bright_hlg() const;
     bool cache_when_source_crop_layer_only_moved() const;
     bool connected_display_hdr_v2() const;
     bool correct_dpi_with_display_size() const;
     bool deprecate_frame_tracker() const;
     bool disable_synthetic_vsync_for_performance() const;
     bool display_command_modeset() const;
-    bool enable_layer_command_batching() const;
-    bool enable_small_area_detection() const;
-    bool flush_buffer_slots_to_uncache() const;
     bool follower_arbitrary_refresh_rate_selection() const;
     bool follower_display_backpressure() const;
     bool force_slower_follower_gpu_composition() const;
@@ -118,6 +116,7 @@ public:
     bool wb_virtualdisplay2() const;
     bool window_blur_kawase2() const;
     bool window_blur_kawase2_fix_aliasing() const;
+    bool window_blur_kawase2_preallocate_buffers() const;
     /// IMPORTANT - please keep alphabetize to reduce merge conflicts
 
 protected:

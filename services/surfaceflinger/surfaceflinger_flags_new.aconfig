@@ -27,14 +27,6 @@ flag {
 } # arr_setframerate_api
 
 flag {
-  name: "arr_setframerate_gte_enum"
-  namespace: "core_graphics"
-  description: "Exposes GTE (greater than or equal to) enum for Android 16"
-  bug: "380949716"
-  is_fixed_read_only: true
-} # arr_setframerate_gte_enum
-
-flag {
   name: "arr_surfacecontrol_setframerate_api"
   namespace: "core_graphics"
   description: "New SDK SurfaceControl.Transaction#setFrameRate API for Android 16"
@@ -42,14 +34,6 @@ flag {
   is_fixed_read_only: true
   is_exported: true
 } # arr_surfacecontrol_setframerate_api
-
-flag {
-  name: "begone_bright_hlg"
-  namespace: "core_graphics"
-  description: "Caps HLG brightness relative to SDR"
-  bug: "362510107"
-  is_fixed_read_only: true
-} # begone_bright_hlg
 
 flag {
   name: "connected_display_hdr_v2"
@@ -120,17 +104,6 @@ flag {
 } # display_command_modeset
 
 flag {
-  name: "flush_buffer_slots_to_uncache"
-  namespace: "core_graphics"
-  description: "Flush DisplayCommands for disabled displays in order to uncache requested buffers."
-  bug: "330806421"
-  is_fixed_read_only: true
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
-} # flush_buffer_slots_to_uncache
-
-flag {
   name: "follower_arbitrary_refresh_rate_selection"
   namespace: "desktop_display"
   description: "Enables selection of any refresh rate for the follower display instead of one matching the pacesetter."
@@ -176,6 +149,13 @@ flag {
   description: "Enables caching of frontend layer states"
   bug: "433229921"
 } # frontend_caching_v0
+
+flag {
+  name: "get_display_known_vsync_sample_enabled"
+  namespace: "core_graphics"
+  description: "Enables querying the last known vsync timestamp from the hwc service."
+  bug: "441162952"
+} # get_display_known_vsync_sample_enabled
 
 flag {
   name: "graphite_renderengine_preview_rollout"
@@ -347,6 +327,16 @@ flag {
 } # shader_disk_cache
 
 flag {
+  name: "set_power_mode_async"
+  namespace: "window_surfaces"
+  description: "Run power mode hardware transitions asynchronously"
+  bug: "339477240"
+  metadata {
+    purpose: PURPOSE_FEATURE
+  }
+} # set_power_mode_async
+
+flag {
   name: "skip_invisible_windows_in_input"
   namespace: "window_surfaces"
   description: "Only send visible windows to input list"
@@ -409,6 +399,13 @@ flag {
 } # use_at_least_60_for_min_vote
 
 flag {
+    name: "use_experimental_jank_classification"
+    namespace: "core_graphics"
+    description: "Use experimental jank classification"
+    bug: "416904263"
+} # use_experimental_jank_classification
+
+flag {
   name: "wb_framebuffersurface2"
   namespace: "core_graphics"
   description: "When enabled, use an updated FrameBufferSurface instead of the legacy one"
@@ -438,5 +435,15 @@ flag {
     purpose: PURPOSE_BUGFIX
   }
 } # window_blur_kawase2_fix_aliasing
+
+flag {
+  name: "window_blur_kawase2_preallocate_buffers"
+  namespace: "core_graphics"
+  description: "Flag for preallocating buffers for kawase2 window blur"
+  bug: "445059696"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+} # window_blur_kawase2_preallocate_buffers
 
 # IMPORTANT - please keep alphabetize to reduce merge conflicts
