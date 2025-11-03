@@ -50,6 +50,7 @@
 #include <SkSurface.h>
 #include <SkTileMode.h>
 #include <android-base/stringprintf.h>
+#include <android/ipcrenderbuffer/RenderBufferHelpers.h>
 #include <common/FlagManager.h>
 #include <common/trace.h>
 #include <gui/FenceMonitor.h>
@@ -1339,7 +1340,26 @@ void SkiaRenderEngine::drawLayersInternal(
             canvas->clipRRect(roundRectClip, enableAntiAlias);
         }
 
-        if (!bounds.isRect()) {
+        if (layer.renderCommandBufferConsumer) {
+            if (layer.renderResourceCache) {
+                for (auto& [id, bitmap] : layer.renderResourceCache->bitmaps) {
+                    auto imageTextureRef = getOrCreateBackendTexture(bitmap.buffer, false);
+
+                    if (!bitmap.image) {
+                        bitmap.image =
+                                imageTextureRef->makeImage(layerDataspace, kUnpremul_SkAlphaType);
+                    }
+                }
+            }
+
+            if (!bounds.isEmpty()) {
+                // Clip rect could be converted to bounds by getBoundsAndClip.
+                canvas->clipRRect(bounds);
+            }
+            renderCommandBufferToCanvas(layer.renderResourceCache.get(),
+                                        layer.renderCommandBufferConsumer.get(), canvas,
+                                        [&](int) {});
+        } else if (!bounds.isRect()) {
             paint.setAntiAlias(true);
             canvas->drawRRect(bounds, paint);
         } else {

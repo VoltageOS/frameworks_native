@@ -16,16 +16,17 @@
 
 #pragma once
 
-namespace android {
+#include <binder/Parcelable.h>
+#include <ui/GraphicBuffer.h>
+#include <vector>
 
-struct ShmemImageInfo {
-    int width;
-    int height;
-    SkColorType colorType;
-    SkAlphaType alphaType;
+namespace android::gui {
+
+struct GraphicBuffersUnregisterInfo : public Parcelable {
+    sp<IBinder> renderResourceToken;
+    std::vector<int64_t> bufferIds;
+    status_t writeToParcel(Parcel* parcel) const override;
+    status_t readFromParcel(const Parcel* parcel) override;
 };
 
-ShmemImageInfo toShmemImageInfo(const SkImageInfo& info);
-SkImageInfo fromShmemImageInfo(const ShmemImageInfo& info);
-
-} // namespace android
+} // namespace android::gui
