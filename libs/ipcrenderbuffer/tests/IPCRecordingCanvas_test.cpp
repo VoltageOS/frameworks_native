@@ -163,12 +163,13 @@ class IPCRecordingCanvasTest : public ::testing::Test {
 public:
     IPCRecordingCanvasTest()
           : mDirectCanvas(CANVAS_TEST_SIZE, CANVAS_TEST_SIZE),
-            mIPCCanvasBackend(CANVAS_TEST_SIZE, CANVAS_TEST_SIZE) {}
+            mIPCCanvasBackend(CANVAS_TEST_SIZE, CANVAS_TEST_SIZE),
+            mIPCRecordingCanvas(mClientCache) {}
 
 protected:
     void SetUp() override {
         Parcel p;
-        mCache.fontManager = sk_make_sp<SkFontMgr_Custom>(TestFontLoader());
+        mServerCache.fontManager = sk_make_sp<SkFontMgr_Custom>(TestFontLoader());
 
         mIPCRecordingCanvas.getRenderCommandBufferProducer()->writeToParcel(&p);
         p.setDataPosition(0);
@@ -181,7 +182,7 @@ public:
         mIPCRecordingCanvas.startRecording();
         doDraw(&mIPCRecordingCanvas);
         mIPCRecordingCanvas.endRecording();
-        renderCommandBufferToCanvas(&mCache, &mRenderCommandBufferConsumer,
+        renderCommandBufferToCanvas(&mServerCache, &mRenderCommandBufferConsumer,
                                     mIPCCanvasBackend.canvas, [&](int) {});
     }
 
@@ -195,7 +196,8 @@ public:
     SoftwareSurfaceAndCanvas mIPCCanvasBackend;
     IPCRecordingCanvas mIPCRecordingCanvas;
     RenderCommandBufferConsumer mRenderCommandBufferConsumer;
-    IPCResourceCache mCache;
+    IPCClientResourceCache mClientCache;
+    IPCServerResourceCache mServerCache;
 };
 
 TEST_F(IPCRecordingCanvasTest, ClearToRed) {
@@ -272,7 +274,7 @@ TEST_F(IPCRecordingCanvasTest, DrawTextBlob) {
         paint.setColor(SK_ColorDKGRAY);
         SkFont font;
         font.setSize(64);
-        font.setTypeface(mCache.fontManager->matchFamilyStyle("Roboto", SkFontStyle()));
+        font.setTypeface(mServerCache.fontManager->matchFamilyStyle("Roboto", SkFontStyle()));
         auto blob = SkTextBlob::MakeFromString("Skia", font);
         c->drawTextBlob(blob, 50, 100, paint);
     };

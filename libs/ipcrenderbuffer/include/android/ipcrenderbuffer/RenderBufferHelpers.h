@@ -19,12 +19,12 @@
 #include <gui/RenderCommandBufferConsumer.h>
 
 namespace android {
-void renderOpToCanvas(IPCResourceCache* cache, RenderCommandBufferConsumer* consumer,
+void renderOpToCanvas(IPCServerResourceCache* cache, RenderCommandBufferConsumer* consumer,
                       IPCRenderBufferOp* op, SkCanvas* canvas,
                       const std::function<void(int)>& renderProxyCallback);
-bool renderCommandBufferToCanvas(IPCResourceCache* cache, RenderCommandBufferConsumer* consumer,
+bool renderCommandBufferToCanvas(IPCServerResourceCache* cache, RenderCommandBufferConsumer* consumer,
                                  SkCanvas* canvas,
                                  const std::function<void(int)>& renderProxyCallback);
-void resetRenderCommandBufferForReplay(IPCResourceCache* cache,
+void resetRenderCommandBufferForReplay(IPCServerResourceCache* cache,
                                        RenderCommandBufferConsumer* consumer);
 } // namespace android

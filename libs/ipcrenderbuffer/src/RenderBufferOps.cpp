@@ -41,7 +41,7 @@ SkImageInfo fromShmemImageInfo(const ShmemImageInfo& info) {
     return SkImageInfo::Make(info.width, info.height, info.colorType, info.alphaType);
 }
 
-void renderOpToCanvas(IPCResourceCache* cache, RenderCommandBufferConsumer* consumer,
+void renderOpToCanvas(IPCServerResourceCache* cache, RenderCommandBufferConsumer* consumer,
                       IPCRenderBufferOp* op, SkCanvas* canvas,
                       const std::function<void(int)>& renderProxyCallback) {
     switch (op->type) {
@@ -172,12 +172,12 @@ void renderOpToCanvas(IPCResourceCache* cache, RenderCommandBufferConsumer* cons
         }
         case TYPE_DRAWIMAGE: {
             DrawImageOp* co = (DrawImageOp*)op;
-            co->draw(canvas, SkMatrix::I());
+            co->draw(canvas, SkMatrix::I(), *cache);
             break;
         }
         case TYPE_DRAWIMAGERECT: {
             DrawImageRectOp* co = (DrawImageRectOp*)op;
-            co->draw(canvas, SkMatrix::I());
+            co->draw(canvas, SkMatrix::I(), *cache);
             break;
         }
         case TYPE_DRAWTEXTBLOB: {
@@ -273,7 +273,7 @@ bool isDrawingOp(uint32_t type) {
     }
 }
 
-bool renderCommandBufferToCanvas(IPCResourceCache* cache, RenderCommandBufferConsumer* consumer,
+bool renderCommandBufferToCanvas(IPCServerResourceCache* cache, RenderCommandBufferConsumer* consumer,
                                  SkCanvas* canvas,
                                  const std::function<void(int)>& renderProxyCallback) {
     auto buffer = consumer->consumerAcquire();
@@ -316,7 +316,7 @@ bool renderCommandBufferToCanvas(IPCResourceCache* cache, RenderCommandBufferCon
     return true;
 }
 
-void resetRenderCommandBufferForReplay(IPCResourceCache* cache,
+void resetRenderCommandBufferForReplay(IPCServerResourceCache* cache,
                                        RenderCommandBufferConsumer* consumer) {
     auto buffer = consumer->consumerAcquire();
     if (buffer == nullptr) {
@@ -800,25 +800,63 @@ std::string DrawPictureOp::toString() const {
     return "DrawPictureOp";
 }
 
-DrawImageOp* DrawImageOp::Create(RenderCommandBuffer* commandBuffer, const SkImage* image,
-                                 SkScalar x, SkScalar y, const SkSamplingOptions& sampling,
+DrawImageOp* DrawImageOp::Create(RenderCommandBuffer* commandBuffer, uint64_t bitmapId, SkScalar x,
+                                 SkScalar y, const SkSamplingOptions& sampling,
                                  const SkPaint* paint) {
     DrawImageOp* op = commandBuffer->allocAligned<DrawImageOp>();
     OP_REQUIRE(op);
-    IPCRENDERBUFFER_UNIMPLEMENTED;
     op->type = kType;
+    op->bitmapId = bitmapId;
+    op->x = x;
+    op->y = y;
+    op->sampling = sampling;
+    if (paint) {
+        op->paint = toShmemPaint(*paint);
+        op->hasPaint = true;
+    } else {
+        op->hasPaint = false;
+    }
     return op;
 }
 
-void DrawImageOp::draw(SkCanvas* c, const SkMatrix&) {
-    IPCRENDERBUFFER_UNIMPLEMENTED;
+void DrawImageOp::draw(SkCanvas* c, const SkMatrix&, IPCServerResourceCache& resourceCache) {
+    auto it = resourceCache.bitmaps.find(bitmapId);
+    LOG_ALWAYS_FATAL_IF(it == resourceCache.bitmaps.end(), "Bitmap not found in cache");
+    SkPaint p;
+    const SkPaint* paintPtr = hasPaint ? &(p = fromShmemPaint(paint)) : nullptr;
+    c->drawImage(it->second.image, x, y, sampling, paintPtr);
 }
 std::string DrawImageOp::toString() const {
     return "DrawImageOp";
 }
 
-void DrawImageRectOp::draw(SkCanvas* c, const SkMatrix&) {
-    IPCRENDERBUFFER_UNIMPLEMENTED;
+DrawImageRectOp* DrawImageRectOp::Create(RenderCommandBuffer* commandBuffer, uint64_t bitmapId,
+                                         const SkRect& src, const SkRect& dst,
+                                         const SkSamplingOptions& sampling, const SkPaint* paint,
+                                         SkCanvas::SrcRectConstraint constraint) {
+    DrawImageRectOp* op = commandBuffer->allocAligned<DrawImageRectOp>();
+    OP_REQUIRE(op);
+    op->type = kType;
+    op->bitmapId = bitmapId;
+    op->src = src;
+    op->dst = dst;
+    op->sampling = sampling;
+    if (paint) {
+        op->paint = toShmemPaint(*paint);
+        op->hasPaint = true;
+    } else {
+        op->hasPaint = false;
+    }
+    op->constraint = constraint;
+    return op;
+}
+
+void DrawImageRectOp::draw(SkCanvas* c, const SkMatrix&, IPCServerResourceCache& resourceCache) {
+    auto it = resourceCache.bitmaps.find(bitmapId);
+    LOG_ALWAYS_FATAL_IF(it == resourceCache.bitmaps.end(), "Bitmap not found in cache");
+    SkPaint p;
+    const SkPaint* paintPtr = hasPaint ? &(p = fromShmemPaint(paint)) : nullptr;
+    c->drawImageRect(it->second.image, src, dst, sampling, paintPtr, constraint);
 }
 std::string DrawImageRectOp::toString() const {
     return "DrawImageRectOp";
