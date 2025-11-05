@@ -363,16 +363,6 @@ flag {
 } # stop_layer
 
 flag {
-    name: "supported_refresh_rate_update"
-    namespace: "core_graphics"
-    description: "Update the supported refresh rate list"
-    bug: "431061528"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-} # supported_refresh_rate_update
-
-flag {
   name: "synced_resolution_switch"
   namespace: "core_graphics"
   description: "Synchronize resolution modeset with framebuffer resizing"
