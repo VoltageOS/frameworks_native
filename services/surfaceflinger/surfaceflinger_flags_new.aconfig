@@ -326,17 +326,6 @@ flag {
 } # set_client_drawn_corner_radii
 
 flag {
-  name: "sf_disable_producer_throttling_for_client_composition"
-  namespace: "core_graphics"
-  description: "Disable producer throttling for client composition"
-  bug: "454707399"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
-} # sf_disable_producer_throttling_for_client_composition
-
-
-flag {
   name: "shader_disk_cache"
   namespace: "core_graphics"
   description: "Enable shader disk cache for RenderEngine"

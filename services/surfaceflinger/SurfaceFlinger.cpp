@@ -4380,10 +4380,7 @@ void SurfaceFlinger::processDisplayAdded(const wp<IBinder>& displayToken,
             displaySurface = frameBufferSurface;
             compositionSurface = frameBufferSurface->getSurface();
         }
-
-        if (FlagManager::getInstance().sf_disable_producer_throttling_for_client_composition()) {
-            compositionSurface->setProducerThrottlingEnabled(false);
-        }
+        compositionSurface->setProducerThrottlingEnabled(false);
     }
 
     LOG_FATAL_IF(!displaySurface);
