@@ -628,7 +628,7 @@ public:
     static constexpr char kFrameTimelineDataSource[] = "android.surfaceflinger.frametimeline";
 
     static constexpr Fps kThresholdFpsForAnimation = 20_Hz;
-    static constexpr float kDeltaFramesRatioThreshold = 0.33f;
+    static constexpr float kDeltaFramesRatioThreshold = 0.30f;
 
 private:
     // Friend class for testing
