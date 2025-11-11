@@ -33,6 +33,8 @@
 #include <gui/DisplayLuts.h>
 #include <gui/IGraphicBufferProducer.h>
 #include <gui/ITransactionCompletedListener.h>
+#include <gui/RenderCommandBufferConsumer.h>
+#include <gui/RenderCommandBufferProducer.h>
 #include <gui/view/Surface.h>
 #include <math/mat4.h>
 
@@ -260,6 +262,7 @@ struct layer_state_t {
         eStopLayerChanged = 0x1000000'00000000,
         eBackgroundBlurScaleChanged = 0x2000000'00000000,
         eSystemContentPriorityChanged = 0x4000000'00000000,
+        eRenderCommandBufferChanged = 0x8000000'00000000,
     };
 
     layer_state_t();
@@ -511,6 +514,9 @@ struct layer_state_t {
     std::shared_ptr<gui::BufferReleaseChannel::ProducerEndpoint> bufferReleaseChannel;
 
     std::shared_ptr<gui::DisplayLuts> luts;
+
+    std::shared_ptr<RenderCommandBufferProducer> renderCommandBufferProducer;
+    std::shared_ptr<RenderCommandBufferConsumer> renderCommandBufferConsumer;
 
 protected:
     struct NotDefaultComparableState {

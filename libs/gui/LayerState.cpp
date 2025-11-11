@@ -247,6 +247,14 @@ status_t layer_state_t::write(Parcel& output) const
     }
 
     SAFE_PARCEL(output.writeInt32, systemContentPriority);
+
+    if (com_android_graphics_libgui_flags_out_of_process_rendering()) {
+        const bool hasRenderCommandBufferProducer = (renderCommandBufferProducer != nullptr);
+        SAFE_PARCEL(output.writeBool, hasRenderCommandBufferProducer);
+        if (hasRenderCommandBufferProducer) {
+            renderCommandBufferProducer->writeToParcel(&output);
+        }
+    }
     return NO_ERROR;
 }
 
@@ -433,6 +441,15 @@ status_t layer_state_t::read(const Parcel& input)
     }
 
     SAFE_PARCEL(input.readInt32, &systemContentPriority);
+
+    if (com_android_graphics_libgui_flags_out_of_process_rendering()) {
+        bool hasRenderCommandBufferProducer;
+        SAFE_PARCEL(input.readBool, &hasRenderCommandBufferProducer);
+        if (hasRenderCommandBufferProducer) {
+            renderCommandBufferConsumer = std::make_shared<RenderCommandBufferConsumer>();
+            RenderCommandBufferConsumer::readFromParcel(input, renderCommandBufferConsumer.get());
+        }
+    }
     return NO_ERROR;
 }
 
@@ -602,6 +619,14 @@ void layer_state_t::sanitize(int32_t permissions) {
                                "layer_state_t::sanitize",
                                permissions & Permission::ACCESS_SURFACE_FLINGER)) {
             what &= ~eFrameRateChanged; // logged in ValidateFrameRate
+        }
+    }
+    if (com_android_graphics_libgui_flags_out_of_process_rendering()) {
+        if (what & eRenderCommandBufferChanged) {
+            if (!(permissions & layer_state_t::Permission::ACCESS_SURFACE_FLINGER)) {
+                what &= eRenderCommandBufferChanged;
+                ALOGE("Stripped attempt to set eRenderCommandBufferChanged in sanitize");
+            }
         }
     }
 }
@@ -853,6 +878,13 @@ void layer_state_t::merge(const layer_state_t& other) {
         what |= eSystemContentPriorityChanged;
         systemContentPriority = other.systemContentPriority;
     }
+    if (com_android_graphics_libgui_flags_out_of_process_rendering()) {
+        if (other.what & eRenderCommandBufferChanged) {
+            what |= eRenderCommandBufferChanged;
+            renderCommandBufferProducer = other.renderCommandBufferProducer;
+            renderCommandBufferConsumer = other.renderCommandBufferConsumer;
+        }
+    }
     if ((other.what & what) != other.what) {
         ALOGE("Unmerged SurfaceComposer Transaction properties. LayerState::merge needs updating? "
               "other.what=0x%" PRIX64 " what=0x%" PRIX64 " unmerged flags=0x%" PRIX64,
@@ -945,6 +977,9 @@ uint64_t layer_state_t::diff(const layer_state_t& other) const {
     CHECK_DIFF(diff, eAppContentPriorityChanged, other, appContentPriority);
     CHECK_DIFF(diff, eSystemContentPriorityChanged, other, systemContentPriority);
     if (other.what & eStopLayerChanged) diff |= eStopLayerChanged;
+    if (com_android_graphics_libgui_flags_out_of_process_rendering()) {
+        if (other.what & eRenderCommandBufferChanged) diff |= eRenderCommandBufferChanged;
+    }
 
     return diff;
 }
