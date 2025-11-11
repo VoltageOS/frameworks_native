@@ -263,6 +263,7 @@ struct layer_state_t {
         eBackgroundBlurScaleChanged = 0x2000000'00000000,
         eSystemContentPriorityChanged = 0x4000000'00000000,
         eRenderCommandBufferChanged = 0x8000000'00000000,
+        eRenderCommandBufferFrameIdChanged = 0x10000000'00000000,
     };
 
     layer_state_t();
@@ -292,7 +293,9 @@ struct layer_state_t {
     static constexpr uint64_t BUFFER_CHANGES = layer_state_t::eApiChanged |
             layer_state_t::eBufferChanged | layer_state_t::eBufferCropChanged |
             layer_state_t::eBufferTransformChanged | layer_state_t::eDataspaceChanged |
-            layer_state_t::eSidebandStreamChanged | layer_state_t::eSurfaceDamageRegionChanged |
+            layer_state_t::eRenderCommandBufferFrameIdChanged |
+            layer_state_t::eRenderCommandBufferChanged | layer_state_t::eSidebandStreamChanged |
+            layer_state_t::eSurfaceDamageRegionChanged |
             layer_state_t::eTransformToDisplayInverseChanged |
             layer_state_t::eTransparentRegionChanged |
             layer_state_t::eExtendedRangeBrightnessChanged |
@@ -309,7 +312,9 @@ struct layer_state_t {
             layer_state_t::eHdrMetadataChanged | layer_state_t::eShadowRadiusChanged |
             layer_state_t::eStretchChanged | layer_state_t::ePictureProfileHandleChanged |
             layer_state_t::eAppContentPriorityChanged | layer_state_t::eBorderSettingsChanged |
-            layer_state_t::eBoxShadowSettingsChanged;
+            layer_state_t::eBoxShadowSettingsChanged |
+            layer_state_t::eRenderCommandBufferFrameIdChanged |
+            layer_state_t::eRenderCommandBufferChanged;
 
     // Changes which invalidates the layer's visible region in CE.
     static constexpr uint64_t CONTENT_DIRTY = layer_state_t::CONTENT_CHANGES |
@@ -517,6 +522,7 @@ struct layer_state_t {
 
     std::shared_ptr<RenderCommandBufferProducer> renderCommandBufferProducer;
     std::shared_ptr<RenderCommandBufferConsumer> renderCommandBufferConsumer;
+    uint64_t renderCommandBufferFrameId;
 
 protected:
     struct NotDefaultComparableState {
