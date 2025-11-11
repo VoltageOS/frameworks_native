@@ -655,7 +655,7 @@ TEST_F(FrameTimelineTest, presentFenceSignaled_reportsLongSfCpu) {
 
     auto jankData = getLayerOneJankData();
     EXPECT_EQ(jankData.size(), 1u);
-    EXPECT_EQ(jankData[0].jankType, JankType::SurfaceFlingerCpuDeadlineMissed);
+    EXPECT_EQ(jankData[0].jankTypeLegacy, JankType::SurfaceFlingerCpuDeadlineMissed);
     EXPECT_EQ(jankData[0].presentDelayNs, 10);
 }
 
@@ -690,7 +690,7 @@ TEST_F(FrameTimelineTest, presentFenceSignaled_reportsLongSfGpu) {
 
     auto jankData = getLayerOneJankData();
     EXPECT_EQ(jankData.size(), 1u);
-    EXPECT_EQ(jankData[0].jankType, JankType::SurfaceFlingerGpuDeadlineMissed);
+    EXPECT_EQ(jankData[0].jankTypeLegacy, JankType::SurfaceFlingerGpuDeadlineMissed);
     EXPECT_EQ(jankData[0].presentDelayNs, 10);
 }
 
@@ -723,7 +723,7 @@ TEST_F(FrameTimelineTest, presentFenceSignaled_reportsDisplayMiss) {
 
     auto jankData = getLayerOneJankData();
     EXPECT_EQ(jankData.size(), 1u);
-    EXPECT_EQ(jankData[0].jankType, JankType::DisplayHAL);
+    EXPECT_EQ(jankData[0].jankTypeLegacy, JankType::DisplayHAL);
     EXPECT_EQ(jankData[0].presentDelayNs, 30);
 }
 
@@ -758,7 +758,7 @@ TEST_F(FrameTimelineTest, presentFenceSignaled_reportsAppMiss) {
 
     auto jankData = getLayerOneJankData();
     EXPECT_EQ(jankData.size(), 1u);
-    EXPECT_EQ(jankData[0].jankType, JankType::AppDeadlineMissed);
+    EXPECT_EQ(jankData[0].jankTypeLegacy, JankType::AppDeadlineMissed);
     EXPECT_EQ(jankData[0].presentDelayNs, 30);
 }
 
@@ -793,7 +793,7 @@ TEST_F(FrameTimelineTest, presentFenceSignaled_reportsSfScheduling) {
 
     auto jankData = getLayerOneJankData();
     EXPECT_EQ(jankData.size(), 1u);
-    EXPECT_EQ(jankData[0].jankType, JankType::SurfaceFlingerScheduling);
+    EXPECT_EQ(jankData[0].jankTypeLegacy, JankType::SurfaceFlingerScheduling);
     EXPECT_EQ(jankData[0].presentDelayNs, -32);
 }
 
@@ -828,7 +828,7 @@ TEST_F(FrameTimelineTest, presentFenceSignaled_reportsSfPredictionError) {
 
     auto jankData = getLayerOneJankData();
     EXPECT_EQ(jankData.size(), 1u);
-    EXPECT_EQ(jankData[0].jankType, JankType::PredictionError);
+    EXPECT_EQ(jankData[0].jankTypeLegacy, JankType::PredictionError);
     EXPECT_EQ(jankData[0].presentDelayNs, 5);
 }
 
@@ -870,7 +870,7 @@ TEST_F(FrameTimelineTest, presentFenceSignaled_reportsAppBufferStuffing) {
 
     auto jankData = getLayerOneJankData();
     EXPECT_EQ(jankData.size(), 1u);
-    EXPECT_EQ(jankData[0].jankType, JankType::BufferStuffing);
+    EXPECT_EQ(jankData[0].jankTypeLegacy, JankType::BufferStuffing);
 }
 
 TEST_F(FrameTimelineTest, presentFenceSignaled_reportsSFJankIfStartedLate) {
@@ -905,7 +905,7 @@ TEST_F(FrameTimelineTest, presentFenceSignaled_reportsSFJankIfStartedLate) {
 
     auto jankData = getLayerOneJankData();
     EXPECT_EQ(jankData.size(), 1u);
-    EXPECT_EQ(jankData[0].jankType, JankType::SurfaceFlingerScheduling);
+    EXPECT_EQ(jankData[0].jankTypeLegacy, JankType::SurfaceFlingerScheduling);
     EXPECT_EQ(jankData[0].presentDelayNs, 32);
 }
 
@@ -942,7 +942,7 @@ TEST_F(FrameTimelineTest, presentFenceSignaled_reportsAppMissWithRenderRate) {
 
     auto jankData = getLayerOneJankData();
     EXPECT_EQ(jankData.size(), 1u);
-    EXPECT_EQ(jankData[0].jankType, JankType::AppDeadlineMissed);
+    EXPECT_EQ(jankData[0].jankTypeLegacy, JankType::AppDeadlineMissed);
     EXPECT_EQ(jankData[0].presentDelayNs, 30);
 }
 
@@ -991,7 +991,7 @@ TEST_F(FrameTimelineTest, presentFenceSignaled_displayFramePredictionExpiredPres
 
     auto jankData = getLayerOneJankData();
     EXPECT_EQ(jankData.size(), 1u);
-    EXPECT_EQ(jankData[0].jankType, JankType::Unknown | JankType::AppDeadlineMissed);
+    EXPECT_EQ(jankData[0].jankTypeLegacy, JankType::Unknown | JankType::AppDeadlineMissed);
     EXPECT_EQ(jankData[0].presentDelayNs, 30);
 }
 
@@ -1924,7 +1924,7 @@ TEST_F(FrameTimelineTest, jankClassification_presentOnTimeDoesNotClassify) {
 
     auto jankData = getLayerOneJankData();
     EXPECT_EQ(jankData.size(), 1u);
-    EXPECT_EQ(jankData[0].jankType, JankType::None);
+    EXPECT_EQ(jankData[0].jankTypeLegacy, JankType::None);
 }
 
 TEST_F(FrameTimelineTest, jankClassification_displayFrameOnTimeFinishEarlyPresent) {
