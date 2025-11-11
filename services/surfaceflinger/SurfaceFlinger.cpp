@@ -1699,7 +1699,12 @@ void SurfaceFlinger::initiateDisplayModeChanges() {
         // TODO: b/142753666 - Use constraints.
         hal::VsyncPeriodChangeConstraints constraints;
         constraints.desiredTimeNanos = systemTime();
-        constraints.seamlessRequired = false;
+        if (!getHwComposer().getComposer()->isDisplayCommandModesetSupported()) {
+            // setActiveConfig doesn't properly support seamless requirement.
+            constraints.seamlessRequired = false;
+        } else {
+            constraints.seamlessRequired = desiredMode.seamless;
+        }
         hal::VsyncPeriodChangeTimeline outTimeline;
 
         // When initiating a resolution change, wait until the commit that resizes the display.
@@ -8742,7 +8747,7 @@ status_t SurfaceFlinger::applyRefreshRateSelectorPolicy(
     }
 
     if (mScheduler->updateFrameRateOverrides(scheduler::GlobalSignals{}, preferredFps)) {
-        setDesiredMode({preferredMode, .emitEvent = false});
+        setDesiredMode({preferredMode, .emitEvent = false, .seamless = true});
         // Update the frameRateOverride and display mode change.
         mScheduler->onDisplayModeAndFrameRateOverridesChanged(displayId, preferredMode,
                                                               /*clearContentRequirements*/ false);
