@@ -579,6 +579,15 @@ void LayerSnapshot::merge(const RequestedLayerState& requested, bool forceUpdate
     if (forceUpdate || requested.what & layer_state_t::eRenderCommandBufferChanged) {
         renderCommandBufferConsumer = requested.renderCommandBufferConsumer;
     }
+    if (forceUpdate || requested.what & layer_state_t::eRenderCommandBufferFrameIdChanged) {
+        renderCommandBufferFrameId = requested.renderCommandBufferFrameId;
+        // TODO(b/459526480): We should implement the barrier logic here and only
+        // acquire the target frame.
+        if (renderCommandBufferConsumer != nullptr) {
+            renderCommandBufferConsumer->consumerAcquire();
+        }
+    }
+
     forceClientComposition = (renderCommandBufferConsumer != nullptr);
 }
 

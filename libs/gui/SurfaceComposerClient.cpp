@@ -2512,6 +2512,19 @@ SurfaceComposerClient::Transaction& SurfaceComposerClient::Transaction::setRende
     return *this;
 }
 
+SurfaceComposerClient::Transaction&
+SurfaceComposerClient::Transaction::setRenderCommandBufferFrameId(const sp<SurfaceControl>& sc,
+                                                                  uint64_t frameId) {
+    layer_state_t* s = getLayerState(sc);
+    if (!s) {
+        mStatus = BAD_INDEX;
+        return *this;
+    }
+    s->what |= layer_state_t::eRenderCommandBufferFrameIdChanged;
+    s->renderCommandBufferFrameId = frameId;
+    return *this;
+}
+
 // ---------------------------------------------------------------------------
 
 SurfaceComposerClient::SurfaceComposerClient() : mStatus(NO_INIT) {}

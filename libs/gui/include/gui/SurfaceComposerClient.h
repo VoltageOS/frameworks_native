@@ -836,6 +836,24 @@ public:
                 const sp<SurfaceControl>& sc,
                 const std::shared_ptr<RenderCommandBufferProducer>& producer);
 
+        /**
+         * Advance the frameId of the RenderCommandBuffer consumer. SurfaceFlinger
+         * will not acquire a RenderCommandBuffer with frameId < the last buffer
+         * applied here, and so this allows for a barrier mechanism.
+         *
+         * More importantly it provides a way to wake up and poke SurfaceFlinger
+         * as otherwise no work would happen at all with the RenderCommandBuffer
+         * path. It would be nice to have a way to advance the frameId continuously
+         * when we know an animation is happening.
+         *
+         * The frame barrier stuff is currently unimplemented and at the moment
+         * this functions just to poke SurfaceFlinger.
+         *
+         * TODO(b/459526480): Finish sync support.
+         * TODO(b/459526115): Enable transaction bypass
+         */
+        Transaction& setRenderCommandBufferFrameId(const sp<SurfaceControl>& sc, uint64_t frameId);
+
         status_t setDisplaySurface(const sp<IBinder>& token,
                 const sp<IGraphicBufferProducer>& bufferProducer);
 
