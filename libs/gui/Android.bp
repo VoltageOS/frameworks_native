@@ -365,7 +365,6 @@ cc_defaults {
         "-cert-dcl50-cpp",
         "-cert-int09-c",
         "-cert-oop54-cpp",
-        "-clang-analyzer-core.CallAndMessage",
         "-clang-analyzer-cplusplus.Move",
         "-clang-analyzer-cplusplus.NewDeleteLeaks",
         "-clang-analyzer-deadcode.DeadStores",
