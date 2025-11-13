@@ -1303,17 +1303,7 @@ void SurfaceFlinger::getDynamicDisplayInfoInternal(ui::DynamicDisplayInfo*& info
     const auto [normal, high] = display->refreshRateSelector().getFrameRateCategoryRates();
     ui::FrameRateCategoryRate frameRateCategoryRate(normal.getValue(), high.getValue());
     info->frameRateCategoryRate = frameRateCategoryRate;
-    if (info->hasArrSupport || FlagManager::getInstance().supported_refresh_rate_update()) {
-        info->supportedRefreshRates = display->refreshRateSelector().getSupportedFrameRates();
-    } else {
-        // On non-ARR devices, list the refresh rates same as the supported display modes.
-        std::vector<float> supportedFrameRates;
-        supportedFrameRates.reserve(info->supportedDisplayModes.size());
-        std::transform(info->supportedDisplayModes.begin(), info->supportedDisplayModes.end(),
-                       std::back_inserter(supportedFrameRates),
-                       [](ui::DisplayMode mode) { return mode.peakRefreshRate; });
-        info->supportedRefreshRates = supportedFrameRates;
-    }
+    info->supportedRefreshRates = display->refreshRateSelector().getSupportedFrameRates();
     info->activeColorMode = display->getCompositionDisplay()->getState().colorMode;
     info->hdrCapabilities = filterOut4k30(display->getHdrCapabilities());
 
