@@ -53,6 +53,7 @@ RequestedLayerState::RequestedLayerState(const LayerCreationArgs& args)
         layerCreationFlags(args.flags),
         ownerUid(args.ownerUid),
         ownerPid(args.ownerPid),
+        ownerPermissions(args.ownerPermissions),
         parentId(args.parentId),
         layerIdToMirror(args.layerIdToMirror),
         stopLayerId(args.stopLayerId),

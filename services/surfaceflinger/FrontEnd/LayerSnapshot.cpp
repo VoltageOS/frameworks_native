@@ -128,6 +128,7 @@ LayerSnapshot::LayerSnapshot(const RequestedLayerState& state,
     inputInfo.ownerPid = gui::Pid{state.ownerPid};
     uid = state.ownerUid;
     pid = state.ownerPid;
+    permissions = state.ownerPermissions;
     changes = RequestedLayerState::Changes::Created;
     clientChanges = 0;
     mirrorRootPath =

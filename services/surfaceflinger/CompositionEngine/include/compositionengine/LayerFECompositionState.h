@@ -249,6 +249,8 @@ struct LayerFECompositionState {
 
     std::shared_ptr<gui::DisplayLuts> luts;
 
+    uint64_t permissions = 0;
+
     virtual ~LayerFECompositionState();
 
     // Debugging
