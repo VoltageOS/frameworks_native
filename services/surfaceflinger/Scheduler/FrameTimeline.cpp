@@ -1813,16 +1813,19 @@ void FrameTimeline::DisplayFrame::traceActuals(pid_t surfaceFlingerPid, nsecs_t 
 nsecs_t FrameTimeline::DisplayFrame::trace(pid_t surfaceFlingerPid, nsecs_t monoBootOffset,
                                            nsecs_t previousPredictionPresentTime,
                                            bool filterFramesBeforeTraceStarts) const {
+    const auto result = (mPredictionState == PredictionState::Valid)
+            ? mSurfaceFlingerPredictions.presentTime
+            : previousPredictionPresentTime;
     if (mSurfaceFrames.empty()) {
         // We don't want to trace display frames without any surface frames updates as this cannot
         // be janky
-        return previousPredictionPresentTime;
+        return result;
     }
 
     if (mToken == FrameTimelineInfo::INVALID_VSYNC_ID) {
         // DisplayFrame should not have an invalid token.
         ALOGE("Cannot trace DisplayFrame with invalid token");
-        return previousPredictionPresentTime;
+        return result;
     }
 
     if (mPredictionState == PredictionState::Valid) {
@@ -1838,7 +1841,7 @@ nsecs_t FrameTimeline::DisplayFrame::trace(pid_t surfaceFlingerPid, nsecs_t mono
 
     addSkippedFrame(surfaceFlingerPid, monoBootOffset, previousPredictionPresentTime,
                     filterFramesBeforeTraceStarts);
-    return mSurfaceFlingerPredictions.presentTime;
+    return result;
 }
 
 float FrameTimeline::computeFps(const std::unordered_set<int32_t>& layerIds) {
