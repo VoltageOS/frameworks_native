@@ -29,6 +29,7 @@
 #include "FakeInputReaderPolicy.h"
 #include "InstrumentedInputReader.h"
 #include "NotifyArgs.h"
+#include "ScopedFlagOverride.h"
 #include "TestConstants.h"
 #include "TestEventMatchers.h"
 #include "TestInputListener.h"
@@ -1710,6 +1711,8 @@ class GestureConverterConsistencyTest
       : public UncapturedGestureConverterTest,
         public testing::WithParamInterface<std::tuple<Gesture, Gesture, Gesture>> {
 protected:
+    FIXTURE_FLAG_OVERRIDE(enable_button_state_verification, true);
+
     GestureConverterConsistencyTest()
           : UncapturedGestureConverterTest(),
             mParamStartGesture(std::get<0>(GetParam())),
@@ -1718,7 +1721,6 @@ protected:
             mDeviceContext(*mDevice, EVENTHUB_ID),
             mConverter(*mReader->getContext(), mDeviceContext, DEVICE_ID) {
         mConverter.setDisplayId(ui::LogicalDisplayId::DEFAULT);
-        input_flags::enable_button_state_verification(true);
         mVerifier = std::make_unique<InputVerifier>("Test verifier");
     }
 
