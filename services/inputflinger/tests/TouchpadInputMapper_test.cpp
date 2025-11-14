@@ -153,12 +153,39 @@ protected:
         assertAccelCurvePropEquals("Scroll Accel Curve", expectedSegments);
     }
 
-    void assertBothCurvesFlatWithGain(float gain) {
-        assertBothCurvesEqual(
-                {AccelerationCurveSegment{.maxPointerSpeedMmPerS =
-                                                  std::numeric_limits<double>::infinity(),
-                                          .baseGain = gain,
-                                          .reciprocal = 0}});
+    void assertRelativeModeCurvesInUse() {
+        auto* touchpadMapper = static_cast<TouchpadInputMapper*>(mMapper.get());
+
+        // The pointer curve should be flat (i.e. a single segment with infinite maximum speed).
+        const auto pointerCurveProp =
+                touchpadMapper->getGesturePropertyForTesting("Pointer Accel Curve");
+        ASSERT_TRUE(pointerCurveProp.has_value());
+
+        std::vector<double> pointerCurveValues = pointerCurveProp.value().getRealValues();
+        ASSERT_TRUE(std::isinf(pointerCurveValues[0]));
+        ASSERT_NEAR(pointerCurveValues[1], 0, EPSILON);
+        // What exact gain it has is an implementation detail subject to change, so we don't want to
+        // assert an exact value.
+        double pointerCurveGain = pointerCurveValues[2];
+        ASSERT_GT(pointerCurveGain, 0);
+        ASSERT_NEAR(pointerCurveValues[3], 0, EPSILON);
+
+        // The scroll curve should also be flat.
+        const auto scrollCurveProp =
+                touchpadMapper->getGesturePropertyForTesting("Scroll Accel Curve");
+        ASSERT_TRUE(scrollCurveProp.has_value());
+
+        std::vector<double> scrollCurveValues = scrollCurveProp.value().getRealValues();
+        ASSERT_TRUE(std::isinf(scrollCurveValues[0]));
+        ASSERT_NEAR(scrollCurveValues[1], 0, EPSILON);
+        // Again, we don't want to specify the exact gain, but it should be positive and smaller
+        // than the pointer curve's gain (since a scroll wheel tick is a much larger movement than a
+        // single-pixel move on a mouse, so the scroll numbers reported in relative mode should be
+        // much smaller than the cursor movement numbers for the same physical distance moved).
+        double scrollCurveGain = scrollCurveValues[2];
+        ASSERT_GT(scrollCurveGain, 0);
+        ASSERT_LT(scrollCurveGain, pointerCurveGain);
+        ASSERT_NEAR(scrollCurveValues[3], 0, EPSILON);
     }
 };
 
@@ -296,7 +323,7 @@ TEST_F(TouchpadInputMapperTest, AccelerationDisabledDuringCapture) {
     std::list<NotifyArgs> args =
             mMapper->reconfigure(ARBITRARY_TIME, mReaderConfiguration,
                                  InputReaderConfiguration::Change::POINTER_CAPTURE);
-    ASSERT_NO_FATAL_FAILURE(assertBothCurvesFlatWithGain(25.4 / 133));
+    ASSERT_NO_FATAL_FAILURE(assertRelativeModeCurvesInUse());
 
     mReaderConfiguration.pointerCaptureRequest.mode = PointerCaptureMode::UNCAPTURED;
     args = mMapper->reconfigure(ARBITRARY_TIME, mReaderConfiguration,
@@ -315,7 +342,7 @@ TEST_F(TouchpadInputMapperTest, ExitingCaptureWithAccelerationDisabledDoesntReen
     mReaderConfiguration.pointerCaptureRequest.mode = PointerCaptureMode::RELATIVE;
     args = mMapper->reconfigure(ARBITRARY_TIME, mReaderConfiguration,
                                 InputReaderConfiguration::Change::POINTER_CAPTURE);
-    ASSERT_NO_FATAL_FAILURE(assertBothCurvesFlatWithGain(25.4 / 133));
+    ASSERT_NO_FATAL_FAILURE(assertRelativeModeCurvesInUse());
 
     mReaderConfiguration.pointerCaptureRequest.mode = PointerCaptureMode::UNCAPTURED;
     args = mMapper->reconfigure(ARBITRARY_TIME, mReaderConfiguration,
@@ -333,7 +360,7 @@ TEST_F(TouchpadInputMapperTest, ChangingSettingsDuringCaptureDoesntReenableAccel
     std::list<NotifyArgs> args =
             mMapper->reconfigure(ARBITRARY_TIME, mReaderConfiguration,
                                  InputReaderConfiguration::Change::POINTER_CAPTURE);
-    ASSERT_NO_FATAL_FAILURE(assertBothCurvesFlatWithGain(25.4 / 133));
+    ASSERT_NO_FATAL_FAILURE(assertRelativeModeCurvesInUse());
 
     // Changing the pointer speed settings shouldn't result in an immediate change to the curve,
     // since we're in pointer capture.
@@ -341,7 +368,7 @@ TEST_F(TouchpadInputMapperTest, ChangingSettingsDuringCaptureDoesntReenableAccel
     mReaderConfiguration.touchpadPointerSpeed = NEW_POINTER_SPEED;
     args = mMapper->reconfigure(ARBITRARY_TIME, mReaderConfiguration,
                                 InputReaderConfiguration::Change::TOUCHPAD_SETTINGS);
-    ASSERT_NO_FATAL_FAILURE(assertBothCurvesFlatWithGain(25.4 / 133));
+    ASSERT_NO_FATAL_FAILURE(assertRelativeModeCurvesInUse());
 
     // ...but once we leave capture, the new speed should take effect.
     mReaderConfiguration.pointerCaptureRequest.mode = PointerCaptureMode::UNCAPTURED;
