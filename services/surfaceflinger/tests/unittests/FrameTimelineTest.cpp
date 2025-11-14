@@ -103,7 +103,20 @@ public:
         JankTracker::clearAndStartCollectingAllJankDataForTesting();
     }
 
-    void TearDown() override { JankTracker::clearAndStopCollectingAllJankDataForTesting(); }
+    void TearDown() override {
+        const ::testing::TestInfo* const test_info =
+                ::testing::UnitTest::GetInstance()->current_test_info();
+
+        // Dump FrameTimeline frames for easy debugging
+        if (test_info->result()->Failed()) {
+            const auto state = mFrameTimeline->dumpStateForTesting();
+            std::cout << std::endl
+                      << "**** FrameTimeline state: ****" << std::endl
+                      << state << std::endl;
+        }
+
+        JankTracker::clearAndStopCollectingAllJankDataForTesting();
+    }
 
     // Each tracing session can be used for a single block of Start -> Stop.
     static std::unique_ptr<perfetto::TracingSession> getTracingSessionForTest() {
