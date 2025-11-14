@@ -2867,11 +2867,10 @@ status_t SurfaceComposerClient::getActiveDisplayMode(const sp<IBinder>& display,
     return NAME_NOT_FOUND;
 }
 
-status_t SurfaceComposerClient::setDesiredDisplayModeSpecs(const sp<IBinder>& displayToken,
-                                                           const gui::DisplayModeSpecs& specs) {
+status_t SurfaceComposerClient::setDesiredDisplayModeSpecs(
+        const std::vector<gui::DisplayModeSpecs>& specs) {
     binder::Status status =
-            ComposerServiceAIDL::getComposerService()->setDesiredDisplayModeSpecs(displayToken,
-                                                                                  specs);
+            ComposerServiceAIDL::getComposerService()->setDesiredDisplayModeSpecs(specs);
     return statusTFromBinderStatus(status);
 }
 

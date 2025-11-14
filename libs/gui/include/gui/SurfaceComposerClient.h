@@ -177,10 +177,9 @@ public:
     // TODO(b/180391891): Update clients to use getDynamicDisplayInfo and remove this function.
     static status_t getActiveDisplayMode(const sp<IBinder>& display, ui::DisplayMode*);
 
-    // Sets the refresh rate boundaries for the display.
-    static status_t setDesiredDisplayModeSpecs(const sp<IBinder>& displayToken,
-                                               const gui::DisplayModeSpecs&);
-    // Gets the refresh rate boundaries for the display.
+    // Sets the mode specifications for multiple displays, to be applied atomically.
+    static status_t setDesiredDisplayModeSpecs(const std::vector<gui::DisplayModeSpecs>&);
+    // Gets the mode specifications for the display.
     static status_t getDesiredDisplayModeSpecs(const sp<IBinder>& displayToken,
                                                gui::DisplayModeSpecs*);
 
@@ -756,6 +755,10 @@ public:
         // Queues up transactions using this token in SurfaceFlinger.  By default, all transactions
         // from a client are placed on the same queue. This can be used to prevent multiple
         // transactions from blocking each other.
+        //
+        // For display transactions, if the client requests DesiredDisplayModeSpecs with the same
+        // apply token prior to applying the transaction, then the modeset will be deferred until
+        // the transaction is committed.
         Transaction& setApplyToken(const sp<IBinder>& token);
 
         /**

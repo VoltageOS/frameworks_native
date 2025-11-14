@@ -597,10 +597,6 @@ struct DisplayState {
     Rect layerStackSpaceRect = Rect::EMPTY_RECT;
     Rect orientedDisplaySpaceRect = Rect::EMPTY_RECT;
 
-    // For physical displays, this is the resolution, which must match the active display mode. To
-    // change the resolution, the client must first call SurfaceControl.setDesiredDisplayModeSpecs
-    // with the new DesiredDisplayModeSpecs#defaultMode, then commit the matching width and height.
-    //
     // For virtual displays, this is an optional resolution that overrides its default dimensions.
     //
     uint32_t width = 0;
