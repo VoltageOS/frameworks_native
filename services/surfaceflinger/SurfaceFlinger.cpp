@@ -7194,7 +7194,8 @@ status_t SurfaceFlinger::onTransact(uint32_t code, const Parcel& data, Parcel* r
                 Mutex::Autolock _l(mStateLock);
                 // daltonize
                 mDaltonizer.setUseUpdatedAlgorithm(
-                        FlagManager::getInstance().enable_color_correction_bugfix());
+                        FlagManager::getInstance().enable_color_correction_bugfix() ||
+                        FlagManager::getInstance().enable_color_correction_desktop_bugfix());
                 n = data.readInt32();
                 // frameworks/native/services/surfaceflinger/common/include/common/FlagManager.h
                 // to get which type of cc to use.
