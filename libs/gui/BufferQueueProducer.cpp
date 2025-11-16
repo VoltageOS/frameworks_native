@@ -944,6 +944,9 @@ status_t BufferQueueProducer::attachBuffer(int* outSlot,
     mSlots[*outSlot].mRequestBufferCalled = true;
     mSlots[*outSlot].mAcquireCalled = false;
     mSlots[*outSlot].mNeedsReallocation = false;
+#if COM_ANDROID_GRAPHICS_LIBGUI_FLAGS(BQ_EXTENDEDALLOCATE)
+    mSlots[*outSlot].mAdditionalOptionsGenerationId = mCore->mAdditionalOptionsGenerationId;
+#endif
     mCore->mActiveBuffers.insert(found);
     VALIDATE_CONSISTENCY();
 
