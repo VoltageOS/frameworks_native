@@ -917,8 +917,6 @@ renderengine::RenderEngine::BlurAlgorithm chooseBlurAlgorithm(bool supportsBlur)
         return renderengine::RenderEngine::BlurAlgorithm::Gaussian;
     } else if (algorithm == "kawase") {
         return renderengine::RenderEngine::BlurAlgorithm::Kawase;
-    } else if (algorithm == "kawase2") {
-        return renderengine::RenderEngine::BlurAlgorithm::KawaseDualFilter;
     } else {
         return renderengine::RenderEngine::BlurAlgorithm::KawaseDualFilterV2;
     }
@@ -1305,17 +1303,7 @@ void SurfaceFlinger::getDynamicDisplayInfoInternal(ui::DynamicDisplayInfo*& info
     const auto [normal, high] = display->refreshRateSelector().getFrameRateCategoryRates();
     ui::FrameRateCategoryRate frameRateCategoryRate(normal.getValue(), high.getValue());
     info->frameRateCategoryRate = frameRateCategoryRate;
-    if (info->hasArrSupport || FlagManager::getInstance().supported_refresh_rate_update()) {
-        info->supportedRefreshRates = display->refreshRateSelector().getSupportedFrameRates();
-    } else {
-        // On non-ARR devices, list the refresh rates same as the supported display modes.
-        std::vector<float> supportedFrameRates;
-        supportedFrameRates.reserve(info->supportedDisplayModes.size());
-        std::transform(info->supportedDisplayModes.begin(), info->supportedDisplayModes.end(),
-                       std::back_inserter(supportedFrameRates),
-                       [](ui::DisplayMode mode) { return mode.peakRefreshRate; });
-        info->supportedRefreshRates = supportedFrameRates;
-    }
+    info->supportedRefreshRates = display->refreshRateSelector().getSupportedFrameRates();
     info->activeColorMode = display->getCompositionDisplay()->getState().colorMode;
     info->hdrCapabilities = filterOut4k30(display->getHdrCapabilities());
 
@@ -1701,7 +1689,12 @@ void SurfaceFlinger::initiateDisplayModeChanges() {
         // TODO: b/142753666 - Use constraints.
         hal::VsyncPeriodChangeConstraints constraints;
         constraints.desiredTimeNanos = systemTime();
-        constraints.seamlessRequired = false;
+        if (!getHwComposer().getComposer()->isDisplayCommandModesetSupported()) {
+            // setActiveConfig doesn't properly support seamless requirement.
+            constraints.seamlessRequired = false;
+        } else {
+            constraints.seamlessRequired = desiredMode.seamless;
+        }
         hal::VsyncPeriodChangeTimeline outTimeline;
 
         // When initiating a resolution change, wait until the commit that resizes the display.
@@ -7201,7 +7194,8 @@ status_t SurfaceFlinger::onTransact(uint32_t code, const Parcel& data, Parcel* r
                 Mutex::Autolock _l(mStateLock);
                 // daltonize
                 mDaltonizer.setUseUpdatedAlgorithm(
-                        FlagManager::getInstance().enable_color_correction_bugfix());
+                        FlagManager::getInstance().enable_color_correction_bugfix() ||
+                        FlagManager::getInstance().enable_color_correction_desktop_bugfix());
                 n = data.readInt32();
                 // frameworks/native/services/surfaceflinger/common/include/common/FlagManager.h
                 // to get which type of cc to use.
@@ -8744,7 +8738,7 @@ status_t SurfaceFlinger::applyRefreshRateSelectorPolicy(
     }
 
     if (mScheduler->updateFrameRateOverrides(scheduler::GlobalSignals{}, preferredFps)) {
-        setDesiredMode({preferredMode, .emitEvent = false});
+        setDesiredMode({preferredMode, .emitEvent = false, .seamless = true});
         // Update the frameRateOverride and display mode change.
         mScheduler->onDisplayModeAndFrameRateOverridesChanged(displayId, preferredMode,
                                                               /*clearContentRequirements*/ false);
@@ -8783,19 +8777,22 @@ gui::DisplayModeSpecs::RefreshRateRanges translate(const FpsRanges& ranges) {
 
 } // namespace
 
-status_t SurfaceFlinger::setDesiredDisplayModeSpecs(const sp<IBinder>& displayToken,
-                                                    const gui::DisplayModeSpecs& specs) {
+status_t SurfaceFlinger::setDesiredDisplayModeSpecs(
+        const std::vector<gui::DisplayModeSpecs>& perDisplaySpecs) {
     SFTRACE_CALL();
 
-    if (!displayToken) {
+    if (perDisplaySpecs.empty()) {
         return BAD_VALUE;
     }
 
+    // TODO: b/373900661 - Use `perDisplaySpecs`.
+    const auto specs = perDisplaySpecs[0];
+
     auto future = mScheduler->schedule([=, this]() FTL_FAKE_GUARD(kMainThreadContext) -> status_t {
-        const auto display = FTL_FAKE_GUARD(mStateLock, getDisplayDeviceLocked(displayToken));
+        const auto display = FTL_FAKE_GUARD(mStateLock, getDisplayDeviceLocked(specs.displayToken));
         if (!display) {
             ALOGE("Attempt to set desired display modes for invalid display token %p",
-                  displayToken.get());
+                  specs.displayToken.get());
             return NAME_NOT_FOUND;
         } else if (display->isVirtual()) {
             ALOGW("Attempt to set desired display modes for virtual display");
@@ -8833,6 +8830,8 @@ status_t SurfaceFlinger::getDesiredDisplayModeSpecs(const sp<IBinder>& displayTo
 
     scheduler::RefreshRateSelector::Policy policy =
             display->refreshRateSelector().getDisplayManagerPolicy();
+    outSpecs->displayToken = displayToken;
+    outSpecs->applyToken = nullptr;
     outSpecs->defaultMode = ftl::to_underlying(policy.defaultMode);
     outSpecs->allowGroupSwitching = policy.allowGroupSwitching;
     outSpecs->primaryRanges = translate(policy.primaryRanges);
@@ -10120,11 +10119,11 @@ binder::Status SurfaceComposerAIDL::removeTunnelModeEnabledListener(
     return binderStatusFromStatusT(status);
 }
 
-binder::Status SurfaceComposerAIDL::setDesiredDisplayModeSpecs(const sp<IBinder>& displayToken,
-                                                               const gui::DisplayModeSpecs& specs) {
+binder::Status SurfaceComposerAIDL::setDesiredDisplayModeSpecs(
+        const std::vector<gui::DisplayModeSpecs>& specs) {
     status_t status = checkAccessPermission();
     if (status == OK) {
-        status = mFlinger->setDesiredDisplayModeSpecs(displayToken, specs);
+        status = mFlinger->setDesiredDisplayModeSpecs(specs);
     }
     return binderStatusFromStatusT(status);
 }
