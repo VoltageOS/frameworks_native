@@ -545,6 +545,7 @@ public:
                                       const sp<SurfaceControl>& relativeTo, int32_t z);
         Transaction& setFlags(const sp<SurfaceControl>& sc,
                 uint32_t flags, uint32_t mask);
+        Transaction& setRoundedCornerOpt(const sp<SurfaceControl>& sc, bool enable);
         Transaction& setTransparentRegionHint(const sp<SurfaceControl>& sc,
                 const Region& transparentRegion);
         Transaction& setDimmingEnabled(const sp<SurfaceControl>& sc, bool dimmingEnabled);

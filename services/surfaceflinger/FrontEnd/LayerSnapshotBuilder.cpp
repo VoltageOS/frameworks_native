@@ -1045,7 +1045,6 @@ void LayerSnapshotBuilder::updateRoundedCorner(LayerSnapshot& snapshot,
     }
 
     RoundedCornerState finalSettings = RoundedCornerState();
-
     // Populate parent settings to inherit
     RoundedCornerState parentSettings =
             calculateParentRoundedCornerSettings(parentSnapshot, snapshot);
@@ -1075,18 +1074,31 @@ void LayerSnapshotBuilder::updateRoundedCorner(LayerSnapshot& snapshot,
                                                parentSettings.effectiveRadii)) {
         finalSettings = parentSettings;
     }
-
     snapshot.roundedCorner = finalSettings;
 
-    snapshot.roundedCorner.clientDrawnRadii = requested.clientDrawnCornerRadii;
-    snapshot.roundedCorner.reportedRadii =
-            getClippedClientRadii(snapshot.roundedCorner.effectiveRadii,
-                                  snapshot.roundedCorner.cropRect, snapshot.sourceBounds());
+    snapshot.roundedCorner.disableClientDrawnRadii =
+            requested.flags & layer_state_t::eRoundedCornerOptDisabled ||
+            parentSettings.disableClientDrawnRadii;
 
-    if (shouldDisableCornerRounding(snapshot, requested)) {
-        snapshot.roundedCorner.sfDrawnRadii = gui::CornerRadii(0.f);
-    } else {
+    if (snapshot.clientChanges & layer_state_t::eClientDrawnCornerRadiusChanged) {
+        snapshot.roundedCorner.clientDrawnRadii = requested.clientDrawnCornerRadii;
+    }
+
+    if (snapshot.roundedCorner.disableClientDrawnRadii) {
+        // We are in a transition. Force Client to 0 and let SF handle it.
+        snapshot.roundedCorner.reportedRadii = gui::CornerRadii(0.f);
         snapshot.roundedCorner.sfDrawnRadii = snapshot.roundedCorner.effectiveRadii;
+    } else {
+        snapshot.roundedCorner.reportedRadii =
+                getClippedClientRadii(snapshot.roundedCorner.effectiveRadii,
+                                      snapshot.roundedCorner.cropRect, snapshot.sourceBounds());
+        if (shouldDisableCornerRounding(snapshot, requested)) {
+            // Optimization ENABLED: Client draws, SF is 0.
+            snapshot.roundedCorner.sfDrawnRadii = gui::CornerRadii(0.f);
+        } else {
+            // Optimization DISABLED: Client is 0, SF draws.
+            snapshot.roundedCorner.sfDrawnRadii = snapshot.roundedCorner.effectiveRadii;
+        }
     }
 }
 
@@ -1113,6 +1125,7 @@ RoundedCornerState LayerSnapshotBuilder::calculateParentRoundedCornerSettings(
     const auto& parentRoundedCorner = parentSnapshot.roundedCorner;
     if (parentRoundedCorner.hasEffectiveRadii()) {
         ui::Transform t = snapshot.localTransform.inverse();
+        parentSettings.disableClientDrawnRadii = parentRoundedCorner.disableClientDrawnRadii;
         parentSettings.cropRect = t.transform(parentRoundedCorner.cropRect);
         parentSettings.effectiveRadii = parentRoundedCorner.effectiveRadii;
         parentSettings.effectiveRadii.transform(t);

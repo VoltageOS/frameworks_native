@@ -168,7 +168,6 @@ void RequestedLayerState::merge(const ResolvedComposerState& resolvedComposerSta
     uint64_t clientChanges = what | layer_state_t::diff(clientState);
     layer_state_t::merge(clientState);
     what = clientChanges;
-    LLOGV(layerId, "requested=%" PRIu64 " flags=%" PRIu64 " ", clientState.what, clientChanges);
 
     if (clientState.what & layer_state_t::eFlagsChanged) {
         if ((oldFlags ^ flags) &
@@ -182,6 +181,9 @@ void RequestedLayerState::merge(const ResolvedComposerState& resolvedComposerSta
         }
         if ((oldFlags ^ flags) & layer_state_t::eCanOccludePresentation) {
             changes |= RequestedLayerState::Changes::Input;
+        }
+        if ((oldFlags ^ flags) & layer_state_t::eRoundedCornerOptDisabled) {
+            changes |= RequestedLayerState::Changes::Geometry;
         }
     }
 

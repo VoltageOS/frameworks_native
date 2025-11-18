@@ -201,6 +201,9 @@ struct layer_state_t {
         // possible. This is the case when the SurfaceControl is the root SurfaceControl
         // owned by ViewRootImpl.
         eRecoverableFromBufferStuffing = 0x2000,
+        // Disables the client-drawn rounded corners optimization by sending a zero radius
+        // to the client.
+        eRoundedCornerOptDisabled = 0x4000,
     };
 
     enum {
