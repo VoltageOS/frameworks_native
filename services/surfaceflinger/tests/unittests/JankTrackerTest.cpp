@@ -56,7 +56,7 @@ public:
     void addJankData(int32_t layerId, int jankType) {
         gui::JankData data;
         data.frameVsyncId = mVsyncId++;
-        data.jankType = jankType;
+        data.jankTypeLegacy = jankType;
         data.frameIntervalNs = 8333333;
         JankTracker::onJankData(layerId, data);
     }
@@ -79,26 +79,26 @@ TEST_F(JankTrackerTest, jankDataIsTrackedAndPropagated) {
     EXPECT_CALL(*mListener.get(), onJankData(SizeIs(3)))
             .WillOnce([](const std::vector<gui::JankData>& jankData) {
                 EXPECT_EQ(jankData[0].frameVsyncId, 1000);
-                EXPECT_EQ(jankData[0].jankType, 1);
+                EXPECT_EQ(jankData[0].jankTypeLegacy, 1);
                 EXPECT_EQ(jankData[0].frameIntervalNs, 8333333);
 
                 EXPECT_EQ(jankData[1].frameVsyncId, 1001);
-                EXPECT_EQ(jankData[1].jankType, 2);
+                EXPECT_EQ(jankData[1].jankTypeLegacy, 2);
                 EXPECT_EQ(jankData[1].frameIntervalNs, 8333333);
 
                 EXPECT_EQ(jankData[2].frameVsyncId, 1002);
-                EXPECT_EQ(jankData[2].jankType, 3);
+                EXPECT_EQ(jankData[2].jankTypeLegacy, 3);
                 EXPECT_EQ(jankData[2].frameIntervalNs, 8333333);
                 return binder::Status::ok();
             });
     EXPECT_CALL(*mListener.get(), onJankData(SizeIs(2)))
             .WillOnce([](const std::vector<gui::JankData>& jankData) {
                 EXPECT_EQ(jankData[0].frameVsyncId, 1003);
-                EXPECT_EQ(jankData[0].jankType, 4);
+                EXPECT_EQ(jankData[0].jankTypeLegacy, 4);
                 EXPECT_EQ(jankData[0].frameIntervalNs, 8333333);
 
                 EXPECT_EQ(jankData[1].frameVsyncId, 1004);
-                EXPECT_EQ(jankData[1].jankType, 5);
+                EXPECT_EQ(jankData[1].jankTypeLegacy, 5);
                 EXPECT_EQ(jankData[1].frameIntervalNs, 8333333);
 
                 return binder::Status::ok();

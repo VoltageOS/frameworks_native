@@ -977,7 +977,8 @@ void SurfaceFrame::onPresent(nsecs_t presentTime, int32_t displayFrameJankTypeLe
 
         gui::JankData jd;
         jd.frameVsyncId = mToken;
-        jd.jankType = mJankType.value();
+        jd.jankTypeLegacy = mJankType.legacy();
+        jd.jankTypeExperimental = mJankType.experimental();
         jd.frameIntervalNs =
                 (mRenderRate ? *mRenderRate : mDisplayFrameRenderRate).getPeriodNsecs();
         jd.presentDelayNs = presentDelay;
