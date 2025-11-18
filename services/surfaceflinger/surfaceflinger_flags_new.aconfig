@@ -39,6 +39,16 @@ flag {
 } # bugfix_resize_virtual_display_surfaces
 
 flag {
+  name: "color_transform_translation"
+  namespace: "core_graphics"
+  description: "Fixes a bug that incorrectly applies a the translation component of global color transforms to source alpha"
+  bug: "432040449"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+} # color_transform_translation
+
+flag {
   name: "configure_work_duration"
   namespace: "window_surfaces"
   description: "Enable the work duration configuration via DisplayModeSpecs."
