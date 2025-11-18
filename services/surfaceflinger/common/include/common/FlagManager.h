@@ -77,7 +77,6 @@ public:
     bool refresh_rate_overlay_on_external_display() const;
     bool resync_on_tx_separate_timer() const;
     bool set_power_mode_async() const;
-    bool use_at_least_60_for_min_vote() const;
     bool use_experimental_jank_classification() const;
 
     /// Trunk stable readonly flags ///

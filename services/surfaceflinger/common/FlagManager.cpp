@@ -147,7 +147,6 @@ void FlagManager::dump(std::string& result) const {
     DUMP_ACONFIG_FLAG(refresh_rate_overlay_on_external_display);
     DUMP_ACONFIG_FLAG(resync_on_tx_separate_timer);
     DUMP_ACONFIG_FLAG(set_power_mode_async);
-    DUMP_ACONFIG_FLAG(use_at_least_60_for_min_vote);
     DUMP_ACONFIG_FLAG(use_experimental_jank_classification);
 
     /// Trunk stable readonly flags ///
@@ -317,7 +316,6 @@ FLAG_MANAGER_ACONFIG_FLAG(readback_screenshot, "")
 FLAG_MANAGER_ACONFIG_FLAG(refresh_rate_overlay_on_external_display, "")
 FLAG_MANAGER_ACONFIG_FLAG(resync_on_tx_separate_timer, "");
 FLAG_MANAGER_ACONFIG_FLAG(set_power_mode_async, "");
-FLAG_MANAGER_ACONFIG_FLAG(use_at_least_60_for_min_vote, "");
 FLAG_MANAGER_ACONFIG_FLAG(use_experimental_jank_classification, "");
 
 /// Trunk stable server (R/W) flags from outside SurfaceFlinger ///
