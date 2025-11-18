@@ -258,6 +258,7 @@ public:
     // Sets the frame as none janky as there was no real display frame.
     void onCommitNotComposited(Fps refreshRate, Fps displayFrameRenderRate);
     // All the timestamps are dumped relative to the baseTime
+    template <typename Period>
     void dump(std::string& result, const std::string& indent, nsecs_t baseTime) const;
     // Dumps only the layer, token, is buffer, jank metadata, prediction and present states.
     std::string miniDump() const;
@@ -439,6 +440,8 @@ public:
 
     // Called when a layer is destroyed. Used for data cleanup.
     virtual void onLayerDestroyed(int32_t layerId) = 0;
+
+    virtual std::string dumpStateForTesting() = 0;
 };
 
 namespace impl {
@@ -490,6 +493,7 @@ public:
         // SurfaceFrame is janky.
         void dumpJank(std::string& result, nsecs_t baseTime, int displayFrameCount) const;
         // Dumpsys interface - dumps all data irrespective of jank
+        template <typename Period>
         void dumpAll(std::string& result, nsecs_t baseTime) const;
         // Emits a packet for perfetto tracing. The function body will be executed only if tracing
         // is enabled. monoBootOffset is the difference between SYSTEM_TIME_BOOTTIME
@@ -533,6 +537,7 @@ public:
         }
 
     private:
+        template <typename Period>
         void dump(std::string& result, nsecs_t baseTime) const;
         void tracePredictions(pid_t surfaceFlingerPid, nsecs_t monoBootOffset,
                               bool filterFramesBeforeTraceStarts) const;
@@ -612,6 +617,7 @@ public:
     void generateFrameStats(int32_t layer, size_t count, FrameStats* outStats) const override;
     void reset() override;
     void onLayerDestroyed(int32_t layerId) override;
+    std::string dumpStateForTesting() override;
 
     // Sets up the perfetto tracing backend and data source.
     void onBootFinished() override;
@@ -622,7 +628,7 @@ public:
     static constexpr char kFrameTimelineDataSource[] = "android.surfaceflinger.frametimeline";
 
     static constexpr Fps kThresholdFpsForAnimation = 20_Hz;
-    static constexpr float kDeltaFramesRatioThreshold = 0.33f;
+    static constexpr float kDeltaFramesRatioThreshold = 0.30f;
 
 private:
     // Friend class for testing
