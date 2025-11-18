@@ -36,6 +36,13 @@ flag {
 } # arr_surfacecontrol_setframerate_api
 
 flag {
+  name: "configure_work_duration"
+  namespace: "window_surfaces"
+  description: "Enable the work duration configuration via DisplayModeSpecs."
+  bug: "399491928"
+} # configure_work_duration
+
+flag {
   name: "connected_display_hdr_v2"
   namespace: "desktop_display"
   description: "enable connected display hdr selection"

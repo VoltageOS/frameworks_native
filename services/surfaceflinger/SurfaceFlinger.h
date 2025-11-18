@@ -767,6 +767,8 @@ private:
                                             const scheduler::RefreshRateSelector&)
             REQUIRES(mStateLock, kMainThreadContext);
 
+    void updateWorkDuration(const sp<DisplayDevice>&, const gui::DisplayModeSpecs&);
+
     void commitTransactions() REQUIRES(kMainThreadContext, mStateLock);
     void commitTransactionsLocked(uint32_t transactionFlags)
             REQUIRES(mStateLock, kMainThreadContext);
