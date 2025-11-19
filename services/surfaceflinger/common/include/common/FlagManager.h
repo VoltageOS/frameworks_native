@@ -98,6 +98,7 @@ public:
     bool idle_screen_refresh_rate_timeout() const;
     bool local_tonemap_screenshots() const;
     bool luts_api() const;
+    bool modeset_multi_display() const;
     bool modeset_state_machine() const;
     bool no_vsyncs_on_screen_off() const;
     bool parse_edid_version_and_input_type() const;
