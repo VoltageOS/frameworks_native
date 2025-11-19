@@ -8777,6 +8777,22 @@ gui::DisplayModeSpecs::RefreshRateRanges translate(const FpsRanges& ranges) {
 
 } // namespace
 
+void SurfaceFlinger::updateWorkDuration(const sp<DisplayDevice>& display,
+                                        const gui::DisplayModeSpecs& specs) {
+    std::optional<gui::DisplayModeSpecs::WorkDuration> workDuration = specs.workDuration;
+    if (workDuration.has_value()) {
+        SFTRACE_FORMAT("Updating the work duration. minSf=%" PRId64 ", maxSf=%" PRId64
+                       ", app=%" PRId64,
+                       workDuration->minSfDurationNanos, workDuration->maxSfDurationNanos,
+                       workDuration->appDurationNanos);
+        mScheduler->reloadPhaseConfiguration(mDisplayModeController.getActiveMode(
+                                                     display->getPhysicalId()),
+                                             Duration::fromNs(workDuration->minSfDurationNanos),
+                                             Duration::fromNs(workDuration->maxSfDurationNanos),
+                                             Duration::fromNs(workDuration->appDurationNanos));
+    }
+}
+
 status_t SurfaceFlinger::setDesiredDisplayModeSpecs(
         const std::vector<gui::DisplayModeSpecs>& perDisplaySpecs) {
     SFTRACE_CALL();
@@ -8803,7 +8819,11 @@ status_t SurfaceFlinger::setDesiredDisplayModeSpecs(
                                 translate(specs.appRequestRanges), specs.allowGroupSwitching,
                                 specs.idleScreenRefreshRateConfig};
 
-            return setDesiredDisplayModeSpecsInternal(display, policy);
+            status_t status = setDesiredDisplayModeSpecsInternal(display, policy);
+            if (status == NO_ERROR && FlagManager::getInstance().configure_work_duration()) {
+                updateWorkDuration(display, specs);
+            }
+            return status;
         }
     });
 
