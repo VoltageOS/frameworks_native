@@ -879,7 +879,7 @@ bool BLASTBufferQueue::syncNextTransaction(
         return false;
     }
 
-    mTransactionReadyCallback = callback;
+    mTransactionReadyCallback = std::move(callback);
     mSyncTransaction = new SurfaceComposerClient::Transaction();
     mAcquireSingleBuffer = acquireSingleBuffer;
     return true;
