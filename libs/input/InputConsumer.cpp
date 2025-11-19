@@ -29,6 +29,7 @@
 
 #include <android-base/logging.h>
 #include <android-base/properties.h>
+#include <android-base/result.h>
 #include <android-base/stringprintf.h>
 #include <binder/Parcel.h>
 #include <cutils/properties.h>
@@ -228,8 +229,9 @@ bool InputConsumer::isTouchResamplingEnabled() {
     return property_get_bool(PROPERTY_RESAMPLING_ENABLED, true);
 }
 
-status_t InputConsumer::consume(InputEventFactoryInterface* factory, bool consumeBatches,
-                                nsecs_t frameTime, uint32_t* outSeq, InputEvent** outEvent) {
+InputConsumer::ConsumeResult InputConsumer::consume(InputEventFactoryInterface* factory,
+                                                    bool consumeBatches, nsecs_t frameTime,
+                                                    uint32_t* outSeq, InputEvent** outEvent) {
     ALOGD_IF(DEBUG_TRANSPORT_CONSUMER,
              "channel '%s' consumer ~ consume: consumeBatches=%s, frameTime=%" PRId64,
              mChannel->getName().c_str(), toString(consumeBatches), frameTime);
@@ -268,14 +270,14 @@ status_t InputConsumer::consume(InputEventFactoryInterface* factory, bool consum
                         break;
                     }
                 }
-                return result.error().code();
+                return result.error();
             }
         }
 
         switch (mMsg.header.type) {
             case InputMessage::Type::KEY: {
                 KeyEvent* keyEvent = factory->createKeyEvent();
-                if (!keyEvent) return NO_MEMORY;
+                if (!keyEvent) return android::base::Error(NO_MEMORY);
 
                 initializeKeyEvent(*keyEvent, mMsg);
                 *outSeq = mMsg.header.seq;
@@ -314,7 +316,7 @@ status_t InputConsumer::consume(InputEventFactoryInterface* factory, bool consum
                                                          outSeq, outEvent);
                         mBatches.erase(mBatches.begin() + batchIndex);
                         if (result) {
-                            return result;
+                            return android::base::Error(result);
                         }
                         ALOGD_IF(DEBUG_TRANSPORT_CONSUMER,
                                  "channel '%s' consumer ~ consumed batch event and "
@@ -337,7 +339,7 @@ status_t InputConsumer::consume(InputEventFactoryInterface* factory, bool consum
                 }
 
                 MotionEvent* motionEvent = factory->createMotionEvent();
-                if (!motionEvent) return NO_MEMORY;
+                if (!motionEvent) return android::base::Error(NO_MEMORY);
 
                 updateTouchState(mMsg);
                 initializeMotionEvent(*motionEvent, mMsg);
@@ -361,7 +363,7 @@ status_t InputConsumer::consume(InputEventFactoryInterface* factory, bool consum
 
             case InputMessage::Type::FOCUS: {
                 FocusEvent* focusEvent = factory->createFocusEvent();
-                if (!focusEvent) return NO_MEMORY;
+                if (!focusEvent) return android::base::Error(NO_MEMORY);
 
                 initializeFocusEvent(*focusEvent, mMsg);
                 *outSeq = mMsg.header.seq;
@@ -371,7 +373,7 @@ status_t InputConsumer::consume(InputEventFactoryInterface* factory, bool consum
 
             case InputMessage::Type::CAPTURE: {
                 CaptureEvent* captureEvent = factory->createCaptureEvent();
-                if (!captureEvent) return NO_MEMORY;
+                if (!captureEvent) return android::base::Error(NO_MEMORY);
 
                 initializeCaptureEvent(*captureEvent, mMsg);
                 *outSeq = mMsg.header.seq;
@@ -381,7 +383,7 @@ status_t InputConsumer::consume(InputEventFactoryInterface* factory, bool consum
 
             case InputMessage::Type::DRAG: {
                 DragEvent* dragEvent = factory->createDragEvent();
-                if (!dragEvent) return NO_MEMORY;
+                if (!dragEvent) return android::base::Error(NO_MEMORY);
 
                 initializeDragEvent(*dragEvent, mMsg);
                 *outSeq = mMsg.header.seq;
@@ -391,7 +393,7 @@ status_t InputConsumer::consume(InputEventFactoryInterface* factory, bool consum
 
             case InputMessage::Type::TOUCH_MODE: {
                 TouchModeEvent* touchModeEvent = factory->createTouchModeEvent();
-                if (!touchModeEvent) return NO_MEMORY;
+                if (!touchModeEvent) return android::base::Error(NO_MEMORY);
 
                 initializeTouchModeEvent(*touchModeEvent, mMsg);
                 *outSeq = mMsg.header.seq;
@@ -400,7 +402,7 @@ status_t InputConsumer::consume(InputEventFactoryInterface* factory, bool consum
             }
         }
     }
-    return OK;
+    return {/* OK */};
 }
 
 status_t InputConsumer::consumeBatch(InputEventFactoryInterface* factory, nsecs_t frameTime,
