@@ -95,6 +95,8 @@ protected:
     std::list<NotifyArgs> reconfigureMapper(nsecs_t when, const InputReaderConfiguration& config,
                                             ConfigurationChanges changes);
 
+    std::list<NotifyArgs> resetMapper(nsecs_t when);
+
 private:
     void processMotionArgs(const std::list<NotifyArgs>& args);
 

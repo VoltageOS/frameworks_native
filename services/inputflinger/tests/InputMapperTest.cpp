@@ -136,6 +136,13 @@ std::list<NotifyArgs> VerifyingInputMapperUnitTest::reconfigureMapper(
     return args;
 }
 
+std::list<NotifyArgs> VerifyingInputMapperUnitTest::resetMapper(nsecs_t when) {
+    std::list<NotifyArgs> args = mMapper->reset(when);
+    processMotionArgs(args);
+    mVerifier.resetDevice(DEVICE_ID);
+    return args;
+}
+
 void VerifyingInputMapperUnitTest::processMotionArgs(const std::list<NotifyArgs>& args) {
     for (const NotifyArgs& notifyArg : args) {
         if (std::holds_alternative<NotifyDeviceResetArgs>(notifyArg)) {
