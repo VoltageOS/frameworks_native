@@ -15,6 +15,7 @@
  */
 
 #include <inttypes.h>
+#include <string>
 
 #define LOG_TAG "BufferQueueProducer"
 #define ATRACE_TAG ATRACE_TAG_GRAPHICS
@@ -31,6 +32,7 @@
 #include <binder/IPCThreadState.h>
 #include <gui/BufferItem.h>
 #include <gui/BufferQueueCore.h>
+#include <gui/BufferQueueHelpers.h>
 #include <gui/BufferQueueProducer.h>
 
 #include <gui/FrameRateUtils.h>
@@ -1836,6 +1838,25 @@ status_t BufferQueueProducer::setLegacyBufferDrop(bool drop) {
     std::lock_guard<std::mutex> lock(mCore->mMutex);
     mCore->mLegacyBufferDrop = drop;
     return NO_ERROR;
+}
+
+status_t BufferQueueProducer::setPresentMode(int32_t mode) {
+    ATRACE_CALL();
+    std::string_view mode_sv = BufferQueueHelpers::presentModeToString(mode);
+    BQ_LOGV("setPresentMode: mode = %.*s", static_cast<int>(mode_sv.length()), mode_sv.data());
+
+    std::lock_guard<std::mutex> lock(mCore->mMutex);
+    switch (mode) {
+        case ANATIVEWINDOW_PRESENT_DEFAULT:
+        case ANATIVEWINDOW_PRESENT_FIFO_LATEST_READY:
+            mCore->mLegacyBufferDrop = false;
+            mCore->mPresentMode = mode;
+            return NO_ERROR;
+        case ANATIVEWINDOW_PRESENT_UNKNOWN:
+        default:
+            BQ_LOGE("setPresentMode: unknown mode %d", mode);
+            return BAD_VALUE;
+    }
 }
 
 status_t BufferQueueProducer::getLastQueuedBuffer(sp<GraphicBuffer>* outBuffer,
