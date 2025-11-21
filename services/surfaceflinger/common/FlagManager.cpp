@@ -135,7 +135,6 @@ void FlagManager::dump(std::string& result) const {
     DUMP_ACONFIG_FLAG(get_display_known_vsync_sample_enabled);
     DUMP_ACONFIG_FLAG(graphite_renderengine_preview_rollout);
     DUMP_ACONFIG_FLAG(graphite_renderengine_desktop_rollout);
-    DUMP_ACONFIG_FLAG(increase_missed_frame_jank_threshold);
     DUMP_ACONFIG_FLAG(jank_classification_v2);
     DUMP_ACONFIG_FLAG(luts_api);
     DUMP_ACONFIG_FLAG(md_degrade_hdr);
@@ -308,7 +307,6 @@ FLAG_MANAGER_ACONFIG_FLAG(get_display_known_vsync_sample_enabled,
                           "debug.sf.get_display_known_vsync_sample_enabled");
 FLAG_MANAGER_ACONFIG_FLAG(graphite_renderengine_preview_rollout, "");
 FLAG_MANAGER_ACONFIG_FLAG(graphite_renderengine_desktop_rollout, "");
-FLAG_MANAGER_ACONFIG_FLAG(increase_missed_frame_jank_threshold, "");
 FLAG_MANAGER_ACONFIG_FLAG(jank_classification_v2, "debug.sf.jank_classification_v2")
 FLAG_MANAGER_ACONFIG_FLAG(md_degrade_hdr, "");
 FLAG_MANAGER_ACONFIG_FLAG(mirror_uid_filtering, "");

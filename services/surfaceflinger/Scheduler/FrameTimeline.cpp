@@ -651,10 +651,7 @@ void SurfaceFrame::classifyJankLegacyLocked(int32_t displayFrameJankType, const 
         mFrameReadyMetadata.legacy() = FrameReadyMetadata::OnTimeFinish;
     }
 
-    const nsecs_t presentThreshold =
-            FlagManager::getInstance().increase_missed_frame_jank_threshold()
-            ? mJankClassificationThresholds.presentThresholdExtended
-            : mJankClassificationThresholds.presentThresholdLegacy;
+    const nsecs_t presentThreshold = mJankClassificationThresholds.presentThreshold;
     if (std::abs(presentDelay) > presentThreshold) {
         mFramePresentMetadata.legacy() = presentDelay > 0 ? FramePresentMetadata::LatePresent
                                                           : FramePresentMetadata::EarlyPresent;
@@ -824,10 +821,7 @@ void SurfaceFrame::classifyJankLocked(int32_t displayFrameJankTypeLegacy,
         mFrameReadyMetadata.experimental() = FrameReadyMetadata::OnTimeFinish;
     }
 
-    const nsecs_t presentThreshold =
-            FlagManager::getInstance().increase_missed_frame_jank_threshold()
-            ? mJankClassificationThresholds.presentThresholdExtended
-            : mJankClassificationThresholds.presentThresholdLegacy;
+    const nsecs_t presentThreshold = mJankClassificationThresholds.presentThreshold;
 
     if (std::abs(mPresentDelay) <= presentThreshold) {
         mFramePresentMetadata.experimental() = FramePresentMetadata::OnTimePresent;
@@ -1351,9 +1345,7 @@ void FrameTimeline::DisplayFrame::setGpuFence(const std::shared_ptr<FenceTime>& 
 
 void FrameTimeline::DisplayFrame::classifyJankLegacy(nsecs_t presentDelay,
                                                      nsecs_t previousPresentTime) {
-    nsecs_t presentThreshold = FlagManager::getInstance().increase_missed_frame_jank_threshold()
-            ? mJankClassificationThresholds.presentThresholdExtended
-            : mJankClassificationThresholds.presentThresholdLegacy;
+    const nsecs_t presentThreshold = mJankClassificationThresholds.presentThreshold;
 
     if (std::abs(presentDelay) > presentThreshold) {
         mFramePresentMetadata.legacy() = presentDelay > 0 ? FramePresentMetadata::LatePresent
@@ -1497,9 +1489,7 @@ void FrameTimeline::DisplayFrame::classifyJank(nsecs_t& deadlineDelta,
 
     mPresentDelay = presentDelay;
 
-    nsecs_t presentThreshold = FlagManager::getInstance().increase_missed_frame_jank_threshold()
-            ? mJankClassificationThresholds.presentThresholdExtended
-            : mJankClassificationThresholds.presentThresholdLegacy;
+    const nsecs_t presentThreshold = mJankClassificationThresholds.presentThreshold;
 
     if (std::abs(presentDelay) <= presentThreshold) {
         mFramePresentMetadata.experimental() = FramePresentMetadata::OnTimePresent;
