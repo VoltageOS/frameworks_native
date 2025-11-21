@@ -5047,12 +5047,7 @@ ui::Size SurfaceFlinger::findLargestFramebufferSizeLocked() const {
     return maxSize;
 }
 
-status_t SurfaceFlinger::addClientLayer(LayerCreationArgs& args, const sp<IBinder>& handle,
-                                        const sp<Layer>& layer, const wp<Layer>& parent,
-                                        uint32_t* outTransformHint) {
-    if (outTransformHint) {
-        *outTransformHint = mFrontInternalDisplayTransformHint;
-    }
+void SurfaceFlinger::addClientLayer(LayerCreationArgs& args, const sp<Layer>& layer) {
     args.parentId = LayerHandle::getLayerId(args.parentHandle.promote());
     args.layerIdToMirror = LayerHandle::getLayerId(args.mirrorLayerHandle.promote());
     {
@@ -5063,9 +5058,7 @@ status_t SurfaceFlinger::addClientLayer(LayerCreationArgs& args, const sp<IBinde
         args.parentHandle.clear();
         mNewLayerArgs.emplace_back(std::move(args));
     }
-
     setTransactionFlags(eTransactionFlushNeeded | eTransactionNeeded);
-    return NO_ERROR;
 }
 
 uint32_t SurfaceFlinger::getTransactionFlags() const {
@@ -5866,8 +5859,8 @@ status_t SurfaceFlinger::mirrorLayer(const LayerCreationArgs& args,
 
     outResult.layerId = mirrorLayer->sequence;
     outResult.layerName = String16(mirrorLayer->getDebugName());
-    return addClientLayer(mirrorArgs, outResult.handle, mirrorLayer /* layer */,
-                          nullptr /* parent */, nullptr /* outTransformHint */);
+    addClientLayer(mirrorArgs, mirrorLayer);
+    return OK;
 }
 
 base::expected<gui::CreateSurfaceResult, status_t> SurfaceFlinger::mirrorLayerStack(
@@ -5900,8 +5893,7 @@ base::expected<gui::CreateSurfaceResult, status_t> SurfaceFlinger::mirrorLayerSt
     }
     surfaceResult.layerId = rootMirrorLayer->sequence;
     surfaceResult.layerName = static_cast<String16>(rootMirrorLayer->getDebugName());
-    addClientLayer(mirrorArgs, surfaceResult.handle, rootMirrorLayer, /*parent=*/nullptr,
-                   /*outTransformHint=*/nullptr);
+    addClientLayer(mirrorArgs, rootMirrorLayer);
     setTransactionFlags(eTransactionFlushNeeded);
     return surfaceResult;
 }
@@ -5949,13 +5941,9 @@ status_t SurfaceFlinger::createLayer(LayerCreationArgs& args, gui::CreateSurface
         args.addToRoot = false;
     }
 
-    uint32_t outTransformHint;
-    result = addClientLayer(args, outResult.handle, layer, parent, &outTransformHint);
-    if (result != NO_ERROR) {
-        return result;
-    }
+    addClientLayer(args, layer);
 
-    outResult.transformHint = static_cast<int32_t>(outTransformHint);
+    outResult.transformHint = mFrontInternalDisplayTransformHint;
     outResult.layerId = layer->sequence;
     outResult.layerName = String16(layer->getDebugName());
     return result;

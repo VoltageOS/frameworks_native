@@ -877,10 +877,8 @@ private:
     base::expected<gui::CreateSurfaceResult, status_t> mirrorLayerStack(
             DisplayId displayId, const LayerCreationArgs& args);
 
-    // add a layer to SurfaceFlinger
-    status_t addClientLayer(LayerCreationArgs& args, const sp<IBinder>& handle,
-                            const sp<Layer>& layer, const wp<Layer>& parentLayer,
-                            uint32_t* outTransformHint);
+    // Adds a layer to SurfaceFlinger
+    void addClientLayer(LayerCreationArgs& args, const sp<Layer>& layer);
 
     // Creates a promise for a future release fence for a layer. This allows for
     // the layer to keep track of when its buffer can be released.
