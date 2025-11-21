@@ -22,6 +22,7 @@
 #include <android-base/properties.h>
 #include <android/apexsupport.h>
 #include <android/dlext.h>
+#include <com_android_graphics_egl_flags.h>
 #include <cutils/properties.h>
 #include <dirent.h>
 #include <dlfcn.h>
@@ -38,6 +39,8 @@
 #include "egldefs.h"
 
 #include <com_android_graphics_egl_flags.h>
+
+namespace egl_flags = com::android::graphics::egl::flags;
 
 namespace android {
 
@@ -268,6 +271,18 @@ void* Loader::open(egl_connection_t* cnx) {
 
     // If a driver has been loaded, return the driver directly.
     if (cnx->dso) {
+        if (egl_flags::update_angle_feature_overrides_in_loader_open()) {
+            // ANGLE feature overrides need to be configured for both system services and apps.
+            // However, updateAngleFeatureOverrides() issues Binder calls, which Zygote cannot do.
+            // Instead, take advantage of the fact that Zygote preloads the GLES driver so when
+            // cnx->dso is valid, then Zygote must have completed initialization and this is now
+            // executing as a fork of Zygote (and can issue Binder calls). This allows us to skip
+            // the expensive IsZygote() check on every app launch. Further, cnx->angleLoaded
+            // restricts this to only when ANGLE is the GLES driver for this process.
+            if (cnx->angleLoaded) {
+                android::GraphicsEnv::getInstance().updateAngleFeatureOverrides();
+            }
+        }
         return cnx->dso;
     }
 
