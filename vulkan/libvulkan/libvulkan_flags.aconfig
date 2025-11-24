@@ -10,6 +10,13 @@ flag {
 }
 
 flag {
+  name: "present_mode_fifo_latest_ready_ext"
+  namespace: "core_graphics"
+  description: "Enable the VK_EXT_present_mode_fifo_latest_ready vulkan extension"
+  bug: "378669647"
+}
+
+flag {
   name: "vulkan_1_4_instance_api"
   namespace: "core_graphics"
   description: "Enable support for the Vulkan 1.4 instance API"

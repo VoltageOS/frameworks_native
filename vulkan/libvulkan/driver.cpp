@@ -1129,8 +1129,13 @@ VkResult EnumerateDeviceExtensionProperties(
     std::vector<VkExtensionProperties> loader_extensions;
     loader_extensions.push_back({
         VK_KHR_INCREMENTAL_PRESENT_EXTENSION_NAME,
-        VK_KHR_INCREMENTAL_PRESENT_SPEC_VERSION});
-
+        VK_KHR_INCREMENTAL_PRESENT_SPEC_VERSION,
+    });
+    if (flags::present_mode_fifo_latest_ready_ext()) {
+        loader_extensions.push_back(
+            {VK_EXT_PRESENT_MODE_FIFO_LATEST_READY_EXTENSION_NAME,
+             VK_EXT_PRESENT_MODE_FIFO_LATEST_READY_SPEC_VERSION});
+    }
     bool hdrBoardConfig = android::sysprop::has_HDR_display(false);
     if (hdrBoardConfig) {
         loader_extensions.push_back({VK_EXT_HDR_METADATA_EXTENSION_NAME,
