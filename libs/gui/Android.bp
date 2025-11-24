@@ -508,6 +508,7 @@ filegroup {
         "BufferQueue.cpp",
         "BufferQueueConsumer.cpp",
         "BufferQueueCore.cpp",
+        "BufferQueueHelpers.cpp",
         "BufferQueueProducer.cpp",
         "BufferQueueThreadState.cpp",
         "BufferSlot.cpp",

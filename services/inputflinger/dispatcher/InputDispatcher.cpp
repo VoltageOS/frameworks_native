@@ -4568,6 +4568,8 @@ void InputDispatcher::notifyMotion(const NotifyMotionArgs& args) {
             validateMotionEvent(args.action, args.actionButton, args.getPointerCount(),
                                 args.pointerProperties.data());
     if (!motionCheck.ok()) {
+        std::scoped_lock _l(mLock);
+        logDispatchStateLocked();
         LOG(FATAL) << "Invalid event: " << args.dump() << "; reason: " << motionCheck.error();
         return;
     }
@@ -4589,6 +4591,7 @@ void InputDispatcher::notifyMotion(const NotifyMotionArgs& args) {
                                            args.pointerProperties.data(), args.pointerCoords.data(),
                                            args.flags, args.buttonState, args.downTime);
         if (!result.ok()) {
+            logDispatchStateLocked();
             LOG(FATAL) << "Bad stream: " << result.error() << " caused by " << args.dump();
         }
     }
@@ -6131,6 +6134,8 @@ void InputDispatcher::logDispatchStateLocked() const {
     std::string line;
 
     while (std::getline(stream, line, '\n')) {
+        // Add a small delay to avoid overwhelming the logcat fd buffer
+        std::this_thread::sleep_for(1ms);
         ALOGI("%s", line.c_str());
     }
 }

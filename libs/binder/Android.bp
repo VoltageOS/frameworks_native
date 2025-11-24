@@ -480,6 +480,7 @@ cc_defaults {
         "-D__ANDROID_VNDK__",
         "-U__ANDROID__",
         "-D__TRUSTY__",
+        "-D__BINDER_VENDOR_STABILITY__",
         "-DTRUSTY_USERSPACE",
         // Flags from the Trusty build system
         "-Werror",
