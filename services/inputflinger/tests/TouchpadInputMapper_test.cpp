@@ -33,6 +33,8 @@
 
 namespace android {
 
+using testing::AllOf;
+using testing::Contains;
 using testing::ElementsAre;
 using testing::IsEmpty;
 using testing::Return;
@@ -247,6 +249,98 @@ TEST_F(TouchpadInputMapperTest, HoverAndLeftButtonPress) {
     args += process(EV_KEY, BTN_TOOL_FINGER, 0);
     args += process(EV_SYN, SYN_REPORT, 0);
     ASSERT_THAT(args, testing::IsEmpty());
+}
+
+// Regression test for b/458469793, where a HOVER_EXIT event was incorrectly reported after
+// resetting the touchpad when the last gesture was a scroll.
+TEST_F(TouchpadInputMapperTest, ScrollThenResetThenHoverMoveIsConsistent) {
+    mFakePolicy->setDefaultPointerDisplayId(DISPLAY_ID);
+    DisplayViewport viewport =
+            createViewport(DISPLAY_ID, DISPLAY_WIDTH, DISPLAY_HEIGHT, ui::ROTATION_0,
+                           /*isActive=*/true, "local:0", NO_PORT, ViewportType::INTERNAL);
+    mFakePolicy->addDisplayViewport(viewport);
+    std::list<NotifyArgs> args;
+
+    args += reconfigureMapper(systemTime(SYSTEM_TIME_MONOTONIC), mReaderConfiguration,
+                              InputReaderConfiguration::Change::DISPLAY_INFO);
+    ASSERT_THAT(args, testing::IsEmpty());
+
+    // Scroll on the touchpad.
+    int32_t scrollY = 300;
+    args += process(EV_ABS, ABS_MT_SLOT, 0);
+    args += process(EV_ABS, ABS_MT_TRACKING_ID, 1);
+    args += process(EV_ABS, ABS_MT_POSITION_X, 500);
+    args += process(EV_ABS, ABS_MT_POSITION_Y, scrollY);
+    args += process(EV_ABS, ABS_MT_PRESSURE, 50);
+    args += process(EV_ABS, ABS_MT_SLOT, 1);
+    args += process(EV_ABS, ABS_MT_TRACKING_ID, 2);
+    args += process(EV_ABS, ABS_MT_POSITION_X, 800);
+    args += process(EV_ABS, ABS_MT_POSITION_Y, scrollY);
+    args += process(EV_ABS, ABS_MT_PRESSURE, 50);
+    args += process(EV_KEY, BTN_TOUCH, 1);
+    args += process(EV_KEY, BTN_TOOL_DOUBLETAP, 1);
+    setScanCodeState(KeyState::DOWN, {BTN_TOUCH, BTN_TOOL_DOUBLETAP});
+    args += process(EV_SYN, SYN_REPORT, 0);
+    ASSERT_THAT(args, testing::IsEmpty());
+
+    for (int32_t i = 0; i < 5; i++) {
+        // Without these sleeps, the test fails.
+        // TODO(b/284133337): remove the dependency of these tests on "real time"
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        scrollY += 50;
+
+        args += process(EV_ABS, ABS_MT_SLOT, 0);
+        args += process(EV_ABS, ABS_MT_POSITION_Y, scrollY);
+        args += process(EV_ABS, ABS_MT_SLOT, 1);
+        args += process(EV_ABS, ABS_MT_POSITION_Y, scrollY);
+        args += process(EV_SYN, SYN_REPORT, 0);
+    }
+
+    // Lift the fingers.
+    args += process(EV_ABS, ABS_MT_SLOT, 0);
+    args += process(EV_ABS, ABS_MT_TRACKING_ID, -1);
+    args += process(EV_ABS, ABS_MT_SLOT, 1);
+    args += process(EV_ABS, ABS_MT_TRACKING_ID, -1);
+    args += process(EV_KEY, BTN_TOUCH, 0);
+    args += process(EV_KEY, BTN_TOOL_DOUBLETAP, 0);
+    setScanCodeState(KeyState::UP, {BTN_TOUCH, BTN_TOOL_DOUBLETAP});
+    args += process(EV_SYN, SYN_REPORT, 0);
+    // We don't care exactly what events are output here (as we're just concerned with consistency
+    // enforced by the verifier), but we want to check that the events above did actually trigger a
+    // complete two-finger swipe.
+    ASSERT_THAT(args,
+                Contains(VariantWith<NotifyMotionArgs>(
+                        AllOf(WithMotionAction(ACTION_UP),
+                              WithMotionClassification(MotionClassification::TWO_FINGER_SWIPE)))));
+
+    // This sleep must be longer than the "Change Timeout" gesture property, to prevent
+    // ImmediateInterpreter from suppressing the following finger motions.
+    std::this_thread::sleep_for(std::chrono::milliseconds(250));
+
+    // Reset the mapper.
+    resetMapper(systemTime(SYSTEM_TIME_MONOTONIC));
+
+    // Move a finger on the touchpad.
+    args.clear();
+    int32_t moveX = 500;
+    args += process(EV_ABS, ABS_MT_SLOT, 0);
+    args += process(EV_ABS, ABS_MT_TRACKING_ID, 3);
+    args += process(EV_KEY, BTN_TOUCH, 1);
+    args += process(EV_KEY, BTN_TOOL_FINGER, 1);
+    setScanCodeState(KeyState::DOWN, {BTN_TOUCH, BTN_TOOL_FINGER});
+    args += process(EV_ABS, ABS_MT_POSITION_X, moveX);
+    args += process(EV_ABS, ABS_MT_POSITION_Y, 500);
+    args += process(EV_ABS, ABS_MT_PRESSURE, 25);
+    args += process(EV_SYN, SYN_REPORT, 0);
+    for (int32_t i = 0; i < 3; i++) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        moveX += 100;
+
+        args += process(EV_ABS, ABS_MT_POSITION_X, moveX);
+        args += process(EV_SYN, SYN_REPORT, 0);
+    }
+    // Again, we don't care about the detailed events, but check a cursor movement was detected.
+    ASSERT_THAT(args, Contains(VariantWith<NotifyMotionArgs>(WithMotionAction(HOVER_MOVE))));
 }
 
 TEST_F(TouchpadInputMapperTest, ThreeFingerSwipeDisabledDuringRelativeCapture) {
