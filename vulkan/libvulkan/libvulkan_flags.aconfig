@@ -2,6 +2,13 @@ package: "com.android.graphics.libvulkan.flags"
 container: "system"
 
 flag {
+  name: "oem_and_platform_layers"
+  namespace: "gpu"
+  description: "Enable support for OEM and Platform Layers"
+  bug: "333952056"
+}
+
+flag {
   name: "swapchain_mutable_format_ext"
   namespace: "core_graphics"
   description: "Enable the VK_KHR_swapchain_mutable_format vulkan extension"
