@@ -52,10 +52,10 @@ constexpr std::optional<uint8_t> NO_PORT = std::nullopt; // no physical port is 
 /**
  * Unit tests for TouchpadInputMapper.
  */
-class TouchpadInputMapperTest : public InputMapperUnitTest {
+class TouchpadInputMapperTest : public VerifyingInputMapperUnitTest {
 protected:
     void SetUp() override {
-        InputMapperUnitTest::SetUp();
+        VerifyingInputMapperUnitTest::SetUp();
 
         // Present scan codes: BTN_TOUCH and BTN_TOOL_FINGER
         expectScanCodes(/*present=*/true,
@@ -203,8 +203,8 @@ TEST_F(TouchpadInputMapperTest, HoverAndLeftButtonPress) {
     mFakePolicy->addDisplayViewport(viewport);
     std::list<NotifyArgs> args;
 
-    args += mMapper->reconfigure(systemTime(SYSTEM_TIME_MONOTONIC), mReaderConfiguration,
-                                 InputReaderConfiguration::Change::DISPLAY_INFO);
+    args += reconfigureMapper(systemTime(SYSTEM_TIME_MONOTONIC), mReaderConfiguration,
+                              InputReaderConfiguration::Change::DISPLAY_INFO);
     ASSERT_THAT(args, testing::IsEmpty());
 
     args += process(EV_ABS, ABS_MT_TRACKING_ID, 1);
@@ -257,16 +257,16 @@ TEST_F(TouchpadInputMapperTest, ThreeFingerSwipeDisabledDuringRelativeCapture) {
 
     mReaderConfiguration.pointerCaptureRequest.mode = PointerCaptureMode::RELATIVE;
     std::list<NotifyArgs> args;
-    args = mMapper->reconfigure(systemTime(SYSTEM_TIME_MONOTONIC), mReaderConfiguration,
-                                InputReaderConfiguration::Change::POINTER_CAPTURE);
+    args = reconfigureMapper(systemTime(SYSTEM_TIME_MONOTONIC), mReaderConfiguration,
+                             InputReaderConfiguration::Change::POINTER_CAPTURE);
 
     ASSERT_THAT(touchpadMapper->getGesturePropertyForTesting("Three Finger Swipe Enable")
                         ->getBoolValues(),
                 ElementsAre(false));
 
     mReaderConfiguration.pointerCaptureRequest.mode = PointerCaptureMode::UNCAPTURED;
-    args = mMapper->reconfigure(systemTime(SYSTEM_TIME_MONOTONIC), mReaderConfiguration,
-                                InputReaderConfiguration::Change::POINTER_CAPTURE);
+    args = reconfigureMapper(systemTime(SYSTEM_TIME_MONOTONIC), mReaderConfiguration,
+                             InputReaderConfiguration::Change::POINTER_CAPTURE);
 
     ASSERT_THAT(touchpadMapper->getGesturePropertyForTesting("Three Finger Swipe Enable")
                         ->getBoolValues(),
@@ -276,8 +276,8 @@ TEST_F(TouchpadInputMapperTest, ThreeFingerSwipeDisabledDuringRelativeCapture) {
 TEST_F(TouchpadInputMapperTest, TouchpadHardwareState) {
     mReaderConfiguration.shouldNotifyTouchpadHardwareState = true;
     std::list<NotifyArgs> args =
-            mMapper->reconfigure(ARBITRARY_TIME, mReaderConfiguration,
-                                 InputReaderConfiguration::Change::TOUCHPAD_SETTINGS);
+            reconfigureMapper(ARBITRARY_TIME, mReaderConfiguration,
+                              InputReaderConfiguration::Change::TOUCHPAD_SETTINGS);
 
     args += process(EV_ABS, ABS_MT_TRACKING_ID, 1);
     args += process(EV_KEY, BTN_TOUCH, 1);
@@ -296,8 +296,8 @@ TEST_F(TouchpadInputMapperTest, TouchpadAccelerationDisabled) {
     mReaderConfiguration.touchpadPointerSpeed = 3;
 
     std::list<NotifyArgs> args =
-            mMapper->reconfigure(ARBITRARY_TIME, mReaderConfiguration,
-                                 InputReaderConfiguration::Change::TOUCHPAD_SETTINGS);
+            reconfigureMapper(ARBITRARY_TIME, mReaderConfiguration,
+                              InputReaderConfiguration::Change::TOUCHPAD_SETTINGS);
 
     ASSERT_NO_FATAL_FAILURE(assertBothCurvesEqual(
             createFlatAccelerationCurve(mReaderConfiguration.touchpadPointerSpeed)));
@@ -309,8 +309,8 @@ TEST_F(TouchpadInputMapperTest, TouchpadAccelerationEnabled) {
     mReaderConfiguration.touchpadPointerSpeed = 3;
 
     std::list<NotifyArgs> args =
-            mMapper->reconfigure(ARBITRARY_TIME, mReaderConfiguration,
-                                 InputReaderConfiguration::Change::TOUCHPAD_SETTINGS);
+            reconfigureMapper(ARBITRARY_TIME, mReaderConfiguration,
+                              InputReaderConfiguration::Change::TOUCHPAD_SETTINGS);
     ASSERT_THAT(args, testing::IsEmpty());
 
     // Use createAccelerationCurveForPointerSensitivity to get expected curve segments.
@@ -321,13 +321,13 @@ TEST_F(TouchpadInputMapperTest, TouchpadAccelerationEnabled) {
 TEST_F(TouchpadInputMapperTest, AccelerationDisabledDuringCapture) {
     mReaderConfiguration.pointerCaptureRequest.mode = PointerCaptureMode::RELATIVE;
     std::list<NotifyArgs> args =
-            mMapper->reconfigure(ARBITRARY_TIME, mReaderConfiguration,
-                                 InputReaderConfiguration::Change::POINTER_CAPTURE);
+            reconfigureMapper(ARBITRARY_TIME, mReaderConfiguration,
+                              InputReaderConfiguration::Change::POINTER_CAPTURE);
     ASSERT_NO_FATAL_FAILURE(assertRelativeModeCurvesInUse());
 
     mReaderConfiguration.pointerCaptureRequest.mode = PointerCaptureMode::UNCAPTURED;
-    args = mMapper->reconfigure(ARBITRARY_TIME, mReaderConfiguration,
-                                InputReaderConfiguration::Change::POINTER_CAPTURE);
+    args = reconfigureMapper(ARBITRARY_TIME, mReaderConfiguration,
+                             InputReaderConfiguration::Change::POINTER_CAPTURE);
     ASSERT_NO_FATAL_FAILURE(assertBothCurvesEqual(createAccelerationCurveForPointerSensitivity(
             mReaderConfiguration.touchpadPointerSpeed)));
 }
@@ -336,17 +336,17 @@ TEST_F(TouchpadInputMapperTest, ExitingCaptureWithAccelerationDisabledDoesntReen
     mReaderConfiguration.touchpadAccelerationEnabled = false;
     mReaderConfiguration.touchpadPointerSpeed = 3;
     std::list<NotifyArgs> args =
-            mMapper->reconfigure(ARBITRARY_TIME, mReaderConfiguration,
-                                 InputReaderConfiguration::Change::TOUCHPAD_SETTINGS);
+            reconfigureMapper(ARBITRARY_TIME, mReaderConfiguration,
+                              InputReaderConfiguration::Change::TOUCHPAD_SETTINGS);
 
     mReaderConfiguration.pointerCaptureRequest.mode = PointerCaptureMode::RELATIVE;
-    args = mMapper->reconfigure(ARBITRARY_TIME, mReaderConfiguration,
-                                InputReaderConfiguration::Change::POINTER_CAPTURE);
+    args = reconfigureMapper(ARBITRARY_TIME, mReaderConfiguration,
+                             InputReaderConfiguration::Change::POINTER_CAPTURE);
     ASSERT_NO_FATAL_FAILURE(assertRelativeModeCurvesInUse());
 
     mReaderConfiguration.pointerCaptureRequest.mode = PointerCaptureMode::UNCAPTURED;
-    args = mMapper->reconfigure(ARBITRARY_TIME, mReaderConfiguration,
-                                InputReaderConfiguration::Change::POINTER_CAPTURE);
+    args = reconfigureMapper(ARBITRARY_TIME, mReaderConfiguration,
+                             InputReaderConfiguration::Change::POINTER_CAPTURE);
 
     ASSERT_NO_FATAL_FAILURE(assertBothCurvesEqual(
             createFlatAccelerationCurve(mReaderConfiguration.touchpadPointerSpeed)));
@@ -358,22 +358,22 @@ TEST_F(TouchpadInputMapperTest, ChangingSettingsDuringCaptureDoesntReenableAccel
 
     mReaderConfiguration.pointerCaptureRequest.mode = PointerCaptureMode::RELATIVE;
     std::list<NotifyArgs> args =
-            mMapper->reconfigure(ARBITRARY_TIME, mReaderConfiguration,
-                                 InputReaderConfiguration::Change::POINTER_CAPTURE);
+            reconfigureMapper(ARBITRARY_TIME, mReaderConfiguration,
+                              InputReaderConfiguration::Change::POINTER_CAPTURE);
     ASSERT_NO_FATAL_FAILURE(assertRelativeModeCurvesInUse());
 
     // Changing the pointer speed settings shouldn't result in an immediate change to the curve,
     // since we're in pointer capture.
     mReaderConfiguration.touchpadAccelerationEnabled = true;
     mReaderConfiguration.touchpadPointerSpeed = NEW_POINTER_SPEED;
-    args = mMapper->reconfigure(ARBITRARY_TIME, mReaderConfiguration,
-                                InputReaderConfiguration::Change::TOUCHPAD_SETTINGS);
+    args = reconfigureMapper(ARBITRARY_TIME, mReaderConfiguration,
+                             InputReaderConfiguration::Change::TOUCHPAD_SETTINGS);
     ASSERT_NO_FATAL_FAILURE(assertRelativeModeCurvesInUse());
 
     // ...but once we leave capture, the new speed should take effect.
     mReaderConfiguration.pointerCaptureRequest.mode = PointerCaptureMode::UNCAPTURED;
-    args = mMapper->reconfigure(ARBITRARY_TIME, mReaderConfiguration,
-                                InputReaderConfiguration::Change::POINTER_CAPTURE);
+    args = reconfigureMapper(ARBITRARY_TIME, mReaderConfiguration,
+                             InputReaderConfiguration::Change::POINTER_CAPTURE);
     ASSERT_NO_FATAL_FAILURE(
             assertBothCurvesEqual(createAccelerationCurveForPointerSensitivity(NEW_POINTER_SPEED)));
 }
