@@ -283,3 +283,13 @@ flag {
     purpose: PURPOSE_BUGFIX
   }
 }
+
+flag {
+  name: "fix_action_up_resampling"
+  namespace: "input"
+  description: "Fix a bug where ACTION_UP events are not resampled causing noticeable jank"
+  bug: "119214052"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
