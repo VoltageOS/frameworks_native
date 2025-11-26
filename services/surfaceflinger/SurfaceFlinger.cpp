@@ -3480,10 +3480,10 @@ void SurfaceFlinger::setForcedClientCompositionLayerStacks(
         refreshArgs.devOptFlashDirtyRegionsDelay = std::chrono::milliseconds(mDebugFlashDelay);
     }
 
+    const auto& displays = FTL_FAKE_GUARD(mStateLock, mDisplays);
     if (forceAllDisplaysToClientComposition) {
-        Mutex::Autolock lock(mStateLock);
-        for (const auto& [_, displayDevice] : mDisplays) {
-            refreshArgs.forcedClientCompositionLayerStacks.insert(displayDevice->getLayerStack());
+        for (const auto& [_, display] : displays) {
+            refreshArgs.forcedClientCompositionLayerStacks.insert(display->getLayerStack());
         }
         return;
     }
@@ -3492,30 +3492,18 @@ void SurfaceFlinger::setForcedClientCompositionLayerStacks(
         return;
     }
 
-    Mutex::Autolock lock(mStateLock);
-    const Fps pacesetterRefreshRate = mScheduler->getPacesetterRefreshRate();
-    for (const auto& [_, displayDevice] : mDisplays) {
-        const ui::LayerStack stack = displayDevice->getLayerStack();
-        if (displayDevice->isVirtual()) {
+    for (const auto& [_, display] : displays) {
+        if (display->isVirtual()) {
             // Assume that virtual displays composite at the same rate as the pacesetter.
             continue;
         }
 
-        const scheduler::RefreshRateSelector& selector = displayDevice->refreshRateSelector();
-        // RefreshRateSelector may not have an active mode set in the beginning.
-        if (!selector.hasActiveMode()) {
-            refreshArgs.forcedClientCompositionLayerStacks.insert(stack);
+        if (mScheduler->isLockstepFollower(display->getPhysicalId())) {
+            // Follower displays in lockstep with pacesetter are allowed to composite on DPU.
             continue;
         }
 
-        const Fps displayVsyncRate = selector.getActiveMode().modePtr->getVsyncRate();
-        const float rateDiff = pacesetterRefreshRate.getValue() - displayVsyncRate.getValue();
-        constexpr float kRefreshRateEpsilon = 0.1f;
-        if (rateDiff > kRefreshRateEpsilon) {
-            refreshArgs.forcedClientCompositionLayerStacks.insert(stack);
-        }
-        // Physical displays with refresh rate roughly equal to pacesetter's are not forced to
-        // client composite.
+        refreshArgs.forcedClientCompositionLayerStacks.insert(display->getLayerStack());
     }
 }
 
