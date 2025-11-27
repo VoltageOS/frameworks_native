@@ -4789,6 +4789,24 @@ void SurfaceFlinger::updateCursorAsync() {
 
 void SurfaceFlinger::requestHardwareVsync(PhysicalDisplayId displayId, bool enable) {
     getHwComposer().setVsyncEnabled(displayId, enable ? hal::Vsync::ENABLE : hal::Vsync::DISABLE);
+
+    // Query HWC for the actual Vsync time and provide it to the scheduler when enabled.
+    if (enable && FlagManager::getInstance().get_display_known_vsync_sample_enabled()) {
+        if (auto sample = getHwComposer().getDisplayKnownVsyncSample(displayId)) {
+            const nsecs_t actualVsyncTime = sample->timestampNs;
+            const auto vsyncSchedule = mScheduler->getVsyncSchedule(displayId);
+            LOG_ALWAYS_FATAL_IF(!vsyncSchedule);
+
+            const nsecs_t modelErrorNs = vsyncSchedule->getModelAccuracyInNs(actualVsyncTime);
+            SFTRACE_FORMAT("VsyncPredictionError(ms): error= %.2f, actual= %.2f, vsyncPeriod= "
+                           "%.2f",
+                           static_cast<float>(modelErrorNs) / 1.0e6f,
+                           static_cast<float>(actualVsyncTime) / 1.0e6f,
+                           static_cast<float>(sample->vsyncPeriodNs) / 1.0e6f);
+
+            mScheduler->addResyncSample(displayId, sample->timestampNs, sample->vsyncPeriodNs);
+        }
+    }
 }
 
 void SurfaceFlinger::requestDisplayModes(std::vector<display::DisplayModeRequest> modeRequests) {

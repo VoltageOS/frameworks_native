@@ -60,6 +60,7 @@
 #include <aidl/android/hardware/graphics/composer3/Luts.h>
 #include <aidl/android/hardware/graphics/composer3/OutputType.h>
 #include <aidl/android/hardware/graphics/composer3/OverlayProperties.h>
+#include <aidl/android/hardware/graphics/composer3/VsyncSample.h>
 
 namespace android {
 
@@ -337,6 +338,7 @@ public:
     virtual status_t setReadbackBuffer(PhysicalDisplayId, const sp<GraphicBuffer>& buffer,
                                        const android::sp<android::Fence>& acquireFence) = 0;
     virtual sp<Fence> getReadbackBufferFence(PhysicalDisplayId) = 0;
+    virtual std::optional<composer3::VsyncSample> getDisplayKnownVsyncSample(PhysicalDisplayId) = 0;
 };
 
 static inline bool operator==(const android::HWComposer::DeviceRequestedChanges& lhs,
@@ -513,6 +515,7 @@ public:
     status_t setReadbackBuffer(PhysicalDisplayId, const sp<GraphicBuffer>& buffer,
                                const android::sp<android::Fence>& acquireFence) override;
     sp<Fence> getReadbackBufferFence(PhysicalDisplayId) override;
+    std::optional<composer3::VsyncSample> getDisplayKnownVsyncSample(PhysicalDisplayId) override;
 
     // for debugging ----------------------------------------------------------
     void dump(std::string& out) const override;
@@ -557,6 +560,7 @@ private:
 
         std::mutex vsyncEnabledLock;
         hal::Vsync vsyncEnabled GUARDED_BY(vsyncEnabledLock) = hal::Vsync::DISABLE;
+        std::optional<bool> getDisplayKnownVsyncSampleSupported;
     };
 
     std::optional<display::DisplayIdentificationInfo> onHotplugConnect(hal::HWDisplayId);

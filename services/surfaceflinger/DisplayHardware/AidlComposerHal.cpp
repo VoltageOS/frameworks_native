@@ -31,6 +31,7 @@
 #include <ui/ScreenPartStatus.h>
 
 #include <aidl/android/hardware/graphics/composer3/BnComposerCallback.h>
+#include <aidl/android/hardware/graphics/composer3/VsyncSample.h>
 
 #include <algorithm>
 #include <cinttypes>
@@ -1805,6 +1806,17 @@ Error AidlComposer::getReadbackBufferFence(Display display, int* outReleaseFence
     }
 
     *outReleaseFence = fence.release();
+    return Error::NONE;
+}
+
+Error AidlComposer::getDisplayKnownVsyncSample(Display display,
+                                               composer3::VsyncSample* outVsyncSample) {
+    const auto status = mAidlComposerClient->getDisplayKnownVsyncSample(translate<int64_t>(display),
+                                                                        outVsyncSample);
+    if (!status.isOk()) {
+        ALOGE("getDisplayKnownVsyncSample failed %s", status.getDescription().c_str());
+        return static_cast<Error>(status.getServiceSpecificError());
+    }
     return Error::NONE;
 }
 

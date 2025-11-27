@@ -247,7 +247,8 @@ public:
     Error setReadbackBuffer(Display display, const sp<GraphicBuffer>& buffer,
                             int acquireFence) override;
     Error getReadbackBufferFence(Display display, int* outReleaseFence) override;
-
+    Error getDisplayKnownVsyncSample(Display display,
+                                     composer3::VsyncSample* outVsyncSample) override;
     Error setDisplayMode(Display display, Config modeId, bool seamless) override;
 
 private:

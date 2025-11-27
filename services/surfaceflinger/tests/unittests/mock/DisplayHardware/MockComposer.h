@@ -193,6 +193,7 @@ public:
                 (Display, composer3::ReadbackBufferAttributes*));
     MOCK_METHOD(Error, setReadbackBuffer, (Display, const sp<GraphicBuffer>&, int));
     MOCK_METHOD(Error, getReadbackBufferFence, (Display, int*));
+    MOCK_METHOD(Error, getDisplayKnownVsyncSample, (Display, composer3::VsyncSample*));
 };
 
 } // namespace Hwc2::mock
