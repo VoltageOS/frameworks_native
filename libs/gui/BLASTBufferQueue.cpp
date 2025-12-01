@@ -244,6 +244,11 @@ BLASTBufferQueue::BLASTBufferQueue(const std::string& name, bool updateDestinati
 
 BLASTBufferQueue::~BLASTBufferQueue() {
     TransactionCompletedListener::getInstance()->removeQueueStallListener(this);
+
+    if (mTransactionReadyCallback) {
+        mTransactionReadyCallback(mSyncTransaction);
+    }
+
     if (mPendingTransactions.empty()) {
         return;
     }
@@ -253,10 +258,6 @@ BLASTBufferQueue::~BLASTBufferQueue() {
     mergePendingTransactions(&t, std::numeric_limits<uint64_t>::max() /* frameNumber */);
     // All transactions on our apply token are one-way. See comment on mAppliedLastTransaction
     t.setApplyToken(mApplyToken).apply(false, true);
-
-    if (mTransactionReadyCallback) {
-        mTransactionReadyCallback(mSyncTransaction);
-    }
 }
 
 void BLASTBufferQueue::onFirstRef() {
