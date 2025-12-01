@@ -76,6 +76,8 @@
 #include <gui/AidlUtil.h>
 #include <gui/BufferQueue.h>
 #include <gui/DebugEGLImageTracker.h>
+#include <gui/GraphicBuffersRegisterInfo.h>
+#include <gui/GraphicBuffersUnregisterInfo.h>
 #include <gui/IProducerListener.h>
 #include <gui/LayerMetadata.h>
 #include <gui/LayerState.h>
@@ -164,6 +166,7 @@
 #include "PowerAdvisor/PowerAdvisor.h"
 #include "PowerAdvisor/Workload.h"
 #include "RegionSamplingThread.h"
+#include "RenderResourceCache.h"
 #include "Scheduler/EventThread.h"
 #include "Scheduler/FrameTimeline.h"
 #include "Scheduler/LayerHistory.h"
@@ -2728,7 +2731,8 @@ bool SurfaceFlinger::updateLayerSnapshots(VsyncId vsyncId, nsecs_t frameTimeNs,
                  .skipRoundCornersWhenProtected = !getRenderEngine().supportsProtectedContent(),
                  .mergeableHierarchyManager = FlagManager::getInstance().frontend_caching_v0()
                          ? &mMergeableHierarchyManager
-                         : nullptr};
+                         : nullptr,
+                 .renderResourceCache = mIpcCache.get()};
 
     if (FlagManager::getInstance().frontend_caching_v0()) {
         {
@@ -2971,6 +2975,10 @@ bool SurfaceFlinger::commit(PhysicalDisplayId pacesetterId,
             display->animateHdrSdrRatioOverlay();
         }
     }
+
+    // Must update resource caches before snapshots will try to resolve
+    // render resource tokens.
+    mIpcCache->processPendingOperations();
 
     // Composite if transactions were committed, or if requested by HWC.
     bool mustComposite = mMustComposite.exchange(false);
@@ -10516,6 +10524,18 @@ binder::Status SurfaceComposerAIDL::resetForcedPacesetter() {
     }
 
     mFlinger->sfdo_resetForcedPacesetter();
+    return binder::Status::ok();
+}
+
+binder::Status SurfaceComposerAIDL::registerGraphicBuffers(
+        const gui::GraphicBuffersRegisterInfo& info) {
+    mFlinger->mIpcCache->queueRegisterGraphicBuffers(info);
+    return binder::Status::ok();
+}
+
+binder::Status SurfaceComposerAIDL::unregisterGraphicBuffers(
+        const gui::GraphicBuffersUnregisterInfo& info) {
+    mFlinger->mIpcCache->queueUnregisterGraphicBuffers(info);
     return binder::Status::ok();
 }
 

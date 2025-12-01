@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2025 The Android Open Source Project
+ * Copyright 2025 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,18 +14,7 @@
  * limitations under the License.
  */
 
-#pragma once
+package android.gui;
 
-namespace android {
+parcelable GraphicBuffersRegisterInfo cpp_header "gui/GraphicBuffersRegisterInfo.h" rust_type "gui_aidl_types_rs::GraphicBuffersRegisterInfo";
 
-struct ShmemImageInfo {
-    int width;
-    int height;
-    SkColorType colorType;
-    SkAlphaType alphaType;
-};
-
-ShmemImageInfo toShmemImageInfo(const SkImageInfo& info);
-SkImageInfo fromShmemImageInfo(const ShmemImageInfo& info);
-
-} // namespace android
