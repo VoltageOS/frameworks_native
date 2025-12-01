@@ -157,6 +157,7 @@ auto DisplayDevice::getFrontEndInfo() const -> frontend::DisplayInfo {
     info.logicalHeight = getLayerStackSpaceRect().height();
 
     return {.info = info,
+            .displayId = getId(),
             .transform = displayTransform,
             .receivesInput = receivesInput(),
             .isSecure = isSecure(),
