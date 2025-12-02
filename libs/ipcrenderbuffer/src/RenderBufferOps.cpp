@@ -855,7 +855,7 @@ std::string DrawImageRectOp::toString() const {
     return "DrawImageRectOp";
 }
 
-sk_sp<SkData> serializeTypeFace(SkTypeface* tf, void* ctx) {
+SkSerialReturnType serializeTypeFace(SkTypeface* tf, void* ctx) {
     thread_local static std::vector<char> sTmpTypefaceStorage;
 
     SkString familyName;
