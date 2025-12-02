@@ -4491,7 +4491,7 @@ void InputDispatcher::notifyKey(const NotifyKeyArgs& args) {
     { // acquire lock
         mLock.lock();
 
-        if (input_flags::keyboard_repeat_keys() && !mConfig.keyRepeatEnabled) {
+        if (!mConfig.keyRepeatEnabled) {
             policyFlags |= POLICY_FLAG_DISABLE_KEY_REPEAT;
         }
 
