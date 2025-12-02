@@ -1309,6 +1309,8 @@ void Output::devOptRepaintFlash(const compositionengine::CompositionRefreshArgs&
     presentFrameAndReleaseLayers(kFlushEvenWhenDisabled);
 
     std::this_thread::sleep_for(*refreshArgs.devOptFlashDirtyRegionsDelay);
+
+    prepareFrame();
 }
 
 void Output::finishFrame(GpuCompositionResult&& result) {
