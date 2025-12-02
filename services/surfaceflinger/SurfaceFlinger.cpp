@@ -5778,11 +5778,13 @@ uint32_t SurfaceFlinger::updateLayerCallbacksAndStats(const FrameTimelineInfo& f
 
     frontend::LayerSnapshot* snapshot = nullptr;
     gui::GameMode gameMode = gui::GameMode::Unsupported;
+    int32_t systemContentPriority = gui::ISystemContentPriorityConstants::Unset;
     if (what & (layer_state_t::eSidebandStreamChanged | layer_state_t::eBufferChanged) ||
         frameTimelineInfo.vsyncId != FrameTimelineInfo::INVALID_VSYNC_ID) {
         snapshot = mLayerSnapshotBuilder.getSnapshot(layer->sequence);
         if (snapshot) {
             gameMode = snapshot->gameMode;
+            systemContentPriority = snapshot->systemContentPriority;
         }
     }
 
@@ -5800,7 +5802,8 @@ uint32_t SurfaceFlinger::updateLayerCallbacksAndStats(const FrameTimelineInfo& f
         if (layer->setCrop(s.crop)) flags |= eTraversalNeeded;
     }
     if (what & layer_state_t::eSidebandStreamChanged) {
-        if (layer->setSidebandStream(s.sidebandStream, frameTimelineInfo, postTime, gameMode))
+        if (layer->setSidebandStream(s.sidebandStream, frameTimelineInfo, postTime, gameMode,
+                                     systemContentPriority))
             flags |= eTraversalNeeded;
     }
     if (what & layer_state_t::eDataspaceChanged) {
@@ -5829,12 +5832,14 @@ uint32_t SurfaceFlinger::updateLayerCallbacksAndStats(const FrameTimelineInfo& f
         }
         layer->setCornerRadii(cornerRadii);
         if (layer->setBuffer(composerState.externalTexture, *s.bufferData, postTime,
-                             desiredPresentTime, isAutoTimestamp, frameTimelineInfo, gameMode)) {
+                             desiredPresentTime, isAutoTimestamp, frameTimelineInfo, gameMode,
+                             systemContentPriority)) {
             flags |= eTraversalNeeded;
         }
         mLayersWithQueuedFrames.emplace(layer, gameMode);
     } else if (frameTimelineInfo.vsyncId != FrameTimelineInfo::INVALID_VSYNC_ID) {
-        layer->setFrameTimelineVsyncForBufferlessTransaction(frameTimelineInfo, postTime, gameMode);
+        layer->setFrameTimelineVsyncForBufferlessTransaction(frameTimelineInfo, postTime, gameMode,
+                                                             systemContentPriority);
     }
 
     if ((what & layer_state_t::eBufferChanged) == 0) {
