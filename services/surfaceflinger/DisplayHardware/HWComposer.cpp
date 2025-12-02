@@ -1142,6 +1142,37 @@ sp<Fence> HWComposer::getReadbackBufferFence(PhysicalDisplayId displayId) {
     return fence;
 }
 
+std::optional<composer3::VsyncSample> HWComposer::getDisplayKnownVsyncSample(
+        PhysicalDisplayId displayId) {
+    RETURN_IF_INVALID_DISPLAY(displayId, std::nullopt);
+    auto& displayData = mDisplayData[displayId];
+    if (displayData.getDisplayKnownVsyncSampleSupported.has_value() &&
+        !displayData.getDisplayKnownVsyncSampleSupported.value()) {
+        return std::nullopt;
+    }
+
+    const auto hwcId = fromPhysicalDisplayId(displayId);
+    if (!hwcId.has_value()) {
+        return std::nullopt;
+    }
+
+    composer3::VsyncSample vsyncSample;
+    const auto error =
+            static_cast<hal::Error>(mComposer->getDisplayKnownVsyncSample(*hwcId, &vsyncSample));
+    if (error != hal::Error::NONE) {
+        if (error == hal::Error::UNSUPPORTED) {
+            displayData.getDisplayKnownVsyncSampleSupported = false;
+            ALOGD("%s: getDisplayKnownVsyncSample is UNSUPPORTED for display %s", __func__,
+                  to_string(displayId).c_str());
+        } else {
+            LOG_HWC_ERROR("getDisplayKnownVsyncSample", error, displayId);
+        }
+        return std::nullopt;
+    }
+    displayData.getDisplayKnownVsyncSampleSupported = true;
+    return vsyncSample;
+}
+
 const std::unordered_map<std::string, bool>& HWComposer::getSupportedLayerGenericMetadata() const {
     return mSupportedLayerGenericMetadata;
 }

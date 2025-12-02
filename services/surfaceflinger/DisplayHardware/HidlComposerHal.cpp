@@ -1483,6 +1483,10 @@ Error HidlComposer::getReadbackBufferFence(Display, int*) {
     return Error::UNSUPPORTED;
 }
 
+Error HidlComposer::getDisplayKnownVsyncSample(Display, composer3::VsyncSample*) {
+    return Error::UNSUPPORTED;
+}
+
 Error HidlComposer::setDisplayPictureProfileId(Display, PictureProfileId) {
     return Error::UNSUPPORTED;
 }

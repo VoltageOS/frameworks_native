@@ -50,6 +50,7 @@
 #include <aidl/android/hardware/graphics/composer3/Luts.h>
 #include <aidl/android/hardware/graphics/composer3/OverlayProperties.h>
 #include <aidl/android/hardware/graphics/composer3/ReadbackBufferAttributes.h>
+#include <aidl/android/hardware/graphics/composer3/VsyncSample.h>
 
 #include <optional>
 
@@ -329,7 +330,8 @@ public:
     virtual Error setReadbackBuffer(Display display, const sp<GraphicBuffer>& buffer,
                                     int acquireFence) = 0;
     virtual Error getReadbackBufferFence(Display display, int* outReleaseFence) = 0;
-
+    virtual Error getDisplayKnownVsyncSample(Display display,
+                                             composer3::VsyncSample* outVsyncSample) = 0;
     virtual Error setDisplayMode(Display display, Config modeId, bool seamless) = 0;
 };
 
