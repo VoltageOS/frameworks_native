@@ -876,6 +876,11 @@ void SkiaRenderEngine::drawLayersInternal(
                 break;
             }
         }
+        if (FlagManager::getInstance().window_blur_kawase2_preallocate_buffers() &&
+            !mBlurFilter->isBufferPreallocated() && !display.physicalDisplay.isEmpty()) {
+            mBlurFilter->preallocateBuffer(mProtectedContext.get(),
+                                           display.physicalDisplay.getSize());
+        }
     }
 
     AutoSaveRestore surfaceAutoSaveRestore(canvas);
@@ -1005,7 +1010,8 @@ void SkiaRenderEngine::drawLayersInternal(
 
                 if (layer.backgroundBlurRadius > 0) {
                     SFTRACE_NAME("BackgroundBlur");
-                    auto blurredImage = mBlurFilter->generate(context, layer.backgroundBlurRadius,
+                    auto blurredImage = mBlurFilter->generate(context, display,
+                                                              layer.backgroundBlurRadius,
                                                               blurInput, blurRect);
 
                     cachedBlurs[layer.backgroundBlurRadius] = blurredImage;
@@ -1020,8 +1026,8 @@ void SkiaRenderEngine::drawLayersInternal(
                     if (cachedBlurs[region.blurRadius] == nullptr) {
                         SFTRACE_NAME("BlurRegion");
                         cachedBlurs[region.blurRadius] =
-                                mBlurFilter->generate(context, region.blurRadius, blurInput,
-                                                      blurRect);
+                                mBlurFilter->generate(context, display, region.blurRadius,
+                                                      blurInput, blurRect);
                     }
 
                     mBlurFilter->drawBlurRegion(canvas, getBlurRRect(region), region.blurRadius,
@@ -1495,6 +1501,10 @@ void SkiaRenderEngine::drawShadow(SkCanvas* canvas,
 }
 
 void SkiaRenderEngine::onActiveDisplaySizeChanged(ui::Size size) {
+    if (FlagManager::getInstance().window_blur_kawase2_preallocate_buffers() && mBlurFilter) {
+        mBlurFilter->preallocateBuffer(mProtectedContext.get(), size);
+    }
+
     // This cache multiplier was selected based on review of cache sizes relative
     // to the screen resolution. Looking at the worst case memory needed by blur (~1.5x),
     // shadows (~1x), and general data structures (e.g. vertex buffers) we selected this as a
