@@ -1740,8 +1740,7 @@ private:
     //  to rebuild layer stack instead of crashing.
     void setVisibleRegionDirtyIfNeeded(compositionengine::CompositionRefreshArgs& refreshArgs);
 
-    void setForcedClientCompositionLayerStacks(
-            compositionengine::CompositionRefreshArgs& refreshArgs) EXCLUDES(mStateLock);
+    void setForcedClientCompositionLayerStacks(compositionengine::CompositionRefreshArgs&);
 };
 
 class SurfaceComposerAIDL : public gui::BnSurfaceComposer {
