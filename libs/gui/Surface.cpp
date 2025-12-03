@@ -2155,6 +2155,7 @@ int Surface::dispatchSetFrameTimelineInfo(va_list args) {
     ftlInfo.skippedFrameVsyncId = nativeWindowFtlInfo.skippedFrameVsyncId;
     ftlInfo.skippedFrameStartTimeNanos = nativeWindowFtlInfo.skippedFrameStartTimeNanos;
     ftlInfo.vsyncResyncedJitterNanos = nativeWindowFtlInfo.vsyncResyncedJitterNanos;
+    ftlInfo.dequeueBufferDurationNanos = nativeWindowFtlInfo.dequeueBufferDurationNanos;
 
     return setFrameTimelineInfo(nativeWindowFtlInfo.frameNumber, ftlInfo);
 #endif
