@@ -824,3 +824,6 @@ pub unsafe extern "C" fn rust_read_uid_power_delta(buffer: *mut u64, buffer_len:
     }
     count * 2
 }
+
+#[cfg(test)]
+mod tests;
