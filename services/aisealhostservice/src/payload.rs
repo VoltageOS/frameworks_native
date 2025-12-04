@@ -30,14 +30,20 @@ use std::{
 };
 use zip::ZipArchive;
 
+/// Holds file descriptors for all APKs and idsig files required to boot a VM.
 pub(crate) struct VmPayload {
+    /// File descriptor of the main config APK.
     pub(crate) config_apk: ParcelFileDescriptor,
+    /// File descriptor of the idsig of the main config APK.
     pub(crate) config_idsig: ParcelFileDescriptor,
+    /// File descriptors of tenant APKs.
     pub(crate) tenant_apks: Vec<ParcelFileDescriptor>,
+    /// File descriptors of idsigs of tenant APKs.
     pub(crate) tenant_idsigs: Vec<ParcelFileDescriptor>,
 }
 
 impl VmPayload {
+    /// Loads all payload APKs and their idsigs.
     pub(crate) fn load(
         pm: &PackageManager,
         vm: &dyn IVirtualizationService,

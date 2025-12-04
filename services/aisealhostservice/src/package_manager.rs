@@ -23,15 +23,19 @@ use packagemanager_aidl::aidl::android::content::pm::{
 const PACKAGE_MANAGER_NATIVE_SERVICE: &str = "package_native";
 
 const USER_SYSTEM: i32 = 0;
+/// Wrapper over `IPackageManagerNative` that provides helper methods for interacting with the
+/// package manager.
 pub(crate) struct PackageManager(binder::Strong<dyn IPackageManagerNative>);
 
 impl PackageManager {
+    /// Creates a new `PackageManager` instance.
     pub(crate) fn new() -> Result<Self> {
         let pm = wait_for_interface::<dyn IPackageManagerNative>(PACKAGE_MANAGER_NATIVE_SERVICE)
             .context("Failed to get package manager native service")?;
         Ok(Self(pm))
     }
 
+    /// Returns the package info for a given package.
     pub(crate) fn get_package_info(&self, package_name: &str) -> Result<PackageInfoNative> {
         self.0
             .getPackageInfoWithSigningInfo(package_name, USER_SYSTEM)
@@ -39,6 +43,7 @@ impl PackageManager {
             .ok_or(anyhow!("Package {package_name} is not found"))
     }
 
+    /// Returns the package name of the calling process.
     pub(crate) fn get_calling_package(&self) -> Result<String> {
         let uid = ThreadState::get_calling_uid();
         let uid: i32 = uid.try_into().with_context(|| format!("Failed to convert {uid} to i32"))?;

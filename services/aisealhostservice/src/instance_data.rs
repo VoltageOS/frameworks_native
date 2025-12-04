@@ -43,14 +43,20 @@ fn get_encrypted_storage_path(vm_dir: &str) -> String {
     format!("{vm_dir}/storage.img")
 }
 
+/// Holds information about files required to boot the VM instance.
 pub(crate) struct InstanceData {
+    /// Unique VM instance ID.
     pub(crate) instance_id: [u8; 64],
+    /// Path to the VM directory.
     pub(crate) vm_dir: String,
+    /// File descriptor for the instance image.
     pub(crate) instance_image: ParcelFileDescriptor,
+    /// File descriptor for the encrypted storage image.
     pub(crate) encrypted_storage: ParcelFileDescriptor,
 }
 
 impl InstanceData {
+    /// Loads an existing VM instance.
     pub(crate) fn load_existing(
         virt_service: &dyn IVirtualizationService,
         aiseal_config: &AiSealConfig,
@@ -77,6 +83,7 @@ impl InstanceData {
         Ok(InstanceData { instance_id, vm_dir, instance_image, encrypted_storage })
     }
 
+    /// Creates a new VM instance.
     pub(crate) fn create(
         virt_service: &dyn IVirtualizationService,
         aiseal_config: &AiSealConfig,
@@ -114,6 +121,7 @@ impl InstanceData {
     }
 }
 
+/// Removes all data related to the current VM instance.
 pub(crate) fn invalidate_current_vm(
     instance_id: &[u8; 64],
     vm_dir: &str,

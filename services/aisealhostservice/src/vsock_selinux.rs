@@ -69,6 +69,7 @@ where
     result
 }
 
+/// Connects to the vsock port of the given CID with a given SELinux context.
 pub(crate) fn connect_with_cid_port_context(
     cid: u32,
     port: u32,

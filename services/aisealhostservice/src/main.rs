@@ -196,6 +196,7 @@ fn main() {
         std::process::exit(1)
     }
 }
+/// A callback for VM lifecycle events.
 struct Callback {}
 impl vmclient::VmCallback for Callback {
     fn on_payload_started(&self, cid: i32) {
@@ -220,6 +221,7 @@ impl vmclient::VmCallback for Callback {
     }
 }
 
+/// Checks if the calling process has a given permission.
 fn check_permission(perm: &str) -> binder::Result<()> {
     let calling_pid = ThreadState::get_calling_pid();
     let calling_uid = ThreadState::get_calling_uid();
@@ -236,10 +238,12 @@ fn check_permission(perm: &str) -> binder::Result<()> {
     }
 }
 
+/// Checks if the calling process has the `MANAGE_AISEAL_VIRTUAL_MACHINE` permission.
 fn check_manage_permission() -> binder::Result<()> {
     check_permission("android.permission.MANAGE_AISEAL_VIRTUAL_MACHINE")
 }
 
+/// Gets SELinux context of the calling process.
 fn get_calling_sid() -> binder::Result<String> {
     ThreadState::with_calling_sid(move |opt_sid| -> Result<String> {
         let sid = opt_sid.context("Failed to get calling sid")?;
@@ -248,6 +252,7 @@ fn get_calling_sid() -> binder::Result<String> {
     .or_binder_exception(ExceptionCode::SECURITY)
 }
 
+/// Extracts MLS level from SELinux context.
 fn extract_mls_level(context: &str) -> binder::Result<String> {
     let fields: Vec<_> = context.split(':').collect();
     if fields.len() == 4 {
@@ -259,6 +264,7 @@ fn extract_mls_level(context: &str) -> binder::Result<String> {
     }
 }
 
+/// Replaces MLS level in SELinux context.
 fn replace_mls_level(context: &str, level: &str) -> binder::Result<String> {
     let fields: Vec<_> = context.split(':').collect();
     if fields.len() >= 4 && fields.len() <= 5 {
@@ -267,6 +273,7 @@ fn replace_mls_level(context: &str, level: &str) -> binder::Result<String> {
         Err(anyhow!("invalid context {}", context)).or_binder_exception(ExceptionCode::SECURITY)
     }
 }
+/// Implementation of the `IAiSealHostService` AIDL interface.
 struct AiSealHostService {
     pm: PackageManager,
     instance: VmInstance,
@@ -277,6 +284,7 @@ struct AiSealHostService {
 impl Interface for AiSealHostService {}
 
 impl AiSealHostService {
+    /// Creates a new binder object for the `AiSealHostService`.
     fn new_binder(
         pm: PackageManager,
         instance: VmInstance,
@@ -291,6 +299,7 @@ impl AiSealHostService {
 }
 
 impl IAiSealHostService for AiSealHostService {
+    /// Connects to a vsock service provided by a tenant in the VM.
     fn connectService(&self, name: &str) -> binder::Result<ParcelFileDescriptor> {
         check_manage_permission()?;
         // TODO: vm state checks

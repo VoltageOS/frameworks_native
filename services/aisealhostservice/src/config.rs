@@ -38,21 +38,32 @@ const AISEAL_DEBUGGABLE_DEFAULT: bool = false;
 const AISEAL_MEMORY_BYTES_DEFAULT: i64 = 300 * 1024 * 1024;
 const AISEAL_ENCRYPTED_STORAGE_BYTES_DEFAULT: i64 = 16 * 1024 * 1024 * 1024;
 
+/// Full AiSeal configuration.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct AiSealConfig {
+    /// Is VM debuggable.
     pub(crate) debuggable: bool,
+    /// Is VM protected.
     pub(crate) protected_vm: bool,
+    /// VM memory size in MiB.
     pub(crate) memory_mib: i32,
+    /// VM encrypted storage size in bytes.
     pub(crate) encrypted_storage_bytes: i64,
+    /// Supported ABIs.
     pub(crate) abis: Vec<String>,
+    /// Name of the package with the payload config.
     pub(crate) payload_config_package_name: String,
+    /// Path to the APK with the payload config.
     pub(crate) payload_config_package_path: String,
+    /// VM payload configuration, shared with AVF.
     pub(crate) vm_payload_config: VmPayloadConfig,
+    /// Path to the VM payload config inside config APK.
     pub(crate) vm_payload_config_path: String,
+    /// AiSeal specific payload configuration.
     pub(crate) aiseal_payload_config: AiSealPayloadConfig,
 }
 
-/// AiSeal-specific VM configuration, stored inside main payload APK
+/// AiSeal-specific payload configuration, stored inside the payload config APK.
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 pub(crate) struct AiSealPayloadConfig {
     /// Version of the config
@@ -64,34 +75,38 @@ pub(crate) struct AiSealPayloadConfig {
     pub(crate) tenants: Vec<AiSealTenant>,
 }
 
-/// AiSeal tenant configuration, that is not part of AVF payload configuration
+/// AiSeal-specific tenant configuration.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub(crate) struct AiSealTenant {
-    /// Package name of the tenant
+    /// Package name of the tenant.
     pub(crate) name: String,
 
-    /// List of services exported by the tenant to be used by its host application
+    /// List of services exported by the tenant to its host application.
     #[serde(default)]
     #[serde(alias = "host_services")]
     pub(crate) exported_services: Vec<ExportedService>,
 }
 
-/// Configuration of service provided by VM tenant to its host application
+/// Configuration of service provided by VM tenant to its host application.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub(crate) struct ExportedService {
-    /// Name of the service
+    /// Name of the service.
     pub(crate) name: String,
 
-    /// Vsock port that is used to serve a service
+    /// Vsock port that is used to serve a service.
     pub(crate) port: i32,
 }
 
+/// Exported service together with its owner package name.
 pub(crate) struct ExportedServiceWithOwner {
+    /// Package name of the tenant that owns a service.
     pub(crate) owner: String,
+    /// Exported service configuration.
     pub(crate) service: ExportedService,
 }
 
 impl AiSealPayloadConfig {
+    /// Returns a map from a service name to its owner.
     pub(crate) fn get_service_to_owner_map(&self) -> HashMap<String, ExportedServiceWithOwner> {
         self.tenants
             .iter()
@@ -111,6 +126,7 @@ impl AiSealPayloadConfig {
 }
 
 impl AiSealConfig {
+    /// Loads AiSeal configuration from system properties and payload config APK.
     pub(crate) fn load(pm: &PackageManager) -> Result<AiSealConfig> {
         let debuggable = get_debuggable()?;
         let protected_vm = get_protected_vm_flag()?;
