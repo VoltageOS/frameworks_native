@@ -35,17 +35,17 @@ impl PackageManager {
     pub(crate) fn get_package_info(&self, package_name: &str) -> Result<PackageInfoNative> {
         self.0
             .getPackageInfoWithSigningInfo(package_name, USER_SYSTEM)
-            .context(format!("getPackageInfoWithSigningInfo failed for {package_name}"))?
+            .with_context(|| format!("getPackageInfoWithSigningInfo failed for {package_name}"))?
             .ok_or(anyhow!("Package {package_name} is not found"))
     }
 
     pub(crate) fn get_calling_package(&self) -> Result<String> {
         let uid = ThreadState::get_calling_uid();
-        let uid: i32 = uid.try_into().context(format!("Failed to convert {uid} to i32"))?;
+        let uid: i32 = uid.try_into().with_context(|| format!("Failed to convert {uid} to i32"))?;
         let names = self
             .0
             .getNamesForUids(&[uid])
-            .context(format!("getNamesForUids failed for UID {uid}"))?;
+            .with_context(|| format!("getNamesForUids failed for UID {uid}"))?;
         if names.len() == 1 {
             Ok(names[0].clone())
         } else {

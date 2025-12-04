@@ -57,17 +57,18 @@ impl InstanceData {
     ) -> Result<InstanceData> {
         let instance_id_path = get_instance_id_path();
         let instance_id = load_instance_id(&instance_id_path)
-            .context(format!("Failed to read instance id from {instance_id_path}"))?;
+            .with_context(|| format!("Failed to read instance id from {instance_id_path}"))?;
 
         let vm_dir = get_vm_dir();
 
         let instance_image_path = get_instance_image_path(&vm_dir);
         let instance_image = load_image(&instance_image_path)
-            .context(format!("Failed to open instance image from {instance_image_path}"))?;
+            .with_context(|| format!("Failed to open instance image from {instance_image_path}"))?;
 
         let encrypted_storage_path = get_encrypted_storage_path(&vm_dir);
-        let encrypted_storage = load_image(&encrypted_storage_path)
-            .context(format!("Failed to open encrypted storage from {encrypted_storage_path}"))?;
+        let encrypted_storage = load_image(&encrypted_storage_path).with_context(|| {
+            format!("Failed to open encrypted storage from {encrypted_storage_path}")
+        })?;
 
         // Update storage size to the current size from configuration, if needed
         virt_service
@@ -84,7 +85,7 @@ impl InstanceData {
             virt_service.allocateInstanceId().context("Failed to allocate instance id")?;
         let instance_id_path = get_instance_id_path();
         write_instance_id(&instance_id, &instance_id_path)
-            .context(format!("Failed to write instance id to {instance_id_path}"))?;
+            .with_context(|| format!("Failed to write instance id to {instance_id_path}"))?;
 
         let vm_dir = get_vm_dir();
         create_vm_dir(&vm_dir)?;
@@ -96,7 +97,7 @@ impl InstanceData {
             AISEAL_INSTANCE_IMAGE_SIZE,
             PartitionType::ANDROID_VM_INSTANCE,
         )
-        .context(format!("Failed to create instance image in {instance_image_path}"))?;
+        .with_context(|| format!("Failed to create instance image in {instance_image_path}"))?;
 
         let encrypted_storage_path = get_encrypted_storage_path(&vm_dir);
         let encrypted_storage = create_image(
@@ -105,7 +106,9 @@ impl InstanceData {
             aiseal_config.encrypted_storage_bytes,
             PartitionType::ENCRYPTEDSTORE,
         )
-        .context(format!("Failed to create encrypted storage in {encrypted_storage_path}"))?;
+        .with_context(|| {
+            format!("Failed to create encrypted storage in {encrypted_storage_path}")
+        })?;
 
         Ok(InstanceData { instance_id, vm_dir, instance_image, encrypted_storage })
     }
@@ -118,8 +121,8 @@ pub(crate) fn invalidate_current_vm(
 ) -> Result<()> {
     // We have to delete instance id file first to make sure it is not reused
     let instance_id_path = get_instance_id_path();
-    fs::remove_file(instance_id_path)
-        .context("Failed to remove instance id file at {instance_id_path}")?;
+    fs::remove_file(&instance_id_path)
+        .with_context(|| format!("Failed to remove instance id file at {instance_id_path}"))?;
     delete_vm(vm_dir, instance_id, virt_service)
 }
 

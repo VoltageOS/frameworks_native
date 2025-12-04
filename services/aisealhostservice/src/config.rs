@@ -126,24 +126,28 @@ impl AiSealConfig {
 
         let config_package_info = pm
             .get_package_info(&config_package)
-            .context(format!("Failed to get config APK info: {config_package}"))?;
+            .with_context(|| format!("Failed to get config APK info: {config_package}"))?;
         let config_apk_path = config_package_info
             .sourceDir
             .ok_or(anyhow!("Failed to get config APK path: {config_package}"))?;
         let mut config_apk_zip = ZipArchive::new(BufReader::new(
             fs::File::open(&config_apk_path)
-                .context(format!("Failed to open config APK: {config_apk_path}"))?,
+                .with_context(|| format!("Failed to open config APK: {config_apk_path}"))?,
         ))
-        .context(format!("Failed to unzip config APK: {config_apk_path}"))?;
+        .with_context(|| format!("Failed to unzip config APK: {config_apk_path}"))?;
 
         let vm_payload_config: VmPayloadConfig =
-            get_config(&mut config_apk_zip, &vm_payload_config_path).context(
+            get_config(&mut config_apk_zip, &vm_payload_config_path).with_context(|| {
+                format!(
                 "Failed to load VM payload config from {config_package}:{vm_payload_config_path}",
-            )?;
+            )
+            })?;
         let aiseal_payload_config: AiSealPayloadConfig =
-            get_config(&mut config_apk_zip, &aiseal_payload_config_path).context(
+            get_config(&mut config_apk_zip, &aiseal_payload_config_path).with_context(|| {
+                format!(
                 "Failed to load AiSeal config from {config_package}:{aiseal_payload_config_path}",
-            )?;
+            )
+            })?;
 
         Ok(AiSealConfig {
             debuggable,
@@ -162,16 +166,16 @@ impl AiSealConfig {
 
 fn get_debuggable() -> Result<bool> {
     system_properties::read_bool(DEBUGGABLE_PROPERTY, AISEAL_DEBUGGABLE_DEFAULT)
-        .context(format!("Failed to get debuggable property {DEBUGGABLE_PROPERTY}"))
+        .with_context(|| format!("Failed to get debuggable property {DEBUGGABLE_PROPERTY}"))
 }
 
 fn get_protected_vm_flag() -> Result<bool> {
     system_properties::read_bool(AISEAL_PROTECTED_VM_FLAG, AISEAL_PROTECTED_VM_FLAG_DEFAULT)
-        .context(format!("Failed to get protected VM flag {AISEAL_PROTECTED_VM_FLAG}"))
+        .with_context(|| format!("Failed to get protected VM flag {AISEAL_PROTECTED_VM_FLAG}"))
 }
 
 fn parse_and_check_non_negative(s: &str) -> Result<i64> {
-    let result = s.parse::<i64>().context(format!("Failed to parse integer: {s}"))?;
+    let result = s.parse::<i64>().with_context(|| format!("Failed to parse integer: {s}"))?;
     if result < 0 {
         bail!("Negative value is not allowed: {result}")
     }
@@ -185,7 +189,7 @@ fn get_memory_bytes() -> Result<i64> {
             None => Ok(AISEAL_MEMORY_BYTES_DEFAULT),
         }
     }
-    .context(format!("Failed to get memory bytes {AISEAL_MEMORY_BYTES}"))
+    .with_context(|| format!("Failed to get memory bytes {AISEAL_MEMORY_BYTES}"))
 }
 
 fn get_encrypted_storage_bytes() -> Result<i64> {
@@ -195,7 +199,9 @@ fn get_encrypted_storage_bytes() -> Result<i64> {
             None => Ok(AISEAL_ENCRYPTED_STORAGE_BYTES_DEFAULT),
         }
     }
-    .context(format!("Failed to get encrypted storage bytes {AISEAL_ENCRYPTED_STORAGE_BYTES}"))
+    .with_context(|| {
+        format!("Failed to get encrypted storage bytes {AISEAL_ENCRYPTED_STORAGE_BYTES}")
+    })
 }
 
 fn bytes_to_memory_mib(bytes: i64) -> Result<i32> {
@@ -204,32 +210,38 @@ fn bytes_to_memory_mib(bytes: i64) -> Result<i32> {
         bail!("Memory bytes must be non-negative: {bytes}")
     }
     let result: i64 = (bytes + ONE_MIB - 1) / ONE_MIB;
-    result.try_into().context(format!("memory value {} MiB is too large to fit in i32", result))
+    result
+        .try_into()
+        .with_context(|| format!("memory value {} MiB is too large to fit in i32", result))
 }
 
 fn get_abis() -> Result<Vec<String>> {
     let value = system_properties::read(ABILIST_PROPERTY)
-        .context(format!("Failed to get list of ABIs {ABILIST_PROPERTY}"))?
-        .context(format!("List of ABIs {ABILIST_PROPERTY} is not set"))?;
+        .with_context(|| format!("Failed to get list of ABIs {ABILIST_PROPERTY}"))?
+        .with_context(|| format!("List of ABIs {ABILIST_PROPERTY} is not set"))?;
     Ok(value.trim().split(',').map(|s| s.to_string()).collect())
 }
 
 fn find_payload_config_package() -> Result<String> {
     system_properties::read(TENANT_CONFIG_PACKAGE_PROPERTY)
-        .context(format!("Failed to get tenant config package {TENANT_CONFIG_PACKAGE_PROPERTY}"))?
-        .context(format!("Tenant config package {TENANT_CONFIG_PACKAGE_PROPERTY} is not set"))
+        .with_context(|| {
+            format!("Failed to get tenant config package {TENANT_CONFIG_PACKAGE_PROPERTY}")
+        })?
+        .with_context(|| {
+            format!("Tenant config package {TENANT_CONFIG_PACKAGE_PROPERTY} is not set")
+        })
 }
 
 fn find_payload_config_path() -> Result<String> {
     system_properties::read(TENANT_CONFIG_PATH_PROPERTY)
-        .context(format!("Failed to get tenant config path {TENANT_CONFIG_PATH_PROPERTY}"))?
-        .context(format!("Tenant config path {TENANT_CONFIG_PATH_PROPERTY} is not set"))
+        .with_context(|| format!("Failed to get tenant config path {TENANT_CONFIG_PATH_PROPERTY}"))?
+        .with_context(|| format!("Tenant config path {TENANT_CONFIG_PATH_PROPERTY} is not set"))
 }
 
 fn find_aiseal_payload_config_path() -> Result<String> {
     system_properties::read(AISEAL_CONFIG_PATH_PROPERTY)
-        .context(format!("Failed to get AiSeal config path {AISEAL_CONFIG_PATH_PROPERTY}"))?
-        .context(format!("AiSeal config path {AISEAL_CONFIG_PATH_PROPERTY} is not set"))
+        .with_context(|| format!("Failed to get AiSeal config path {AISEAL_CONFIG_PATH_PROPERTY}"))?
+        .with_context(|| format!("AiSeal config path {AISEAL_CONFIG_PATH_PROPERTY} is not set"))
 }
 
 fn get_config<T: for<'de> Deserialize<'de>, R: Read + Seek>(
