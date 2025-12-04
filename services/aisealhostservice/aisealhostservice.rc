@@ -1,7 +1,7 @@
 service aisealhostservice /system/bin/aisealhostservice
     class core
     user system
-    group system virtualmachine
+    group system
     task_profiles MaxPerformance
     disabled
 
