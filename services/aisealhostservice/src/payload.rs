@@ -30,15 +30,15 @@ use std::{
 };
 use zip::ZipArchive;
 
-pub struct VmPayload {
-    pub config_apk: ParcelFileDescriptor,
-    pub config_idsig: ParcelFileDescriptor,
-    pub tenant_apks: Vec<ParcelFileDescriptor>,
-    pub tenant_idsigs: Vec<ParcelFileDescriptor>,
+pub(crate) struct VmPayload {
+    pub(crate) config_apk: ParcelFileDescriptor,
+    pub(crate) config_idsig: ParcelFileDescriptor,
+    pub(crate) tenant_apks: Vec<ParcelFileDescriptor>,
+    pub(crate) tenant_idsigs: Vec<ParcelFileDescriptor>,
 }
 
 impl VmPayload {
-    pub fn load(
+    pub(crate) fn load(
         pm: &PackageManager,
         vm: &dyn IVirtualizationService,
         vm_dir: &str,

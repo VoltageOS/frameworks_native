@@ -35,57 +35,57 @@ const AISEAL_PROTECTED_VM_FLAG_DEFAULT: bool = true;
 const AISEAL_DEBUGGABLE_DEFAULT: bool = false;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct AiSealConfig {
-    pub debuggable: bool,
-    pub protected_vm: bool,
-    pub abis: Vec<String>,
-    pub payload_config_package_name: String,
-    pub payload_config_package_path: String,
-    pub vm_payload_config: VmPayloadConfig,
-    pub vm_payload_config_path: String,
-    pub aiseal_payload_config: AiSealPayloadConfig,
+pub(crate) struct AiSealConfig {
+    pub(crate) debuggable: bool,
+    pub(crate) protected_vm: bool,
+    pub(crate) abis: Vec<String>,
+    pub(crate) payload_config_package_name: String,
+    pub(crate) payload_config_package_path: String,
+    pub(crate) vm_payload_config: VmPayloadConfig,
+    pub(crate) vm_payload_config_path: String,
+    pub(crate) aiseal_payload_config: AiSealPayloadConfig,
 }
 
 /// AiSeal-specific VM configuration, stored inside main payload APK
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
-pub struct AiSealPayloadConfig {
+pub(crate) struct AiSealPayloadConfig {
     /// Version of the config
     #[serde(default)]
-    pub version: i32,
+    pub(crate) version: i32,
 
     /// List of tenants in the VM
     #[serde(default)]
-    pub tenants: Vec<AiSealTenant>,
+    pub(crate) tenants: Vec<AiSealTenant>,
 }
 
 /// AiSeal tenant configuration, that is not part of AVF payload configuration
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct AiSealTenant {
+pub(crate) struct AiSealTenant {
     /// Package name of the tenant
-    pub name: String,
+    pub(crate) name: String,
 
     /// List of host services provided by the tenant
     #[serde(default)]
-    pub host_services: Vec<HostService>,
+    pub(crate) host_services: Vec<HostService>,
 }
 
 /// Configuration of service provided by VM tenant to its host application
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct HostService {
+pub(crate) struct HostService {
     /// Name of the service
-    pub name: String,
+    pub(crate) name: String,
 
     /// Vsock port that is used to serve a service
-    pub port: i32,
+    pub(crate) port: i32,
 }
 
-pub struct HostServiceWithOwner {
-    pub owner: String,
-    pub service: HostService,
+pub(crate) struct HostServiceWithOwner {
+    pub(crate) owner: String,
+    pub(crate) service: HostService,
 }
 
 impl AiSealPayloadConfig {
-    pub fn get_service_name_map(&self) -> HashMap<String, HostServiceWithOwner> {
+    pub(crate) fn get_service_name_map(&self) -> HashMap<String, HostServiceWithOwner> {
         self.tenants
             .iter()
             .flat_map(|tenant| {
@@ -104,7 +104,7 @@ impl AiSealPayloadConfig {
 }
 
 impl AiSealConfig {
-    pub fn load(pm: &PackageManager) -> Result<AiSealConfig> {
+    pub(crate) fn load(pm: &PackageManager) -> Result<AiSealConfig> {
         let debuggable = get_debuggable()?;
         let protected_vm = get_protected_vm_flag()?;
         let abis = get_abis()?;

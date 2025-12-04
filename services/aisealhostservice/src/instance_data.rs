@@ -43,15 +43,15 @@ fn get_encrypted_storage_path(vm_dir: &str) -> String {
     format!("{vm_dir}/storage.img")
 }
 
-pub struct InstanceData {
-    pub instance_id: [u8; 64],
-    pub vm_dir: String,
-    pub instance_image: ParcelFileDescriptor,
-    pub encrypted_storage: ParcelFileDescriptor,
+pub(crate) struct InstanceData {
+    pub(crate) instance_id: [u8; 64],
+    pub(crate) vm_dir: String,
+    pub(crate) instance_image: ParcelFileDescriptor,
+    pub(crate) encrypted_storage: ParcelFileDescriptor,
 }
 
 impl InstanceData {
-    pub fn load_existing(virt_service: &dyn IVirtualizationService) -> Result<InstanceData> {
+    pub(crate) fn load_existing(virt_service: &dyn IVirtualizationService) -> Result<InstanceData> {
         let instance_id_path = get_instance_id_path();
         let instance_id = load_instance_id(&instance_id_path)
             .context(format!("Failed to read instance id from {instance_id_path}"))?;
@@ -72,7 +72,7 @@ impl InstanceData {
         Ok(InstanceData { instance_id, vm_dir, instance_image, encrypted_storage })
     }
 
-    pub fn create(virt_service: &dyn IVirtualizationService) -> Result<InstanceData> {
+    pub(crate) fn create(virt_service: &dyn IVirtualizationService) -> Result<InstanceData> {
         let instance_id: [u8; 64] =
             virt_service.allocateInstanceId().context("Failed to allocate instance id")?;
         let instance_id_path = get_instance_id_path();
@@ -104,7 +104,7 @@ impl InstanceData {
     }
 }
 
-pub fn invalidate_current_vm(
+pub(crate) fn invalidate_current_vm(
     instance_id: &[u8; 64],
     vm_dir: &str,
     virt_service: &dyn IVirtualizationService,

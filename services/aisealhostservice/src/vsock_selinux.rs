@@ -69,7 +69,7 @@ where
     result
 }
 
-pub fn connect_with_cid_port_context(
+pub(crate) fn connect_with_cid_port_context(
     cid: u32,
     port: u32,
     context: &str,
