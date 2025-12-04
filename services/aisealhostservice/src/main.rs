@@ -20,7 +20,7 @@ mod package_manager;
 mod payload;
 mod vsock_selinux;
 
-use crate::config::{AiSealConfig, HostServiceWithOwner};
+use crate::config::{AiSealConfig, ExportedServiceWithOwner};
 use crate::instance_data::{invalidate_current_vm, InstanceData};
 use crate::package_manager::PackageManager;
 use crate::payload::VmPayload;
@@ -269,7 +269,7 @@ fn replace_mls_level(context: &str, level: &str) -> binder::Result<String> {
 struct AiSealHostService {
     pm: PackageManager,
     instance: VmInstance,
-    service_map: HashMap<String, HostServiceWithOwner>,
+    service_to_owner: HashMap<String, ExportedServiceWithOwner>,
 }
 
 // TODO: implement dump
@@ -281,9 +281,9 @@ impl AiSealHostService {
         instance: VmInstance,
         config: AiSealConfig,
     ) -> Strong<dyn IAiSealHostService> {
-        let service_map = config.aiseal_payload_config.get_service_name_map();
+        let service_to_owner = config.aiseal_payload_config.get_service_to_owner_map();
         BnAiSealHostService::new_binder(
-            AiSealHostService { pm, instance, service_map },
+            AiSealHostService { pm, instance, service_to_owner },
             BinderFeatures { set_requesting_sid: true, ..BinderFeatures::default() },
         )
     }
@@ -294,7 +294,7 @@ impl IAiSealHostService for AiSealHostService {
         check_manage_permission()?;
         // TODO: vm state checks
         let service_description = &self
-            .service_map
+            .service_to_owner
             .get(name)
             .context("Service not found")
             .or_binder_exception(ExceptionCode::ILLEGAL_ARGUMENT)?;

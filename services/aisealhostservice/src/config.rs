@@ -64,14 +64,15 @@ pub(crate) struct AiSealTenant {
     /// Package name of the tenant
     pub(crate) name: String,
 
-    /// List of host services provided by the tenant
+    /// List of services exported by the tenant to be used by its host application
     #[serde(default)]
-    pub(crate) host_services: Vec<HostService>,
+    #[serde(alias = "host_services")]
+    pub(crate) exported_services: Vec<ExportedService>,
 }
 
 /// Configuration of service provided by VM tenant to its host application
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub(crate) struct HostService {
+pub(crate) struct ExportedService {
     /// Name of the service
     pub(crate) name: String,
 
@@ -79,20 +80,20 @@ pub(crate) struct HostService {
     pub(crate) port: i32,
 }
 
-pub(crate) struct HostServiceWithOwner {
+pub(crate) struct ExportedServiceWithOwner {
     pub(crate) owner: String,
-    pub(crate) service: HostService,
+    pub(crate) service: ExportedService,
 }
 
 impl AiSealPayloadConfig {
-    pub(crate) fn get_service_name_map(&self) -> HashMap<String, HostServiceWithOwner> {
+    pub(crate) fn get_service_to_owner_map(&self) -> HashMap<String, ExportedServiceWithOwner> {
         self.tenants
             .iter()
             .flat_map(|tenant| {
-                tenant.host_services.iter().map(move |service| {
+                tenant.exported_services.iter().map(move |service| {
                     (
                         service.name.clone(),
-                        HostServiceWithOwner {
+                        ExportedServiceWithOwner {
                             owner: tenant.name.clone(),
                             service: service.clone(),
                         },
