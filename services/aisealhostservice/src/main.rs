@@ -95,15 +95,16 @@ fn try_main() -> Result<()> {
 
     let aiseal_config = AiSealConfig::load(&pm)?;
 
-    let instance_data = match InstanceData::load_existing(virtualization_service.as_ref()) {
-        Ok(instance_data) => instance_data,
-        Err(e) => {
-            warn!("Failed to load existing VM data: {:?}", e);
-            info!("Creating new VM");
-            InstanceData::create(virtualization_service.as_ref())
-                .context("Failed to create VM data")?
-        }
-    };
+    let instance_data =
+        match InstanceData::load_existing(virtualization_service.as_ref(), &aiseal_config) {
+            Ok(instance_data) => instance_data,
+            Err(e) => {
+                warn!("Failed to load existing VM data: {:?}", e);
+                info!("Creating new VM");
+                InstanceData::create(virtualization_service.as_ref(), &aiseal_config)
+                    .context("Failed to create VM data")?
+            }
+        };
     let vm_dir = instance_data.vm_dir;
     let instance_id = instance_data.instance_id;
 
@@ -129,7 +130,7 @@ fn try_main() -> Result<()> {
         payload: Payload::ConfigPath(aiseal_config.vm_payload_config_path.clone()),
         debugLevel: if aiseal_config.debuggable { DebugLevel::FULL } else { DebugLevel::NONE },
         protectedVm: aiseal_config.protected_vm,
-        memoryMib: 300,
+        memoryMib: aiseal_config.memory_mib,
         cpuOptions: CpuOptions { cpuTopology: CpuTopology::MatchHost(true) },
         customConfig: custom_config,
         ..Default::default()

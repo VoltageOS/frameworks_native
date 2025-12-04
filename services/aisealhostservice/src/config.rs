@@ -15,7 +15,7 @@
 //! AiSeal specific configuration
 
 use crate::package_manager::PackageManager;
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use log::info;
 use microdroid_payload_config::VmPayloadConfig;
 use rustutils::android::system_properties;
@@ -31,13 +31,19 @@ const TENANT_CONFIG_PACKAGE_PROPERTY: &str = "service.aiseal.tenant_config_packa
 const TENANT_CONFIG_PATH_PROPERTY: &str = "service.aiseal.tenant_config_path";
 const AISEAL_CONFIG_PATH_PROPERTY: &str = "service.aiseal.aiseal_config_path";
 const AISEAL_PROTECTED_VM_FLAG: &str = "service.aiseal.protected_vm";
+const AISEAL_MEMORY_BYTES: &str = "service.aiseal.memory_bytes";
+const AISEAL_ENCRYPTED_STORAGE_BYTES: &str = "service.aiseal.encrypted_storage_bytes";
 const AISEAL_PROTECTED_VM_FLAG_DEFAULT: bool = true;
 const AISEAL_DEBUGGABLE_DEFAULT: bool = false;
+const AISEAL_MEMORY_BYTES_DEFAULT: i64 = 300 * 1024 * 1024;
+const AISEAL_ENCRYPTED_STORAGE_BYTES_DEFAULT: i64 = 16 * 1024 * 1024 * 1024;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct AiSealConfig {
     pub(crate) debuggable: bool,
     pub(crate) protected_vm: bool,
+    pub(crate) memory_mib: i32,
+    pub(crate) encrypted_storage_bytes: i64,
     pub(crate) abis: Vec<String>,
     pub(crate) payload_config_package_name: String,
     pub(crate) payload_config_package_path: String,
@@ -108,6 +114,9 @@ impl AiSealConfig {
     pub(crate) fn load(pm: &PackageManager) -> Result<AiSealConfig> {
         let debuggable = get_debuggable()?;
         let protected_vm = get_protected_vm_flag()?;
+        let memory_bytes = get_memory_bytes()?;
+        let memory_mib = bytes_to_memory_mib(memory_bytes)?;
+        let encrypted_storage_bytes = get_encrypted_storage_bytes()?;
         let abis = get_abis()?;
         let config_package = find_payload_config_package()?;
         let vm_payload_config_path = find_payload_config_path()?;
@@ -139,6 +148,8 @@ impl AiSealConfig {
         Ok(AiSealConfig {
             debuggable,
             protected_vm,
+            memory_mib,
+            encrypted_storage_bytes,
             abis,
             payload_config_package_name: config_package,
             payload_config_package_path: config_apk_path,
@@ -157,6 +168,43 @@ fn get_debuggable() -> Result<bool> {
 fn get_protected_vm_flag() -> Result<bool> {
     system_properties::read_bool(AISEAL_PROTECTED_VM_FLAG, AISEAL_PROTECTED_VM_FLAG_DEFAULT)
         .context(format!("Failed to get protected VM flag {AISEAL_PROTECTED_VM_FLAG}"))
+}
+
+fn parse_and_check_non_negative(s: &str) -> Result<i64> {
+    let result = s.parse::<i64>().context(format!("Failed to parse integer: {s}"))?;
+    if result < 0 {
+        bail!("Negative value is not allowed: {result}")
+    }
+    Ok(result)
+}
+
+fn get_memory_bytes() -> Result<i64> {
+    {
+        match system_properties::read(AISEAL_MEMORY_BYTES)? {
+            Some(s) => parse_and_check_non_negative(&s),
+            None => Ok(AISEAL_MEMORY_BYTES_DEFAULT),
+        }
+    }
+    .context(format!("Failed to get memory bytes {AISEAL_MEMORY_BYTES}"))
+}
+
+fn get_encrypted_storage_bytes() -> Result<i64> {
+    {
+        match system_properties::read(AISEAL_ENCRYPTED_STORAGE_BYTES)? {
+            Some(s) => parse_and_check_non_negative(&s),
+            None => Ok(AISEAL_ENCRYPTED_STORAGE_BYTES_DEFAULT),
+        }
+    }
+    .context(format!("Failed to get encrypted storage bytes {AISEAL_ENCRYPTED_STORAGE_BYTES}"))
+}
+
+fn bytes_to_memory_mib(bytes: i64) -> Result<i32> {
+    const ONE_MIB: i64 = 1024 * 1024;
+    if bytes < 0 {
+        bail!("Memory bytes must be non-negative: {bytes}")
+    }
+    let result: i64 = (bytes + ONE_MIB - 1) / ONE_MIB;
+    result.try_into().context(format!("memory value {} MiB is too large to fit in i32", result))
 }
 
 fn get_abis() -> Result<Vec<String>> {

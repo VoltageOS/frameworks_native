@@ -14,6 +14,7 @@
 
 //! Manages VM storage directory and image files.
 
+use crate::config::AiSealConfig;
 use android_system_virtualizationservice::aidl::android::system::virtualizationservice::{
     IVirtualizationService::IVirtualizationService, PartitionType::PartitionType,
 };
@@ -24,7 +25,6 @@ use std::{fs, path::Path};
 
 const AISEAL_DEVICE_ENCRYPTED_DIR: &str = "/data/system/aiseal";
 const AISEAL_INSTANCE_IMAGE_SIZE: i64 = 10 * 1024 * 1024;
-const AISEAL_ENCRYPTED_STORAGE_SIZE: i64 = 16 * 1024 * 1024 * 1024;
 
 fn get_instance_id_path() -> String {
     format!("{AISEAL_DEVICE_ENCRYPTED_DIR}/instance_id")
@@ -51,7 +51,10 @@ pub(crate) struct InstanceData {
 }
 
 impl InstanceData {
-    pub(crate) fn load_existing(virt_service: &dyn IVirtualizationService) -> Result<InstanceData> {
+    pub(crate) fn load_existing(
+        virt_service: &dyn IVirtualizationService,
+        aiseal_config: &AiSealConfig,
+    ) -> Result<InstanceData> {
         let instance_id_path = get_instance_id_path();
         let instance_id = load_instance_id(&instance_id_path)
             .context(format!("Failed to read instance id from {instance_id_path}"))?;
@@ -67,12 +70,16 @@ impl InstanceData {
             .context(format!("Failed to open encrypted storage from {encrypted_storage_path}"))?;
 
         // Update storage size to the current size from configuration, if needed
-        virt_service.setEncryptedStorageSize(&encrypted_storage, AISEAL_ENCRYPTED_STORAGE_SIZE)?;
+        virt_service
+            .setEncryptedStorageSize(&encrypted_storage, aiseal_config.encrypted_storage_bytes)?;
 
         Ok(InstanceData { instance_id, vm_dir, instance_image, encrypted_storage })
     }
 
-    pub(crate) fn create(virt_service: &dyn IVirtualizationService) -> Result<InstanceData> {
+    pub(crate) fn create(
+        virt_service: &dyn IVirtualizationService,
+        aiseal_config: &AiSealConfig,
+    ) -> Result<InstanceData> {
         let instance_id: [u8; 64] =
             virt_service.allocateInstanceId().context("Failed to allocate instance id")?;
         let instance_id_path = get_instance_id_path();
@@ -95,7 +102,7 @@ impl InstanceData {
         let encrypted_storage = create_image(
             virt_service,
             &encrypted_storage_path,
-            AISEAL_ENCRYPTED_STORAGE_SIZE,
+            aiseal_config.encrypted_storage_bytes,
             PartitionType::ENCRYPTEDSTORE,
         )
         .context(format!("Failed to create encrypted storage in {encrypted_storage_path}"))?;
