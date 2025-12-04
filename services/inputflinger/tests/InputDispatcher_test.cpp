@@ -19,7 +19,6 @@
 #include "FakeInputDispatcherPolicy.h"
 #include "FakeInputTracingBackend.h"
 #include "FakeWindows.h"
-#include "ScopedFlagOverride.h"
 #include "TestEventMatchers.h"
 
 #include <NotifyArgsBuilders.h>
@@ -40,6 +39,7 @@
 #include <input/InputConsumer.h>
 #include <input/KeyCharacterMap.h>
 #include <input/PrintTools.h>
+#include <input/ScopedFlagOverride.h>
 #include <linux/input.h>
 #include <sys/epoll.h>
 #include <utils/Timers.h>
