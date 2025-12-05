@@ -303,7 +303,7 @@ void InputPublisherAndConsumerTest::publishAndConsumeKeyEvent() {
     waitUntilInputAvailable(*mConsumer);
     uint32_t consumeSeq;
     InputEvent* event;
-    InputConsumer::ConsumeResult consumeResult =
+    auto [consumeResult, unfinishedInputMessages] =
             mConsumer->consume(&mEventFactory, /*consumeBatches=*/true, -1, &consumeSeq, &event);
     ASSERT_TRUE(consumeResult.ok()) << "consumer consume should return OK";
     EXPECT_FALSE(mConsumer->probablyHasInput())
@@ -382,7 +382,7 @@ void InputPublisherAndConsumerTest::publishAndConsumeBatchedMotionMove(nsecs_t d
     // Consume leaving a batch behind.
     uint32_t consumeSeq;
     InputEvent* event;
-    InputConsumer::ConsumeResult consumeResult =
+    auto [consumeResult, unfinishedInputMessages] =
             mConsumer->consume(&mEventFactory,
                                /*consumeBatches=*/false, -1, &consumeSeq, &event);
     ASSERT_FALSE(consumeResult.ok());
@@ -403,7 +403,7 @@ void InputPublisherAndConsumerTest::publishAndConsumeMotionEvent(
 
     uint32_t consumeSeq;
     InputEvent* event;
-    InputConsumer::ConsumeResult consumeResult =
+    auto [consumeResult, unfinishedInputMessages] =
             mConsumer->consume(&mEventFactory, /*consumeBatches=*/true, -1, &consumeSeq, &event);
     ASSERT_TRUE(consumeResult.ok()) << "consumer consume should return OK";
     ASSERT_TRUE(event != nullptr)
@@ -429,7 +429,7 @@ void InputPublisherAndConsumerTest::publishAndConsumeFocusEvent() {
 
     uint32_t consumeSeq;
     InputEvent* event;
-    InputConsumer::ConsumeResult consumeResult =
+    auto [consumeResult, unfinishedInputMessages] =
             mConsumer->consume(&mEventFactory, /*consumeBatches=*/true, -1, &consumeSeq, &event);
     ASSERT_TRUE(consumeResult.ok()) << "consumer consume should return OK";
 
@@ -471,7 +471,7 @@ void InputPublisherAndConsumerTest::publishAndConsumeCaptureEvent() {
 
     uint32_t consumeSeq;
     InputEvent* event;
-    InputConsumer::ConsumeResult consumeResult =
+    auto [consumeResult, unfinishedInputMessages] =
             mConsumer->consume(&mEventFactory, /*consumeBatches=*/true, -1, &consumeSeq, &event);
     ASSERT_TRUE(consumeResult.ok()) << "consumer consume should return OK";
 
@@ -514,7 +514,7 @@ void InputPublisherAndConsumerTest::publishAndConsumeDragEvent() {
 
     uint32_t consumeSeq;
     InputEvent* event;
-    InputConsumer::ConsumeResult consumeResult =
+    auto [consumeResult, unfinishedInputMessages] =
             mConsumer->consume(&mEventFactory, /*consumeBatches=*/true, -1, &consumeSeq, &event);
     ASSERT_TRUE(consumeResult.ok()) << "consumer consume should return OK";
 
@@ -557,7 +557,7 @@ void InputPublisherAndConsumerTest::publishAndConsumeTouchModeEvent() {
 
     uint32_t consumeSeq;
     InputEvent* event;
-    InputConsumer::ConsumeResult consumeResult =
+    auto [consumeResult, unfinishedInputMessages] =
             mConsumer->consume(&mEventFactory, /*consumeBatches=*/true, -1, &consumeSeq, &event);
     ASSERT_TRUE(consumeResult.ok()) << "consumer consume should return OK";
 

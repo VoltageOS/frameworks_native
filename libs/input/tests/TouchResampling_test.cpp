@@ -177,10 +177,10 @@ void TouchResamplingTest::consumeInputEventEntries(const std::vector<InputEventE
     uint32_t consumeSeq;
     InputEvent* event;
 
-    InputConsumer::ConsumeResult consumeResult =
+    auto [result, unfinishedInputMessages] =
             mConsumer->consume(&mEventFactory, /*consumeBatches=*/true, frameTime.count(),
                                &consumeSeq, &event);
-    ASSERT_TRUE(consumeResult.ok());
+    ASSERT_TRUE(result.ok());
     MotionEvent* motionEvent = static_cast<MotionEvent*>(event);
 
     ASSERT_EQ(entries.size() - 1, motionEvent->getHistorySize());
