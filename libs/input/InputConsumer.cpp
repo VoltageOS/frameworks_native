@@ -581,12 +581,8 @@ void InputConsumer::rewriteMessage(TouchState& state, InputMessage& msg) {
     for (uint32_t i = 0; i < msg.body.motion.pointerCount; i++) {
         uint32_t id = msg.body.motion.pointers[i].properties.id;
         if (state.lastResample.idBits.hasBit(id)) {
-            const int32_t actionMasked = msg.body.motion.action & AMOTION_EVENT_ACTION_MASK;
-            const bool isUpEvent = (actionMasked == AMOTION_EVENT_ACTION_UP);
-            const bool isPointerUpEvent = (actionMasked == AMOTION_EVENT_ACTION_POINTER_UP);
             if (eventTime < state.lastResample.eventTime ||
-                state.recentCoordinatesAreIdentical(id) ||
-                (input_flags::fix_action_up_resampling() && (isUpEvent || isPointerUpEvent))) {
+                state.recentCoordinatesAreIdentical(id)) {
                 PointerCoords& msgCoords = msg.body.motion.pointers[i].coords;
                 const PointerCoords& resampleCoords = state.lastResample.getPointerById(id);
                 ALOGD_IF(debugResampling(), "[%d] - rewrite (%0.3f, %0.3f), old (%0.3f, %0.3f)", id,
