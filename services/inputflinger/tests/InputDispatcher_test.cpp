@@ -30,7 +30,6 @@
 #include <android-base/thread_annotations.h>
 #include <android/configuration.h>
 #include <binder/Binder.h>
-#include <com_android_input_flags.h>
 #include <fcntl.h>
 #include <flag_macros.h>
 #include <gmock/gmock.h>
@@ -9732,7 +9731,6 @@ TEST_F(InputDispatcherKeyRepeatTest, FocusedWindow_CorrectRepeatCountWhenInjectK
 }
 
 TEST_F(InputDispatcherKeyRepeatTest, FocusedWindow_NoRepeatWhenKeyRepeatDisabled) {
-    SCOPED_FLAG_OVERRIDE(keyboard_repeat_keys, true);
     constexpr std::chrono::milliseconds KEY_NO_REPEAT_ASSERTION_TIMEOUT = 100ms;
     // In the other tests, we multiply the repeat timeout and delay by the hardware multiplier,
     // since delays in sending key UPs on slow systems were causing multiple repeat DOWNs to be sent
