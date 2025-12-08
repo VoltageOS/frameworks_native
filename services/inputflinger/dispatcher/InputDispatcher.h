@@ -902,7 +902,11 @@ private:
 
     // Dump state.
     void dumpDispatchStateLocked(std::string& dump) const REQUIRES(mLock);
-    void logDispatchStateLocked() const REQUIRES(mLock);
+    // Logs the dispatcher state to logcat.
+    // A delay may be added to avoid overwhelming the logcat buffer. This delay should be zero
+    // unless we are crashing after the log to prevent the system monitor from incorrectly
+    // detecting a deadlock while this thread sleeps.
+    void logDispatchStateLocked(std::chrono::milliseconds delay = 1ms) const REQUIRES(mLock);
     std::string dumpPointerCaptureStateLocked() const REQUIRES(mLock);
 
     status_t removeInputChannelLocked(const std::shared_ptr<Connection>& connection, bool notify)

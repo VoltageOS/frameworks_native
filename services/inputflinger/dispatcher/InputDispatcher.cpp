@@ -2087,7 +2087,7 @@ bool InputDispatcher::dispatchMotionLocked(nsecs_t currentTime,
                                                                   this),
                                                   std::bind_front(&InputDispatcher::
                                                                           logDispatchStateLocked,
-                                                                  this));
+                                                                  this, /*delay=*/0ms));
 
         if (result.ok()) {
             inputTargets = std::move(*result);
@@ -4241,7 +4241,7 @@ void InputDispatcher::synthesizeCancellationEventsForConnectionLocked(
                                                     /*pointerDisplayId=*/std::nullopt,
                                                     std::bind_front(&InputDispatcher::
                                                                             logDispatchStateLocked,
-                                                                    this),
+                                                                    this, /*delay=*/1ms),
                                                     targets);
                 } else {
                     targets.emplace_back(fallbackTarget);
@@ -4327,7 +4327,7 @@ void InputDispatcher::synthesizePointerDownEventsForConnectionLocked(
                                                     /*pointerDisplayId=*/std::nullopt,
                                                     std::bind_front(&InputDispatcher::
                                                                             logDispatchStateLocked,
-                                                                    this),
+                                                                    this, /*delay=*/1ms),
                                                     targets);
                 } else {
                     targets.emplace_back(connection, targetFlags);
@@ -4788,7 +4788,7 @@ bool InputDispatcher::shouldRejectInjectedMotionLocked(const MotionEvent& motion
                                      motionEvent.getSamplePointerCoords(), flags.get(),
                                      motionEvent.getButtonState(), motionEvent.getDownTime());
     if (!result.ok()) {
-        logDispatchStateLocked();
+        logDispatchStateLocked(/*delay=*/0ms);
         LOG(ERROR) << "Inconsistent event: " << motionEvent << ", reason: " << result.error();
         return true;
     }
@@ -6129,7 +6129,7 @@ void InputDispatcher::resetAndDropEverythingLocked(const char* reason) {
     mTouchStates.clear();
 }
 
-void InputDispatcher::logDispatchStateLocked() const {
+void InputDispatcher::logDispatchStateLocked(std::chrono::milliseconds delay) const {
     std::string dump;
     dumpDispatchStateLocked(dump);
 
@@ -6138,7 +6138,7 @@ void InputDispatcher::logDispatchStateLocked() const {
 
     while (std::getline(stream, line, '\n')) {
         // Add a small delay to avoid overwhelming the logcat fd buffer
-        std::this_thread::sleep_for(1ms);
+        std::this_thread::sleep_for(delay);
         ALOGI("%s", line.c_str());
     }
 }
