@@ -29,6 +29,7 @@ cc_test {
         "surfaceflinger_defaults",
         "libsurfaceflinger_common_test_deps",
         "libsurfaceflinger_proto_deps",
+        "skia_deps",
     ],
     test_suites: ["device-tests"],
     srcs: [
@@ -70,6 +71,8 @@ cc_test {
     static_libs: [
         "android.hardware.graphics.composer@2.1",
         "libsurfaceflinger_common",
+        "libipcrenderbuffer_static",
+        "libskia",
     ],
     shared_libs: [
         "android.hardware.graphics.common@1.2",

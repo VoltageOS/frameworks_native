@@ -43,13 +43,6 @@
 using aidl::android::hardware::graphics::common::DisplayHotplugEvent;
 using aidl::android::hardware::graphics::common::HdrConversionCapability;
 using aidl::android::hardware::graphics::common::HdrConversionStrategy;
-using aidl::android::hardware::graphics::composer3::Capability;
-using aidl::android::hardware::graphics::composer3::ClientTargetPropertyWithBrightness;
-using aidl::android::hardware::graphics::composer3::DimmingStage;
-using aidl::android::hardware::graphics::composer3::DisplayCapability;
-using aidl::android::hardware::graphics::composer3::DisplayLuts;
-using aidl::android::hardware::graphics::composer3::Luts;
-using aidl::android::hardware::graphics::composer3::OverlayProperties;
 
 namespace android {
 
@@ -63,6 +56,9 @@ namespace {
 using android::hardware::Return;
 using android::hardware::Void;
 using android::HWC2::ComposerCallback;
+
+using AidlCapability = composer3::Capability;
+using AidlDisplayCapability = composer3::DisplayCapability;
 
 class ComposerCallbackBridge : public IComposerCallback {
 public:
@@ -290,10 +286,10 @@ bool HidlComposer::isDisplayCommandModesetSupported() const {
     return false;
 };
 
-std::vector<Capability> HidlComposer::getCapabilities() {
-    std::vector<Capability> capabilities;
+std::vector<AidlCapability> HidlComposer::getCapabilities() {
+    std::vector<AidlCapability> capabilities;
     mComposer->getCapabilities([&](const auto& tmpCapabilities) {
-        capabilities = translate<Capability>(tmpCapabilities);
+        capabilities = translate<AidlCapability>(tmpCapabilities);
     });
     return capabilities;
 }
@@ -413,9 +409,8 @@ Error HidlComposer::getActiveConfig(Display display, Config* outConfig) {
     return error;
 }
 
-Error HidlComposer::getChangedCompositionTypes(
-        Display display, std::vector<Layer>* outLayers,
-        std::vector<aidl::android::hardware::graphics::composer3::Composition>* outTypes) {
+Error HidlComposer::getChangedCompositionTypes(Display display, std::vector<Layer>* outLayers,
+                                               std::vector<composer3::Composition>* outTypes) {
     mReader.takeChangedCompositionTypes(display, outLayers, outTypes);
     return Error::NONE;
 }
@@ -502,7 +497,7 @@ Error HidlComposer::getDisplayConfigs(Display display, std::vector<Config>* outC
 }
 
 Error HidlComposer::getDisplayConfigurations(Display, int32_t /*maxFrameIntervalNs*/,
-                                             std::vector<DisplayConfiguration>*) {
+                                             std::vector<composer3::DisplayConfiguration>*) {
     LOG_ALWAYS_FATAL("getDisplayConfigurations should not have been called on this, as "
                      "it's a HWC3 interface version 3 feature");
 }
@@ -588,7 +583,7 @@ Error HidlComposer::getHdrCapabilities(Display display, std::vector<Hdr>* outHdr
     return error;
 }
 
-Error HidlComposer::getOverlaySupport(OverlayProperties* /*outProperties*/) {
+Error HidlComposer::getOverlaySupport(composer3::OverlayProperties* /*outProperties*/) {
     return Error::NONE;
 }
 
@@ -799,8 +794,7 @@ Error HidlComposer::setLayerBlendMode(Display display, Layer layer,
     return Error::NONE;
 }
 
-static IComposerClient::Color to_hidl_type(
-        aidl::android::hardware::graphics::composer3::Color color) {
+static IComposerClient::Color to_hidl_type(composer3::Color color) {
     const auto floatColorToUint8Clamped = [](float val) -> uint8_t {
         const auto intVal = static_cast<uint64_t>(std::round(255.0f * val));
         const auto minVal = static_cast<uint64_t>(0);
@@ -816,17 +810,14 @@ static IComposerClient::Color to_hidl_type(
     };
 }
 
-Error HidlComposer::setLayerColor(
-        Display display, Layer layer,
-        const aidl::android::hardware::graphics::composer3::Color& color) {
+Error HidlComposer::setLayerColor(Display display, Layer layer, const composer3::Color& color) {
     mWriter.selectDisplay(display);
     mWriter.selectLayer(layer);
     mWriter.setLayerColor(to_hidl_type(color));
     return Error::NONE;
 }
 
-static IComposerClient::Composition to_hidl_type(
-        aidl::android::hardware::graphics::composer3::Composition type) {
+static IComposerClient::Composition to_hidl_type(composer3::Composition type) {
     LOG_ALWAYS_FATAL_IF(static_cast<int32_t>(type) >
                                 static_cast<int32_t>(IComposerClient::Composition::SIDEBAND),
                         "Trying to use %s, which is not supported by HidlComposer!",
@@ -835,9 +826,8 @@ static IComposerClient::Composition to_hidl_type(
     return static_cast<IComposerClient::Composition>(type);
 }
 
-Error HidlComposer::setLayerCompositionType(
-        Display display, Layer layer,
-        aidl::android::hardware::graphics::composer3::Composition type) {
+Error HidlComposer::setLayerCompositionType(Display display, Layer layer,
+                                            composer3::Composition type) {
     mWriter.selectDisplay(display);
     mWriter.selectLayer(layer);
     mWriter.setLayerCompositionType(to_hidl_type(type));
@@ -1223,7 +1213,7 @@ Error HidlComposer::setDisplayMode(Display, Config, bool) {
 // Composer HAL 2.4
 
 Error HidlComposer::getDisplayCapabilities(Display display,
-                                           std::vector<DisplayCapability>* outCapabilities) {
+                                           std::vector<AidlDisplayCapability>* outCapabilities) {
     if (!mClient_2_3) {
         return Error::UNSUPPORTED;
     }
@@ -1237,7 +1227,8 @@ Error HidlComposer::getDisplayCapabilities(Display display,
                                                         return;
                                                     }
                                                     *outCapabilities =
-                                                            translate<DisplayCapability>(tmpCaps);
+                                                            translate<AidlDisplayCapability>(
+                                                                    tmpCaps);
                                                 });
     } else {
         mClient_2_3->getDisplayCapabilities(display,
@@ -1248,7 +1239,7 @@ Error HidlComposer::getDisplayCapabilities(Display display,
                                                 }
 
                                                 *outCapabilities =
-                                                        translate<DisplayCapability>(tmpCaps);
+                                                        translate<AidlDisplayCapability>(tmpCaps);
                                             });
     }
 
@@ -1417,7 +1408,7 @@ Error HidlComposer::notifyExpectedPresent(Display, nsecs_t, int32_t) {
 }
 
 Error HidlComposer::getClientTargetProperty(
-        Display display, ClientTargetPropertyWithBrightness* outClientTargetProperty) {
+        Display display, composer3::ClientTargetPropertyWithBrightness* outClientTargetProperty) {
     IComposerClient::ClientTargetProperty property;
     mReader.takeClientTargetProperty(display, &property);
     outClientTargetProperty->display = display;
@@ -1427,16 +1418,16 @@ Error HidlComposer::getClientTargetProperty(
             static_cast<::aidl::android::hardware::graphics::common::PixelFormat>(
                     property.pixelFormat);
     outClientTargetProperty->brightness = 1.f;
-    outClientTargetProperty->dimmingStage = DimmingStage::NONE;
+    outClientTargetProperty->dimmingStage = composer3::DimmingStage::NONE;
     return Error::NONE;
 }
 
 Error HidlComposer::getRequestedLuts(Display, std::vector<Layer>*,
-                                     std::vector<DisplayLuts::LayerLut>*) {
+                                     std::vector<composer3::DisplayLuts::LayerLut>*) {
     return Error::NONE;
 }
 
-Error HidlComposer::setLayerLuts(Display, Layer, Luts&) {
+Error HidlComposer::setLayerLuts(Display, Layer, composer3::Luts&) {
     return Error::NONE;
 }
 
@@ -1476,11 +1467,11 @@ Error HidlComposer::startHdcpNegotiation(Display, const aidl::android::hardware:
 }
 
 Error HidlComposer::getLuts(Display, const std::vector<sp<GraphicBuffer>>&,
-                            std::vector<aidl::android::hardware::graphics::composer3::Luts>*) {
+                            std::vector<composer3::Luts>*) {
     return Error::UNSUPPORTED;
 }
 
-Error HidlComposer::getReadbackBufferAttributes(Display, V3_0::ReadbackBufferAttributes*) {
+Error HidlComposer::getReadbackBufferAttributes(Display, composer3::ReadbackBufferAttributes*) {
     return Error::UNSUPPORTED;
 }
 
@@ -1489,6 +1480,10 @@ Error HidlComposer::setReadbackBuffer(Display, const sp<GraphicBuffer>&, int) {
 }
 
 Error HidlComposer::getReadbackBufferFence(Display, int*) {
+    return Error::UNSUPPORTED;
+}
+
+Error HidlComposer::getDisplayKnownVsyncSample(Display, composer3::VsyncSample*) {
     return Error::UNSUPPORTED;
 }
 
@@ -1601,8 +1596,7 @@ bool CommandReader::parseSetChangedCompositionTypes(uint16_t length) {
     mCurrentReturnData->compositionTypes.reserve(count);
     while (count > 0) {
         auto layer = read64();
-        auto type = static_cast<aidl::android::hardware::graphics::composer3::Composition>(
-                readSigned());
+        auto type = static_cast<composer3::Composition>(readSigned());
 
         mCurrentReturnData->changedLayers.push_back(layer);
         mCurrentReturnData->compositionTypes.push_back(type);
@@ -1728,9 +1722,8 @@ bool CommandReader::hasChanges(Display display, uint32_t* outNumChangedCompositi
     return !(data.compositionTypes.empty() && data.requestMasks.empty());
 }
 
-void CommandReader::takeChangedCompositionTypes(
-        Display display, std::vector<Layer>* outLayers,
-        std::vector<aidl::android::hardware::graphics::composer3::Composition>* outTypes) {
+void CommandReader::takeChangedCompositionTypes(Display display, std::vector<Layer>* outLayers,
+                                                std::vector<composer3::Composition>* outTypes) {
     auto found = mReturnData.find(display);
     if (found == mReturnData.end()) {
         outLayers->clear();

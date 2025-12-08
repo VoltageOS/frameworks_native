@@ -24,6 +24,7 @@
 #include <optional>
 #include <string>
 
+#include <android/gui/ISystemContentPriorityConstants.h>
 #include <common/FlagManager.h>
 #include <gui/ISurfaceComposer.h>
 #include <gui/JankInfo.h>
@@ -202,7 +203,8 @@ public:
                  int32_t layerId, std::string layerName, std::string debugName,
                  PredictionState predictionState, TimelineItem&& predictions,
                  std::shared_ptr<TimeStats> timeStats, JankClassificationThresholds thresholds,
-                 TraceCookieCounter* traceCookieCounter, bool isBuffer, GameMode);
+                 TraceCookieCounter* traceCookieCounter, bool isBuffer, GameMode,
+                 int32_t systemContentPriority);
     ~SurfaceFrame() = default;
 
     bool isSelfJanky() const;
@@ -325,6 +327,7 @@ private:
     const int64_t mToken;
     const int32_t mInputEventId;
     const nsecs_t mVsyncResyncedJitter;
+    const nsecs_t mDequeueBufferDuration;
     const pid_t mOwnerPid;
     const uid_t mOwnerUid;
     const std::string mLayerName;
@@ -368,6 +371,7 @@ private:
     bool mIsBuffer;
     // GameMode from the layer. Used in metrics.
     GameMode mGameMode = GameMode::Unsupported;
+    int32_t mSystemContentPriority = gui::ISystemContentPriorityConstants::Unset;
 
     std::weak_ptr<SurfaceFrame> mPreviousSurfaceFrame GUARDED_BY(mMutex);
 
@@ -393,8 +397,8 @@ public:
     // Debug name is the human-readable debugging string for dumpsys.
     virtual std::shared_ptr<SurfaceFrame> createSurfaceFrameForToken(
             const FrameTimelineInfo& frameTimelineInfo, pid_t ownerPid, uid_t ownerUid,
-            int32_t layerId, std::string layerName, std::string debugName, bool isBuffer,
-            GameMode) = 0;
+            int32_t layerId, std::string layerName, std::string debugName, bool isBuffer, GameMode,
+            int32_t systemContentPriority) = 0;
 
     // Adds a new SurfaceFrame to the current DisplayFrame. Frames from multiple layers can be
     // composited into one display frame.
@@ -601,8 +605,8 @@ public:
     scheduler::TokenManager* getTokenManager() override { return &mTokenManager; }
     std::shared_ptr<SurfaceFrame> createSurfaceFrameForToken(
             const FrameTimelineInfo& frameTimelineInfo, pid_t ownerPid, uid_t ownerUid,
-            int32_t layerId, std::string layerName, std::string debugName, bool isBuffer,
-            GameMode) override;
+            int32_t layerId, std::string layerName, std::string debugName, bool isBuffer, GameMode,
+            int32_t systemContentPriority) override;
     void addSurfaceFrame(std::shared_ptr<scheduler::SurfaceFrame> surfaceFrame) override;
     void setSfWakeUp(int64_t token, nsecs_t wakeupTime, Fps refreshRate, Fps renderRate,
                      bool displayOn = true) override;
