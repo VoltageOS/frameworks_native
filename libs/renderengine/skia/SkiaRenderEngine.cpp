@@ -877,9 +877,12 @@ void SkiaRenderEngine::drawLayersInternal(
             }
         }
         if (FlagManager::getInstance().window_blur_kawase2_preallocate_buffers() &&
-            !mBlurFilter->isBufferPreallocated() && !display.physicalDisplay.isEmpty()) {
-            mBlurFilter->preallocateBuffer(mProtectedContext.get(),
-                                           display.physicalDisplay.getSize());
+            !mBlurFilter->isBufferPreallocated() && !display.physicalDisplay.isEmpty() &&
+            supportsProtectedContent()) {
+            const bool inProtected = mInProtectedContext;
+            useProtectedContext(true);
+            mBlurFilter->preallocateBuffer(getActiveContext(), display.physicalDisplay.getSize());
+            useProtectedContext(inProtected);
         }
     }
 
@@ -1501,8 +1504,12 @@ void SkiaRenderEngine::drawShadow(SkCanvas* canvas,
 }
 
 void SkiaRenderEngine::onActiveDisplaySizeChanged(ui::Size size) {
-    if (FlagManager::getInstance().window_blur_kawase2_preallocate_buffers() && mBlurFilter) {
-        mBlurFilter->preallocateBuffer(mProtectedContext.get(), size);
+    if (FlagManager::getInstance().window_blur_kawase2_preallocate_buffers() &&
+        supportsProtectedContent()) {
+        const bool inProtected = mInProtectedContext;
+        useProtectedContext(true);
+        mBlurFilter->preallocateBuffer(getActiveContext(), size);
+        useProtectedContext(inProtected);
     }
 
     // This cache multiplier was selected based on review of cache sizes relative
