@@ -1285,6 +1285,9 @@ def generate_vk_py_content(
 # Format: {feature_name: [{struct_name: sType_enum_value}, ...]}"""
     content += "# --- Vulkan Feature to Struct Mappings ---\n"
     content += feature_comment + "\n"
+    for version, struct_list in feature_map.items():
+        struct_list.sort(key=lambda x: next(iter(x)))
+
     feature_map_str = pprint.pformat(feature_map, indent=4, width=100)
     content += f"VULKAN_VERSIONS_AND_STRUCTS_MAPPING = {feature_map_str}\n\n"
     return content

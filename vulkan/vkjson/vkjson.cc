@@ -7440,32 +7440,24 @@ inline bool Iterate(Visitor* visitor, VkJsonDevice* device) {
   switch (device->properties.apiVersion ^
           VK_API_VERSION_PATCH(device->properties.apiVersion)) {
     case VK_API_VERSION_1_4:
-      ret &= visitor->Visit("globalPriorityQueryFeatures",
+      ret &= visitor->Visit("dynamicRenderingLocalReadFeatures",
+                            &device->dynamic_rendering_local_read_features) &&
+             visitor->Visit("globalPriorityQueryFeatures",
                             &device->global_priority_query_features) &&
-             visitor->Visit("shaderSubgroupRotateFeatures",
-                            &device->shader_subgroup_rotate_features) &&
-             visitor->Visit("shaderFloatControls2Features",
-                            &device->shader_float_controls2_features) &&
-             visitor->Visit("shaderExpectAssumeFeatures",
-                            &device->shader_expect_assume_features) &&
+             visitor->Visit("hostImageCopyFeatures",
+                            &device->host_image_copy_features) &&
+             visitor->Visit("hostImageCopyProperties",
+                            &device->host_image_copy_properties) &&
+             visitor->Visit("indexTypeUint8Features",
+                            &device->index_type_uint8_features) &&
              visitor->Visit("lineRasterizationFeatures",
                             &device->line_rasterization_features) &&
              visitor->Visit("lineRasterizationProperties",
                             &device->line_rasterization_properties) &&
-             visitor->Visit("vertexAttributeDivisorProperties",
-                            &device->vertex_attribute_divisor_properties) &&
-             visitor->Visit("vertexAttributeDivisorFeatures",
-                            &device->vertex_attribute_divisor_features) &&
-             visitor->Visit("indexTypeUint8Features",
-                            &device->index_type_uint8_features) &&
              visitor->Visit("maintenance5Features",
                             &device->maintenance5_features) &&
              visitor->Visit("maintenance5Properties",
                             &device->maintenance5_properties) &&
-             visitor->Visit("pushDescriptorProperties",
-                            &device->push_descriptor_properties) &&
-             visitor->Visit("dynamicRenderingLocalReadFeatures",
-                            &device->dynamic_rendering_local_read_features) &&
              visitor->Visit("maintenance6Features",
                             &device->maintenance6_features) &&
              visitor->Visit("maintenance6Properties",
@@ -7476,122 +7468,130 @@ inline bool Iterate(Visitor* visitor, VkJsonDevice* device) {
                             &device->pipeline_robustness_features) &&
              visitor->Visit("pipelineRobustnessProperties",
                             &device->pipeline_robustness_properties) &&
-             visitor->Visit("hostImageCopyFeatures",
-                            &device->host_image_copy_features) &&
-             visitor->Visit("hostImageCopyProperties",
-                            &device->host_image_copy_properties) &&
+             visitor->Visit("pushDescriptorProperties",
+                            &device->push_descriptor_properties) &&
+             visitor->Visit("shaderExpectAssumeFeatures",
+                            &device->shader_expect_assume_features) &&
+             visitor->Visit("shaderFloatControls2Features",
+                            &device->shader_float_controls2_features) &&
+             visitor->Visit("shaderSubgroupRotateFeatures",
+                            &device->shader_subgroup_rotate_features) &&
+             visitor->Visit("vertexAttributeDivisorFeatures",
+                            &device->vertex_attribute_divisor_features) &&
+             visitor->Visit("vertexAttributeDivisorProperties",
+                            &device->vertex_attribute_divisor_properties) &&
              visitor->Visit("core14", &device->core14);
       FALLTHROUGH_INTENDED;
     case VK_API_VERSION_1_3:
       ret &=
-          visitor->Visit("shaderTerminateInvocationFeatures",
-                         &device->shader_terminate_invocation_features) &&
-          visitor->Visit(
-              "shaderDemoteToHelperInvocationFeatures",
-              &device->shader_demote_to_helper_invocation_features) &&
-          visitor->Visit("privateDataFeatures",
-                         &device->private_data_features) &&
-          visitor->Visit("pipelineCreationCacheControlFeatures",
-                         &device->pipeline_creation_cache_control_features) &&
-          visitor->Visit("synchronization2Features",
-                         &device->synchronization2_features) &&
-          visitor->Visit("zeroInitializeWorkgroupMemoryFeatures",
-                         &device->zero_initialize_workgroup_memory_features) &&
+          visitor->Visit("dynamicRenderingFeatures",
+                         &device->dynamic_rendering_features) &&
           visitor->Visit("imageRobustnessFeatures",
                          &device->image_robustness_features) &&
-          visitor->Visit("subgroupSizeControlFeatures",
-                         &device->subgroup_size_control_features) &&
-          visitor->Visit("subgroupSizeControlProperties",
-                         &device->subgroup_size_control_properties) &&
           visitor->Visit("inlineUniformBlockFeatures",
                          &device->inline_uniform_block_features) &&
           visitor->Visit("inlineUniformBlockProperties",
                          &device->inline_uniform_block_properties) &&
-          visitor->Visit("textureCompressionAstchdrFeatures",
-                         &device->texture_compression_astchdr_features) &&
-          visitor->Visit("dynamicRenderingFeatures",
-                         &device->dynamic_rendering_features) &&
-          visitor->Visit("shaderIntegerDotProductFeatures",
-                         &device->shader_integer_dot_product_features) &&
-          visitor->Visit("shaderIntegerDotProductProperties",
-                         &device->shader_integer_dot_product_properties) &&
-          visitor->Visit("texelBufferAlignmentProperties",
-                         &device->texel_buffer_alignment_properties) &&
           visitor->Visit("maintenance4Features",
                          &device->maintenance4_features) &&
           visitor->Visit("maintenance4Properties",
                          &device->maintenance4_properties) &&
+          visitor->Visit("pipelineCreationCacheControlFeatures",
+                         &device->pipeline_creation_cache_control_features) &&
+          visitor->Visit("privateDataFeatures",
+                         &device->private_data_features) &&
+          visitor->Visit(
+              "shaderDemoteToHelperInvocationFeatures",
+              &device->shader_demote_to_helper_invocation_features) &&
+          visitor->Visit("shaderIntegerDotProductFeatures",
+                         &device->shader_integer_dot_product_features) &&
+          visitor->Visit("shaderIntegerDotProductProperties",
+                         &device->shader_integer_dot_product_properties) &&
+          visitor->Visit("shaderTerminateInvocationFeatures",
+                         &device->shader_terminate_invocation_features) &&
+          visitor->Visit("subgroupSizeControlFeatures",
+                         &device->subgroup_size_control_features) &&
+          visitor->Visit("subgroupSizeControlProperties",
+                         &device->subgroup_size_control_properties) &&
+          visitor->Visit("synchronization2Features",
+                         &device->synchronization2_features) &&
+          visitor->Visit("texelBufferAlignmentProperties",
+                         &device->texel_buffer_alignment_properties) &&
+          visitor->Visit("textureCompressionAstchdrFeatures",
+                         &device->texture_compression_astchdr_features) &&
+          visitor->Visit("zeroInitializeWorkgroupMemoryFeatures",
+                         &device->zero_initialize_workgroup_memory_features) &&
           visitor->Visit("core13", &device->core13);
       FALLTHROUGH_INTENDED;
     case VK_API_VERSION_1_2:
       ret &= visitor->Visit("bit8StorageFeatures",
                             &device->bit8_storage_features) &&
-             visitor->Visit("driverProperties", &device->driver_properties) &&
-             visitor->Visit("shaderAtomicInt64Features",
-                            &device->shader_atomic_int64_features) &&
-             visitor->Visit("shaderFloat16Int8Features",
-                            &device->shader_float16_int8_features) &&
-             visitor->Visit("floatControlsProperties",
-                            &device->float_controls_properties) &&
+             visitor->Visit("bufferDeviceAddressFeatures",
+                            &device->buffer_device_address_features) &&
+             visitor->Visit("depthStencilResolveProperties",
+                            &device->depth_stencil_resolve_properties) &&
              visitor->Visit("descriptorIndexingFeatures",
                             &device->descriptor_indexing_features) &&
              visitor->Visit("descriptorIndexingProperties",
                             &device->descriptor_indexing_properties) &&
-             visitor->Visit("depthStencilResolveProperties",
-                            &device->depth_stencil_resolve_properties) &&
-             visitor->Visit("scalarBlockLayoutFeatures",
-                            &device->scalar_block_layout_features) &&
-             visitor->Visit("samplerFilterMinmaxProperties",
-                            &device->sampler_filter_minmax_properties) &&
-             visitor->Visit("vulkanMemoryModelFeatures",
-                            &device->vulkan_memory_model_features) &&
-             visitor->Visit("imagelessFramebufferFeatures",
-                            &device->imageless_framebuffer_features) &&
-             visitor->Visit("uniformBufferStandardLayoutFeatures",
-                            &device->uniform_buffer_standard_layout_features) &&
-             visitor->Visit("shaderSubgroupExtendedTypesFeatures",
-                            &device->shader_subgroup_extended_types_features) &&
-             visitor->Visit("separateDepthStencilLayoutsFeatures",
-                            &device->separate_depth_stencil_layouts_features) &&
+             visitor->Visit("driverProperties", &device->driver_properties) &&
+             visitor->Visit("floatControlsProperties",
+                            &device->float_controls_properties) &&
              visitor->Visit("hostQueryResetFeatures",
                             &device->host_query_reset_features) &&
+             visitor->Visit("imagelessFramebufferFeatures",
+                            &device->imageless_framebuffer_features) &&
+             visitor->Visit("samplerFilterMinmaxProperties",
+                            &device->sampler_filter_minmax_properties) &&
+             visitor->Visit("scalarBlockLayoutFeatures",
+                            &device->scalar_block_layout_features) &&
+             visitor->Visit("separateDepthStencilLayoutsFeatures",
+                            &device->separate_depth_stencil_layouts_features) &&
+             visitor->Visit("shaderAtomicInt64Features",
+                            &device->shader_atomic_int64_features) &&
+             visitor->Visit("shaderFloat16Int8Features",
+                            &device->shader_float16_int8_features) &&
+             visitor->Visit("shaderSubgroupExtendedTypesFeatures",
+                            &device->shader_subgroup_extended_types_features) &&
              visitor->Visit("timelineSemaphoreFeatures",
                             &device->timeline_semaphore_features) &&
              visitor->Visit("timelineSemaphoreProperties",
                             &device->timeline_semaphore_properties) &&
-             visitor->Visit("bufferDeviceAddressFeatures",
-                            &device->buffer_device_address_features) &&
+             visitor->Visit("uniformBufferStandardLayoutFeatures",
+                            &device->uniform_buffer_standard_layout_features) &&
+             visitor->Visit("vulkanMemoryModelFeatures",
+                            &device->vulkan_memory_model_features) &&
 
              visitor->Visit("core11", &device->core11);
       ret &= visitor->Visit("core12", &device->core12);
       FALLTHROUGH_INTENDED;
     case VK_API_VERSION_1_1:
       ret &=
-          visitor->Visit("subgroupProperties", &device->subgroup_properties) &&
           visitor->Visit("bit16StorageFeatures",
                          &device->bit16_storage_features) &&
-          visitor->Visit("pointClippingProperties",
-                         &device->point_clipping_properties) &&
+          visitor->Visit("idProperties", &device->id_properties) &&
+          visitor->Visit("maintenance3Properties",
+                         &device->maintenance3_properties) &&
           visitor->Visit("multiviewFeatures", &device->multiview_features) &&
           visitor->Visit("multiviewProperties",
                          &device->multiview_properties) &&
-          visitor->Visit("variablePointerFeatures",
-                         &device->variable_pointer_features) &&
-          visitor->Visit("variablePointersFeatures",
-                         &device->variable_pointers_features) &&
+          visitor->Visit("pointClippingProperties",
+                         &device->point_clipping_properties) &&
           visitor->Visit("protectedMemoryFeatures",
                          &device->protected_memory_features) &&
           visitor->Visit("protectedMemoryProperties",
                          &device->protected_memory_properties) &&
           visitor->Visit("samplerYcbcrConversionFeatures",
                          &device->sampler_ycbcr_conversion_features) &&
-          visitor->Visit("idProperties", &device->id_properties) &&
-          visitor->Visit("maintenance3Properties",
-                         &device->maintenance3_properties) &&
           visitor->Visit("shaderDrawParameterFeatures",
                          &device->shader_draw_parameter_features) &&
           visitor->Visit("shaderDrawParametersFeatures",
                          &device->shader_draw_parameters_features) &&
+          visitor->Visit("subgroupProperties", &device->subgroup_properties) &&
+          visitor->Visit("variablePointerFeatures",
+                         &device->variable_pointer_features) &&
+          visitor->Visit("variablePointersFeatures",
+                         &device->variable_pointers_features) &&
           visitor->Visit("externalFenceProperties",
                          &device->external_fence_properties) &&
           visitor->Visit("externalSemaphoreProperties",

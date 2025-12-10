@@ -3604,26 +3604,6 @@ VkJsonDevice VkJsonGetDevice(VkPhysicalDevice physical_device) {
       device.formats.insert(std::make_pair(format, format_properties));
     }
 
-    device.subgroup_properties.sType =
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES;
-    device.subgroup_properties.pNext = properties.pNext;
-    properties.pNext = &device.subgroup_properties;
-
-    device.point_clipping_properties.sType =
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_POINT_CLIPPING_PROPERTIES;
-    device.point_clipping_properties.pNext = properties.pNext;
-    properties.pNext = &device.point_clipping_properties;
-
-    device.multiview_properties.sType =
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTIVIEW_PROPERTIES;
-    device.multiview_properties.pNext = properties.pNext;
-    properties.pNext = &device.multiview_properties;
-
-    device.protected_memory_properties.sType =
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROTECTED_MEMORY_PROPERTIES;
-    device.protected_memory_properties.pNext = properties.pNext;
-    properties.pNext = &device.protected_memory_properties;
-
     device.id_properties.sType =
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ID_PROPERTIES;
     device.id_properties.pNext = properties.pNext;
@@ -3633,6 +3613,26 @@ VkJsonDevice VkJsonGetDevice(VkPhysicalDevice physical_device) {
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_3_PROPERTIES;
     device.maintenance3_properties.pNext = properties.pNext;
     properties.pNext = &device.maintenance3_properties;
+
+    device.multiview_properties.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTIVIEW_PROPERTIES;
+    device.multiview_properties.pNext = properties.pNext;
+    properties.pNext = &device.multiview_properties;
+
+    device.point_clipping_properties.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_POINT_CLIPPING_PROPERTIES;
+    device.point_clipping_properties.pNext = properties.pNext;
+    properties.pNext = &device.point_clipping_properties;
+
+    device.protected_memory_properties.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROTECTED_MEMORY_PROPERTIES;
+    device.protected_memory_properties.pNext = properties.pNext;
+    properties.pNext = &device.protected_memory_properties;
+
+    device.subgroup_properties.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES;
+    device.subgroup_properties.pNext = properties.pNext;
+    properties.pNext = &device.subgroup_properties;
 
     vkGetPhysicalDeviceProperties2(physical_device, &properties);
 
@@ -3645,16 +3645,6 @@ VkJsonDevice VkJsonGetDevice(VkPhysicalDevice physical_device) {
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTIVIEW_FEATURES;
     device.multiview_features.pNext = features.pNext;
     features.pNext = &device.multiview_features;
-
-    device.variable_pointer_features.sType =
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VARIABLE_POINTERS_FEATURES;
-    device.variable_pointer_features.pNext = features.pNext;
-    features.pNext = &device.variable_pointer_features;
-
-    device.variable_pointers_features.sType =
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VARIABLE_POINTERS_FEATURES;
-    device.variable_pointers_features.pNext = features.pNext;
-    features.pNext = &device.variable_pointers_features;
 
     device.protected_memory_features.sType =
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROTECTED_MEMORY_FEATURES;
@@ -3675,6 +3665,16 @@ VkJsonDevice VkJsonGetDevice(VkPhysicalDevice physical_device) {
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DRAW_PARAMETERS_FEATURES;
     device.shader_draw_parameters_features.pNext = features.pNext;
     features.pNext = &device.shader_draw_parameters_features;
+
+    device.variable_pointer_features.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VARIABLE_POINTERS_FEATURES;
+    device.variable_pointer_features.pNext = features.pNext;
+    features.pNext = &device.variable_pointer_features;
+
+    device.variable_pointers_features.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VARIABLE_POINTERS_FEATURES;
+    device.variable_pointers_features.pNext = features.pNext;
+    features.pNext = &device.variable_pointers_features;
 
     vkGetPhysicalDeviceFeatures2(physical_device, &features);
 
@@ -3733,6 +3733,16 @@ VkJsonDevice VkJsonGetDevice(VkPhysicalDevice physical_device) {
     device.core12.properties.pNext = properties.pNext;
     properties.pNext = &device.core12.properties;
 
+    device.depth_stencil_resolve_properties.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DEPTH_STENCIL_RESOLVE_PROPERTIES;
+    device.depth_stencil_resolve_properties.pNext = properties.pNext;
+    properties.pNext = &device.depth_stencil_resolve_properties;
+
+    device.descriptor_indexing_properties.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_PROPERTIES;
+    device.descriptor_indexing_properties.pNext = properties.pNext;
+    properties.pNext = &device.descriptor_indexing_properties;
+
     device.driver_properties.sType =
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DRIVER_PROPERTIES;
     device.driver_properties.pNext = properties.pNext;
@@ -3742,16 +3752,6 @@ VkJsonDevice VkJsonGetDevice(VkPhysicalDevice physical_device) {
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FLOAT_CONTROLS_PROPERTIES;
     device.float_controls_properties.pNext = properties.pNext;
     properties.pNext = &device.float_controls_properties;
-
-    device.descriptor_indexing_properties.sType =
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_PROPERTIES;
-    device.descriptor_indexing_properties.pNext = properties.pNext;
-    properties.pNext = &device.descriptor_indexing_properties;
-
-    device.depth_stencil_resolve_properties.sType =
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DEPTH_STENCIL_RESOLVE_PROPERTIES;
-    device.depth_stencil_resolve_properties.pNext = properties.pNext;
-    properties.pNext = &device.depth_stencil_resolve_properties;
 
     device.sampler_filter_minmax_properties.sType =
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SAMPLER_FILTER_MINMAX_PROPERTIES;
@@ -3780,6 +3780,36 @@ VkJsonDevice VkJsonGetDevice(VkPhysicalDevice physical_device) {
     device.bit8_storage_features.pNext = features.pNext;
     features.pNext = &device.bit8_storage_features;
 
+    device.buffer_device_address_features.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES;
+    device.buffer_device_address_features.pNext = features.pNext;
+    features.pNext = &device.buffer_device_address_features;
+
+    device.descriptor_indexing_features.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES;
+    device.descriptor_indexing_features.pNext = features.pNext;
+    features.pNext = &device.descriptor_indexing_features;
+
+    device.host_query_reset_features.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_QUERY_RESET_FEATURES;
+    device.host_query_reset_features.pNext = features.pNext;
+    features.pNext = &device.host_query_reset_features;
+
+    device.imageless_framebuffer_features.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGELESS_FRAMEBUFFER_FEATURES;
+    device.imageless_framebuffer_features.pNext = features.pNext;
+    features.pNext = &device.imageless_framebuffer_features;
+
+    device.scalar_block_layout_features.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SCALAR_BLOCK_LAYOUT_FEATURES;
+    device.scalar_block_layout_features.pNext = features.pNext;
+    features.pNext = &device.scalar_block_layout_features;
+
+    device.separate_depth_stencil_layouts_features.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SEPARATE_DEPTH_STENCIL_LAYOUTS_FEATURES;
+    device.separate_depth_stencil_layouts_features.pNext = features.pNext;
+    features.pNext = &device.separate_depth_stencil_layouts_features;
+
     device.shader_atomic_int64_features.sType =
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_ATOMIC_INT64_FEATURES;
     device.shader_atomic_int64_features.pNext = features.pNext;
@@ -3790,55 +3820,25 @@ VkJsonDevice VkJsonGetDevice(VkPhysicalDevice physical_device) {
     device.shader_float16_int8_features.pNext = features.pNext;
     features.pNext = &device.shader_float16_int8_features;
 
-    device.descriptor_indexing_features.sType =
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES;
-    device.descriptor_indexing_features.pNext = features.pNext;
-    features.pNext = &device.descriptor_indexing_features;
-
-    device.scalar_block_layout_features.sType =
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SCALAR_BLOCK_LAYOUT_FEATURES;
-    device.scalar_block_layout_features.pNext = features.pNext;
-    features.pNext = &device.scalar_block_layout_features;
-
-    device.vulkan_memory_model_features.sType =
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_MEMORY_MODEL_FEATURES;
-    device.vulkan_memory_model_features.pNext = features.pNext;
-    features.pNext = &device.vulkan_memory_model_features;
-
-    device.imageless_framebuffer_features.sType =
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGELESS_FRAMEBUFFER_FEATURES;
-    device.imageless_framebuffer_features.pNext = features.pNext;
-    features.pNext = &device.imageless_framebuffer_features;
-
-    device.uniform_buffer_standard_layout_features.sType =
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_UNIFORM_BUFFER_STANDARD_LAYOUT_FEATURES;
-    device.uniform_buffer_standard_layout_features.pNext = features.pNext;
-    features.pNext = &device.uniform_buffer_standard_layout_features;
-
     device.shader_subgroup_extended_types_features.sType =
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_SUBGROUP_EXTENDED_TYPES_FEATURES;
     device.shader_subgroup_extended_types_features.pNext = features.pNext;
     features.pNext = &device.shader_subgroup_extended_types_features;
-
-    device.separate_depth_stencil_layouts_features.sType =
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SEPARATE_DEPTH_STENCIL_LAYOUTS_FEATURES;
-    device.separate_depth_stencil_layouts_features.pNext = features.pNext;
-    features.pNext = &device.separate_depth_stencil_layouts_features;
-
-    device.host_query_reset_features.sType =
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_QUERY_RESET_FEATURES;
-    device.host_query_reset_features.pNext = features.pNext;
-    features.pNext = &device.host_query_reset_features;
 
     device.timeline_semaphore_features.sType =
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES;
     device.timeline_semaphore_features.pNext = features.pNext;
     features.pNext = &device.timeline_semaphore_features;
 
-    device.buffer_device_address_features.sType =
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES;
-    device.buffer_device_address_features.pNext = features.pNext;
-    features.pNext = &device.buffer_device_address_features;
+    device.uniform_buffer_standard_layout_features.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_UNIFORM_BUFFER_STANDARD_LAYOUT_FEATURES;
+    device.uniform_buffer_standard_layout_features.pNext = features.pNext;
+    features.pNext = &device.uniform_buffer_standard_layout_features;
+
+    device.vulkan_memory_model_features.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_MEMORY_MODEL_FEATURES;
+    device.vulkan_memory_model_features.pNext = features.pNext;
+    features.pNext = &device.vulkan_memory_model_features;
     vkGetPhysicalDeviceFeatures2(physical_device, &features);
   }
 
@@ -3867,30 +3867,30 @@ VkJsonDevice VkJsonGetDevice(VkPhysicalDevice physical_device) {
       device.formats.insert(std::make_pair(format, format_properties));
     }
 
-    device.subgroup_size_control_properties.sType =
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_SIZE_CONTROL_PROPERTIES;
-    device.subgroup_size_control_properties.pNext = properties.pNext;
-    properties.pNext = &device.subgroup_size_control_properties;
-
     device.inline_uniform_block_properties.sType =
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_INLINE_UNIFORM_BLOCK_PROPERTIES;
     device.inline_uniform_block_properties.pNext = properties.pNext;
     properties.pNext = &device.inline_uniform_block_properties;
+
+    device.maintenance4_properties.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_4_PROPERTIES;
+    device.maintenance4_properties.pNext = properties.pNext;
+    properties.pNext = &device.maintenance4_properties;
 
     device.shader_integer_dot_product_properties.sType =
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_INTEGER_DOT_PRODUCT_PROPERTIES;
     device.shader_integer_dot_product_properties.pNext = properties.pNext;
     properties.pNext = &device.shader_integer_dot_product_properties;
 
+    device.subgroup_size_control_properties.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_SIZE_CONTROL_PROPERTIES;
+    device.subgroup_size_control_properties.pNext = properties.pNext;
+    properties.pNext = &device.subgroup_size_control_properties;
+
     device.texel_buffer_alignment_properties.sType =
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TEXEL_BUFFER_ALIGNMENT_PROPERTIES;
     device.texel_buffer_alignment_properties.pNext = properties.pNext;
     properties.pNext = &device.texel_buffer_alignment_properties;
-
-    device.maintenance4_properties.sType =
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_4_PROPERTIES;
-    device.maintenance4_properties.pNext = properties.pNext;
-    properties.pNext = &device.maintenance4_properties;
 
     device.core13.properties.sType =
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_PROPERTIES;
@@ -3904,70 +3904,70 @@ VkJsonDevice VkJsonGetDevice(VkPhysicalDevice physical_device) {
     device.core13.features.pNext = features.pNext;
     features.pNext = &device.core13.features;
 
-    device.shader_terminate_invocation_features.sType =
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_TERMINATE_INVOCATION_FEATURES;
-    device.shader_terminate_invocation_features.pNext = features.pNext;
-    features.pNext = &device.shader_terminate_invocation_features;
-
-    device.shader_demote_to_helper_invocation_features.sType =
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DEMOTE_TO_HELPER_INVOCATION_FEATURES;
-    device.shader_demote_to_helper_invocation_features.pNext = features.pNext;
-    features.pNext = &device.shader_demote_to_helper_invocation_features;
-
-    device.private_data_features.sType =
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PRIVATE_DATA_FEATURES;
-    device.private_data_features.pNext = features.pNext;
-    features.pNext = &device.private_data_features;
-
-    device.pipeline_creation_cache_control_features.sType =
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PIPELINE_CREATION_CACHE_CONTROL_FEATURES;
-    device.pipeline_creation_cache_control_features.pNext = features.pNext;
-    features.pNext = &device.pipeline_creation_cache_control_features;
-
-    device.synchronization2_features.sType =
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES;
-    device.synchronization2_features.pNext = features.pNext;
-    features.pNext = &device.synchronization2_features;
-
-    device.zero_initialize_workgroup_memory_features.sType =
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ZERO_INITIALIZE_WORKGROUP_MEMORY_FEATURES;
-    device.zero_initialize_workgroup_memory_features.pNext = features.pNext;
-    features.pNext = &device.zero_initialize_workgroup_memory_features;
+    device.dynamic_rendering_features.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES;
+    device.dynamic_rendering_features.pNext = features.pNext;
+    features.pNext = &device.dynamic_rendering_features;
 
     device.image_robustness_features.sType =
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_ROBUSTNESS_FEATURES;
     device.image_robustness_features.pNext = features.pNext;
     features.pNext = &device.image_robustness_features;
 
-    device.subgroup_size_control_features.sType =
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_SIZE_CONTROL_FEATURES;
-    device.subgroup_size_control_features.pNext = features.pNext;
-    features.pNext = &device.subgroup_size_control_features;
-
     device.inline_uniform_block_features.sType =
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_INLINE_UNIFORM_BLOCK_FEATURES;
     device.inline_uniform_block_features.pNext = features.pNext;
     features.pNext = &device.inline_uniform_block_features;
 
-    device.texture_compression_astchdr_features.sType =
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TEXTURE_COMPRESSION_ASTC_HDR_FEATURES;
-    device.texture_compression_astchdr_features.pNext = features.pNext;
-    features.pNext = &device.texture_compression_astchdr_features;
+    device.maintenance4_features.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_4_FEATURES;
+    device.maintenance4_features.pNext = features.pNext;
+    features.pNext = &device.maintenance4_features;
 
-    device.dynamic_rendering_features.sType =
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES;
-    device.dynamic_rendering_features.pNext = features.pNext;
-    features.pNext = &device.dynamic_rendering_features;
+    device.pipeline_creation_cache_control_features.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PIPELINE_CREATION_CACHE_CONTROL_FEATURES;
+    device.pipeline_creation_cache_control_features.pNext = features.pNext;
+    features.pNext = &device.pipeline_creation_cache_control_features;
+
+    device.private_data_features.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PRIVATE_DATA_FEATURES;
+    device.private_data_features.pNext = features.pNext;
+    features.pNext = &device.private_data_features;
+
+    device.shader_demote_to_helper_invocation_features.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DEMOTE_TO_HELPER_INVOCATION_FEATURES;
+    device.shader_demote_to_helper_invocation_features.pNext = features.pNext;
+    features.pNext = &device.shader_demote_to_helper_invocation_features;
 
     device.shader_integer_dot_product_features.sType =
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_INTEGER_DOT_PRODUCT_FEATURES;
     device.shader_integer_dot_product_features.pNext = features.pNext;
     features.pNext = &device.shader_integer_dot_product_features;
 
-    device.maintenance4_features.sType =
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_4_FEATURES;
-    device.maintenance4_features.pNext = features.pNext;
-    features.pNext = &device.maintenance4_features;
+    device.shader_terminate_invocation_features.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_TERMINATE_INVOCATION_FEATURES;
+    device.shader_terminate_invocation_features.pNext = features.pNext;
+    features.pNext = &device.shader_terminate_invocation_features;
+
+    device.subgroup_size_control_features.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_SIZE_CONTROL_FEATURES;
+    device.subgroup_size_control_features.pNext = features.pNext;
+    features.pNext = &device.subgroup_size_control_features;
+
+    device.synchronization2_features.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES;
+    device.synchronization2_features.pNext = features.pNext;
+    features.pNext = &device.synchronization2_features;
+
+    device.texture_compression_astchdr_features.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TEXTURE_COMPRESSION_ASTC_HDR_FEATURES;
+    device.texture_compression_astchdr_features.pNext = features.pNext;
+    features.pNext = &device.texture_compression_astchdr_features;
+
+    device.zero_initialize_workgroup_memory_features.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ZERO_INITIALIZE_WORKGROUP_MEMORY_FEATURES;
+    device.zero_initialize_workgroup_memory_features.pNext = features.pNext;
+    features.pNext = &device.zero_initialize_workgroup_memory_features;
 
     vkGetPhysicalDeviceFeatures2(physical_device, &features);
   }
@@ -3981,25 +3981,20 @@ VkJsonDevice VkJsonGetDevice(VkPhysicalDevice physical_device) {
       device.formats.insert(std::make_pair(format, format_properties));
     }
 
+    device.host_image_copy_properties.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_IMAGE_COPY_PROPERTIES;
+    device.host_image_copy_properties.pNext = properties.pNext;
+    properties.pNext = &device.host_image_copy_properties;
+
     device.line_rasterization_properties.sType =
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_LINE_RASTERIZATION_PROPERTIES;
     device.line_rasterization_properties.pNext = properties.pNext;
     properties.pNext = &device.line_rasterization_properties;
 
-    device.vertex_attribute_divisor_properties.sType =
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_ATTRIBUTE_DIVISOR_PROPERTIES;
-    device.vertex_attribute_divisor_properties.pNext = properties.pNext;
-    properties.pNext = &device.vertex_attribute_divisor_properties;
-
     device.maintenance5_properties.sType =
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_5_PROPERTIES;
     device.maintenance5_properties.pNext = properties.pNext;
     properties.pNext = &device.maintenance5_properties;
-
-    device.push_descriptor_properties.sType =
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PUSH_DESCRIPTOR_PROPERTIES;
-    device.push_descriptor_properties.pNext = properties.pNext;
-    properties.pNext = &device.push_descriptor_properties;
 
     device.maintenance6_properties.sType =
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_6_PROPERTIES;
@@ -4011,10 +4006,15 @@ VkJsonDevice VkJsonGetDevice(VkPhysicalDevice physical_device) {
     device.pipeline_robustness_properties.pNext = properties.pNext;
     properties.pNext = &device.pipeline_robustness_properties;
 
-    device.host_image_copy_properties.sType =
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_IMAGE_COPY_PROPERTIES;
-    device.host_image_copy_properties.pNext = properties.pNext;
-    properties.pNext = &device.host_image_copy_properties;
+    device.push_descriptor_properties.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PUSH_DESCRIPTOR_PROPERTIES;
+    device.push_descriptor_properties.pNext = properties.pNext;
+    properties.pNext = &device.push_descriptor_properties;
+
+    device.vertex_attribute_divisor_properties.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_ATTRIBUTE_DIVISOR_PROPERTIES;
+    device.vertex_attribute_divisor_properties.pNext = properties.pNext;
+    properties.pNext = &device.vertex_attribute_divisor_properties;
 
     device.core14.properties.sType =
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_4_PROPERTIES;
@@ -4064,50 +4064,35 @@ VkJsonDevice VkJsonGetDevice(VkPhysicalDevice physical_device) {
     device.core14.features.pNext = features.pNext;
     features.pNext = &device.core14.features;
 
+    device.dynamic_rendering_local_read_features.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_LOCAL_READ_FEATURES;
+    device.dynamic_rendering_local_read_features.pNext = features.pNext;
+    features.pNext = &device.dynamic_rendering_local_read_features;
+
     device.global_priority_query_features.sType =
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_GLOBAL_PRIORITY_QUERY_FEATURES;
     device.global_priority_query_features.pNext = features.pNext;
     features.pNext = &device.global_priority_query_features;
 
-    device.shader_subgroup_rotate_features.sType =
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_SUBGROUP_ROTATE_FEATURES;
-    device.shader_subgroup_rotate_features.pNext = features.pNext;
-    features.pNext = &device.shader_subgroup_rotate_features;
-
-    device.shader_float_controls2_features.sType =
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_FLOAT_CONTROLS_2_FEATURES;
-    device.shader_float_controls2_features.pNext = features.pNext;
-    features.pNext = &device.shader_float_controls2_features;
-
-    device.shader_expect_assume_features.sType =
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_EXPECT_ASSUME_FEATURES;
-    device.shader_expect_assume_features.pNext = features.pNext;
-    features.pNext = &device.shader_expect_assume_features;
-
-    device.line_rasterization_features.sType =
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_LINE_RASTERIZATION_FEATURES;
-    device.line_rasterization_features.pNext = features.pNext;
-    features.pNext = &device.line_rasterization_features;
-
-    device.vertex_attribute_divisor_features.sType =
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_ATTRIBUTE_DIVISOR_FEATURES;
-    device.vertex_attribute_divisor_features.pNext = features.pNext;
-    features.pNext = &device.vertex_attribute_divisor_features;
+    device.host_image_copy_features.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_IMAGE_COPY_FEATURES;
+    device.host_image_copy_features.pNext = features.pNext;
+    features.pNext = &device.host_image_copy_features;
 
     device.index_type_uint8_features.sType =
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_INDEX_TYPE_UINT8_FEATURES;
     device.index_type_uint8_features.pNext = features.pNext;
     features.pNext = &device.index_type_uint8_features;
 
+    device.line_rasterization_features.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_LINE_RASTERIZATION_FEATURES;
+    device.line_rasterization_features.pNext = features.pNext;
+    features.pNext = &device.line_rasterization_features;
+
     device.maintenance5_features.sType =
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_5_FEATURES;
     device.maintenance5_features.pNext = features.pNext;
     features.pNext = &device.maintenance5_features;
-
-    device.dynamic_rendering_local_read_features.sType =
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_LOCAL_READ_FEATURES;
-    device.dynamic_rendering_local_read_features.pNext = features.pNext;
-    features.pNext = &device.dynamic_rendering_local_read_features;
 
     device.maintenance6_features.sType =
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_6_FEATURES;
@@ -4124,10 +4109,25 @@ VkJsonDevice VkJsonGetDevice(VkPhysicalDevice physical_device) {
     device.pipeline_robustness_features.pNext = features.pNext;
     features.pNext = &device.pipeline_robustness_features;
 
-    device.host_image_copy_features.sType =
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_IMAGE_COPY_FEATURES;
-    device.host_image_copy_features.pNext = features.pNext;
-    features.pNext = &device.host_image_copy_features;
+    device.shader_expect_assume_features.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_EXPECT_ASSUME_FEATURES;
+    device.shader_expect_assume_features.pNext = features.pNext;
+    features.pNext = &device.shader_expect_assume_features;
+
+    device.shader_float_controls2_features.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_FLOAT_CONTROLS_2_FEATURES;
+    device.shader_float_controls2_features.pNext = features.pNext;
+    features.pNext = &device.shader_float_controls2_features;
+
+    device.shader_subgroup_rotate_features.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_SUBGROUP_ROTATE_FEATURES;
+    device.shader_subgroup_rotate_features.pNext = features.pNext;
+    features.pNext = &device.shader_subgroup_rotate_features;
+
+    device.vertex_attribute_divisor_features.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_ATTRIBUTE_DIVISOR_FEATURES;
+    device.vertex_attribute_divisor_features.pNext = features.pNext;
+    features.pNext = &device.vertex_attribute_divisor_features;
 
     vkGetPhysicalDeviceFeatures2(physical_device, &features);
   }
