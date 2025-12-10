@@ -108,7 +108,6 @@ public:
     bool shader_disk_cache() const;
     bool skip_invisible_windows_in_input() const;
     bool stable_edid_ids() const;
-    bool stop_layer() const;
     bool synced_resolution_switch() const;
     bool true_hdr_screenshots() const;
     bool vulkan_renderengine() const;

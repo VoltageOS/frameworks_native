@@ -362,14 +362,6 @@ flag {
 } # stable_edid_ids
 
 flag {
-    name: "stop_layer"
-    namespace: "window_surfaces"
-    description: "Enables stop layers when building layer snapshots"
-    bug: "403312802"
-    is_fixed_read_only: true
-} # stop_layer
-
-flag {
   name: "synced_resolution_switch"
   namespace: "core_graphics"
   description: "Synchronize resolution modeset with framebuffer resizing"
