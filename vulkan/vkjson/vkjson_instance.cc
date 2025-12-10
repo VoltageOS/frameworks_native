@@ -114,6 +114,18 @@ VkJsonDevice VkJsonGetDevice(VkPhysicalDevice physical_device) {
                             .external_format_resolve_properties_android;
   }
 
+  if (HasExtension("VK_ARM_performance_counters_by_region",
+                   device.extensions)) {
+    device.arm_performance_counters_by_region.reported = true;
+    device.arm_performance_counters_by_region
+        .performance_counters_by_region_properties_arm.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PERFORMANCE_COUNTERS_BY_REGION_PROPERTIES_ARM;
+    device.arm_performance_counters_by_region
+        .performance_counters_by_region_properties_arm.pNext = properties.pNext;
+    properties.pNext = &device.arm_performance_counters_by_region
+                            .performance_counters_by_region_properties_arm;
+  }
+
   if (HasExtension("VK_ARM_render_pass_striped", device.extensions)) {
     device.arm_render_pass_striped.reported = true;
     device.arm_render_pass_striped.render_pass_striped_properties_arm.sType =
@@ -353,6 +365,16 @@ VkJsonDevice VkJsonGetDevice(VkPhysicalDevice physical_device) {
         &device.ext_map_memory_placed.map_memory_placed_properties_ext;
   }
 
+  if (HasExtension("VK_EXT_memory_decompression", device.extensions)) {
+    device.ext_memory_decompression.reported = true;
+    device.ext_memory_decompression.memory_decompression_properties_ext.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_DECOMPRESSION_PROPERTIES_EXT;
+    device.ext_memory_decompression.memory_decompression_properties_ext.pNext =
+        properties.pNext;
+    properties.pNext =
+        &device.ext_memory_decompression.memory_decompression_properties_ext;
+  }
+
   if (HasExtension("VK_EXT_mesh_shader", device.extensions)) {
     device.ext_mesh_shader.reported = true;
     device.ext_mesh_shader.mesh_shader_properties_ext.sType =
@@ -425,6 +447,18 @@ VkJsonDevice VkJsonGetDevice(VkPhysicalDevice physical_device) {
         properties.pNext;
     properties.pNext =
         &device.ext_provoking_vertex.provoking_vertex_properties_ext;
+  }
+
+  if (HasExtension("VK_EXT_ray_tracing_invocation_reorder",
+                   device.extensions)) {
+    device.ext_ray_tracing_invocation_reorder.reported = true;
+    device.ext_ray_tracing_invocation_reorder
+        .ray_tracing_invocation_reorder_properties_ext.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_INVOCATION_REORDER_PROPERTIES_EXT;
+    device.ext_ray_tracing_invocation_reorder
+        .ray_tracing_invocation_reorder_properties_ext.pNext = properties.pNext;
+    properties.pNext = &device.ext_ray_tracing_invocation_reorder
+                            .ray_tracing_invocation_reorder_properties_ext;
   }
 
   if (HasExtension("VK_EXT_robustness2", device.extensions)) {
@@ -582,6 +616,16 @@ VkJsonDevice VkJsonGetDevice(VkPhysicalDevice physical_device) {
         &device.khr_cooperative_matrix.cooperative_matrix_properties_khr;
   }
 
+  if (HasExtension("VK_KHR_copy_memory_indirect", device.extensions)) {
+    device.khr_copy_memory_indirect.reported = true;
+    device.khr_copy_memory_indirect.copy_memory_indirect_properties_khr.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COPY_MEMORY_INDIRECT_PROPERTIES_KHR;
+    device.khr_copy_memory_indirect.copy_memory_indirect_properties_khr.pNext =
+        properties.pNext;
+    properties.pNext =
+        &device.khr_copy_memory_indirect.copy_memory_indirect_properties_khr;
+  }
+
   if (HasExtension("VK_KHR_depth_stencil_resolve", device.extensions)) {
     device.khr_depth_stencil_resolve.reported = true;
     device.khr_depth_stencil_resolve.depth_stencil_resolve_properties_khr
@@ -662,6 +706,15 @@ VkJsonDevice VkJsonGetDevice(VkPhysicalDevice physical_device) {
         properties.pNext;
     properties.pNext =
         &device.khr_line_rasterization.line_rasterization_properties_khr;
+  }
+
+  if (HasExtension("VK_KHR_maintenance10", device.extensions)) {
+    device.khr_maintenance10.reported = true;
+    device.khr_maintenance10.maintenance10_properties_khr.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_10_PROPERTIES_KHR;
+    device.khr_maintenance10.maintenance10_properties_khr.pNext =
+        properties.pNext;
+    properties.pNext = &device.khr_maintenance10.maintenance10_properties_khr;
   }
 
   if (HasExtension("VK_KHR_maintenance2", device.extensions)) {
@@ -906,7 +959,7 @@ VkJsonDevice VkJsonGetDevice(VkPhysicalDevice physical_device) {
   if (HasExtension("VK_NV_copy_memory_indirect", device.extensions)) {
     device.nv_copy_memory_indirect.reported = true;
     device.nv_copy_memory_indirect.copy_memory_indirect_properties_nv.sType =
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COPY_MEMORY_INDIRECT_PROPERTIES_NV;
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COPY_MEMORY_INDIRECT_PROPERTIES_KHR;
     device.nv_copy_memory_indirect.copy_memory_indirect_properties_nv.pNext =
         properties.pNext;
     properties.pNext =
@@ -960,7 +1013,7 @@ VkJsonDevice VkJsonGetDevice(VkPhysicalDevice physical_device) {
   if (HasExtension("VK_NV_memory_decompression", device.extensions)) {
     device.nv_memory_decompression.reported = true;
     device.nv_memory_decompression.memory_decompression_properties_nv.sType =
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_DECOMPRESSION_PROPERTIES_NV;
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_DECOMPRESSION_PROPERTIES_EXT;
     device.nv_memory_decompression.memory_decompression_properties_nv.pNext =
         properties.pNext;
     properties.pNext =
@@ -1200,6 +1253,18 @@ VkJsonDevice VkJsonGetDevice(VkPhysicalDevice physical_device) {
     features.pNext = &device.arm_format_pack.format_pack_features_arm;
   }
 
+  if (HasExtension("VK_ARM_performance_counters_by_region",
+                   device.extensions)) {
+    device.arm_performance_counters_by_region.reported = true;
+    device.arm_performance_counters_by_region
+        .performance_counters_by_region_features_arm.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PERFORMANCE_COUNTERS_BY_REGION_FEATURES_ARM;
+    device.arm_performance_counters_by_region
+        .performance_counters_by_region_features_arm.pNext = features.pNext;
+    features.pNext = &device.arm_performance_counters_by_region
+                          .performance_counters_by_region_features_arm;
+  }
+
   if (HasExtension("VK_ARM_pipeline_opacity_micromap", device.extensions)) {
     device.arm_pipeline_opacity_micromap.reported = true;
     device.arm_pipeline_opacity_micromap.pipeline_opacity_micromap_features_arm
@@ -1373,6 +1438,15 @@ VkJsonDevice VkJsonGetDevice(VkPhysicalDevice physical_device) {
         features.pNext;
     features.pNext =
         &device.ext_custom_border_color.custom_border_color_features_ext;
+  }
+
+  if (HasExtension("VK_EXT_custom_resolve", device.extensions)) {
+    device.ext_custom_resolve.reported = true;
+    device.ext_custom_resolve.custom_resolve_features_ext.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_CUSTOM_RESOLVE_FEATURES_EXT;
+    device.ext_custom_resolve.custom_resolve_features_ext.pNext =
+        features.pNext;
+    features.pNext = &device.ext_custom_resolve.custom_resolve_features_ext;
   }
 
   if (HasExtension("VK_EXT_depth_bias_control", device.extensions)) {
@@ -1734,6 +1808,16 @@ VkJsonDevice VkJsonGetDevice(VkPhysicalDevice physical_device) {
         &device.ext_map_memory_placed.map_memory_placed_features_ext;
   }
 
+  if (HasExtension("VK_EXT_memory_decompression", device.extensions)) {
+    device.ext_memory_decompression.reported = true;
+    device.ext_memory_decompression.memory_decompression_features_ext.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_DECOMPRESSION_FEATURES_EXT;
+    device.ext_memory_decompression.memory_decompression_features_ext.pNext =
+        features.pNext;
+    features.pNext =
+        &device.ext_memory_decompression.memory_decompression_features_ext;
+  }
+
   if (HasExtension("VK_EXT_memory_priority", device.extensions)) {
     device.ext_memory_priority.reported = true;
     device.ext_memory_priority.memory_priority_features_ext.sType =
@@ -1878,6 +1962,15 @@ VkJsonDevice VkJsonGetDevice(VkPhysicalDevice physical_device) {
         &device.ext_pipeline_robustness.pipeline_robustness_features_ext;
   }
 
+  if (HasExtension("VK_EXT_present_timing", device.extensions)) {
+    device.ext_present_timing.reported = true;
+    device.ext_present_timing.present_timing_features_ext.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PRESENT_TIMING_FEATURES_EXT;
+    device.ext_present_timing.present_timing_features_ext.pNext =
+        features.pNext;
+    features.pNext = &device.ext_present_timing.present_timing_features_ext;
+  }
+
   if (HasExtension("VK_EXT_primitive_topology_list_restart",
                    device.extensions)) {
     device.ext_primitive_topology_list_restart.reported = true;
@@ -1931,6 +2024,18 @@ VkJsonDevice VkJsonGetDevice(VkPhysicalDevice physical_device) {
                           .rasterization_order_attachment_access_features_ext;
   }
 
+  if (HasExtension("VK_EXT_ray_tracing_invocation_reorder",
+                   device.extensions)) {
+    device.ext_ray_tracing_invocation_reorder.reported = true;
+    device.ext_ray_tracing_invocation_reorder
+        .ray_tracing_invocation_reorder_features_ext.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_INVOCATION_REORDER_FEATURES_EXT;
+    device.ext_ray_tracing_invocation_reorder
+        .ray_tracing_invocation_reorder_features_ext.pNext = features.pNext;
+    features.pNext = &device.ext_ray_tracing_invocation_reorder
+                          .ray_tracing_invocation_reorder_features_ext;
+  }
+
   if (HasExtension("VK_EXT_rgba10x6_formats", device.extensions)) {
     device.ext_rgba10x6_formats.reported = true;
     device.ext_rgba10x6_formats.rgba10_x6_formats_features_ext.sType =
@@ -1957,6 +2062,16 @@ VkJsonDevice VkJsonGetDevice(VkPhysicalDevice physical_device) {
         features.pNext;
     features.pNext =
         &device.ext_scalar_block_layout.scalar_block_layout_features_ext;
+  }
+
+  if (HasExtension("VK_EXT_shader_64bit_indexing", device.extensions)) {
+    device.ext_shader_64bit_indexing.reported = true;
+    device.ext_shader_64bit_indexing.shaderbit64_indexing_features_ext.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_64_BIT_INDEXING_FEATURES_EXT;
+    device.ext_shader_64bit_indexing.shaderbit64_indexing_features_ext.pNext =
+        features.pNext;
+    features.pNext =
+        &device.ext_shader_64bit_indexing.shaderbit64_indexing_features_ext;
   }
 
   if (HasExtension("VK_EXT_shader_atomic_float", device.extensions)) {
@@ -2048,6 +2163,19 @@ VkJsonDevice VkJsonGetDevice(VkPhysicalDevice physical_device) {
         features.pNext;
     features.pNext =
         &device.ext_shader_tile_image.shader_tile_image_features_ext;
+  }
+
+  if (HasExtension("VK_EXT_shader_uniform_buffer_unsized_array",
+                   device.extensions)) {
+    device.ext_shader_uniform_buffer_unsized_array.reported = true;
+    device.ext_shader_uniform_buffer_unsized_array
+        .shader_uniform_buffer_unsized_array_features_ext.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_UNIFORM_BUFFER_UNSIZED_ARRAY_FEATURES_EXT;
+    device.ext_shader_uniform_buffer_unsized_array
+        .shader_uniform_buffer_unsized_array_features_ext.pNext =
+        features.pNext;
+    features.pNext = &device.ext_shader_uniform_buffer_unsized_array
+                          .shader_uniform_buffer_unsized_array_features_ext;
   }
 
   if (HasExtension("VK_EXT_subgroup_size_control", device.extensions)) {
@@ -2298,6 +2426,16 @@ VkJsonDevice VkJsonGetDevice(VkPhysicalDevice physical_device) {
         &device.khr_cooperative_matrix.cooperative_matrix_features_khr;
   }
 
+  if (HasExtension("VK_KHR_copy_memory_indirect", device.extensions)) {
+    device.khr_copy_memory_indirect.reported = true;
+    device.khr_copy_memory_indirect.copy_memory_indirect_features_khr.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COPY_MEMORY_INDIRECT_FEATURES_KHR;
+    device.khr_copy_memory_indirect.copy_memory_indirect_features_khr.pNext =
+        features.pNext;
+    features.pNext =
+        &device.khr_copy_memory_indirect.copy_memory_indirect_features_khr;
+  }
+
   if (HasExtension("VK_KHR_depth_clamp_zero_one", device.extensions)) {
     device.khr_depth_clamp_zero_one.reported = true;
     device.khr_depth_clamp_zero_one.depth_clamp_zero_one_features_khr.sType =
@@ -2387,6 +2525,14 @@ VkJsonDevice VkJsonGetDevice(VkPhysicalDevice physical_device) {
         features.pNext;
     features.pNext =
         &device.khr_line_rasterization.line_rasterization_features_khr;
+  }
+
+  if (HasExtension("VK_KHR_maintenance10", device.extensions)) {
+    device.khr_maintenance10.reported = true;
+    device.khr_maintenance10.maintenance10_features_khr.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_10_FEATURES_KHR;
+    device.khr_maintenance10.maintenance10_features_khr.pNext = features.pNext;
+    features.pNext = &device.khr_maintenance10.maintenance10_features_khr;
   }
 
   if (HasExtension("VK_KHR_maintenance4", device.extensions)) {
@@ -2652,6 +2798,14 @@ VkJsonDevice VkJsonGetDevice(VkPhysicalDevice physical_device) {
         .pNext = features.pNext;
     features.pNext =
         &device.khr_shader_float_controls2.shader_float_controls2_features_khr;
+  }
+
+  if (HasExtension("VK_KHR_shader_fma", device.extensions)) {
+    device.khr_shader_fma.reported = true;
+    device.khr_shader_fma.shader_fma_features_khr.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_FMA_FEATURES_KHR;
+    device.khr_shader_fma.shader_fma_features_khr.pNext = features.pNext;
+    features.pNext = &device.khr_shader_fma.shader_fma_features_khr;
   }
 
   if (HasExtension("VK_KHR_shader_integer_dot_product", device.extensions)) {
@@ -3148,7 +3302,7 @@ VkJsonDevice VkJsonGetDevice(VkPhysicalDevice physical_device) {
   if (HasExtension("VK_NV_memory_decompression", device.extensions)) {
     device.nv_memory_decompression.reported = true;
     device.nv_memory_decompression.memory_decompression_features_nv.sType =
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_DECOMPRESSION_FEATURES_NV;
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_DECOMPRESSION_FEATURES_EXT;
     device.nv_memory_decompression.memory_decompression_features_nv.pNext =
         features.pNext;
     features.pNext =
@@ -3317,6 +3471,16 @@ VkJsonDevice VkJsonGetDevice(VkPhysicalDevice physical_device) {
         &device.nv_shading_rate_image.shading_rate_image_features_nv;
   }
 
+  if (HasExtension("VK_QCOM_data_graph_model", device.extensions)) {
+    device.qcom_data_graph_model.reported = true;
+    device.qcom_data_graph_model.data_graph_model_features_qcom.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DATA_GRAPH_MODEL_FEATURES_QCOM;
+    device.qcom_data_graph_model.data_graph_model_features_qcom.pNext =
+        features.pNext;
+    features.pNext =
+        &device.qcom_data_graph_model.data_graph_model_features_qcom;
+  }
+
   if (HasExtension("VK_QCOM_filter_cubic_clamp", device.extensions)) {
     device.qcom_filter_cubic_clamp.reported = true;
     device.qcom_filter_cubic_clamp.cubic_clamp_features_qcom.sType =
@@ -3479,6 +3643,17 @@ VkJsonDevice VkJsonGetDevice(VkPhysicalDevice physical_device) {
         .pNext = features.pNext;
     features.pNext = &device.valve_mutable_descriptor_type
                           .mutable_descriptor_type_features_valve;
+  }
+
+  if (HasExtension("VK_VALVE_video_encode_rgb_conversion", device.extensions)) {
+    device.valve_video_encode_rgb_conversion.reported = true;
+    device.valve_video_encode_rgb_conversion
+        .video_encode_rgb_conversion_features_valve.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VIDEO_ENCODE_RGB_CONVERSION_FEATURES_VALVE;
+    device.valve_video_encode_rgb_conversion
+        .video_encode_rgb_conversion_features_valve.pNext = features.pNext;
+    features.pNext = &device.valve_video_encode_rgb_conversion
+                          .video_encode_rgb_conversion_features_valve;
   }
 
   vkGetPhysicalDeviceFeatures2(physical_device, &features);

@@ -427,11 +427,11 @@ struct EnumTraits<VkFormat> {
 };
 
 template <>
-struct EnumTraits<VkRayTracingInvocationReorderModeNV> {
+struct EnumTraits<VkRayTracingInvocationReorderModeEXT> {
   static bool exist(uint32_t e) {
     switch (e) {
-      case VK_RAY_TRACING_INVOCATION_REORDER_MODE_NONE_NV:
-      case VK_RAY_TRACING_INVOCATION_REORDER_MODE_REORDER_NV:
+      case VK_RAY_TRACING_INVOCATION_REORDER_MODE_NONE_EXT:
+      case VK_RAY_TRACING_INVOCATION_REORDER_MODE_REORDER_EXT:
         return true;
     }
     return false;
@@ -556,6 +556,7 @@ struct EnumTraits<VkDriverId> {
       case VK_DRIVER_ID_IMAGINATION_OPEN_SOURCE_MESA:
       case VK_DRIVER_ID_MESA_HONEYKRISP:
       case VK_DRIVER_ID_VULKAN_SC_EMULATION_ON_VULKAN:
+      case VK_DRIVER_ID_MESA_KOSMICKRISP:
         return true;
     }
     return false;
@@ -762,6 +763,17 @@ inline bool Iterate(Visitor* visitor, VkJsonARMFormatPack* structs) {
 
 template <typename Visitor>
 inline bool Iterate(Visitor* visitor,
+                    VkJsonARMPerformanceCountersByRegion* structs) {
+  return visitor->Visit(
+             "performanceCountersByRegionFeaturesARM",
+             &structs->performance_counters_by_region_features_arm) &&
+         visitor->Visit(
+             "performanceCountersByRegionPropertiesARM",
+             &structs->performance_counters_by_region_properties_arm);
+}
+
+template <typename Visitor>
+inline bool Iterate(Visitor* visitor,
                     VkJsonARMPipelineOpacityMicromap* structs) {
   return visitor->Visit("pipelineOpacityMicromapFeaturesARM",
                         &structs->pipeline_opacity_micromap_features_arm);
@@ -891,6 +903,12 @@ inline bool Iterate(Visitor* visitor, VkJsonExtCustomBorderColor* structs) {
                         &structs->custom_border_color_properties_ext) &&
          visitor->Visit("customBorderColorFeaturesEXT",
                         &structs->custom_border_color_features_ext);
+}
+
+template <typename Visitor>
+inline bool Iterate(Visitor* visitor, VkJsonExtCustomResolve* structs) {
+  return visitor->Visit("customResolveFeaturesEXT",
+                        &structs->custom_resolve_features_ext);
 }
 
 template <typename Visitor>
@@ -1155,6 +1173,14 @@ inline bool Iterate(Visitor* visitor, VkJsonExtMapMemoryPlaced* structs) {
 }
 
 template <typename Visitor>
+inline bool Iterate(Visitor* visitor, VkJsonExtMemoryDecompression* structs) {
+  return visitor->Visit("memoryDecompressionFeaturesEXT",
+                        &structs->memory_decompression_features_ext) &&
+         visitor->Visit("memoryDecompressionPropertiesEXT",
+                        &structs->memory_decompression_properties_ext);
+}
+
+template <typename Visitor>
 inline bool Iterate(Visitor* visitor, VkJsonExtMemoryPriority* structs) {
   return visitor->Visit("memoryPriorityFeaturesEXT",
                         &structs->memory_priority_features_ext);
@@ -1266,6 +1292,12 @@ inline bool Iterate(Visitor* visitor, VkJsonExtPipelineRobustness* structs) {
 }
 
 template <typename Visitor>
+inline bool Iterate(Visitor* visitor, VkJsonExtPresentTiming* structs) {
+  return visitor->Visit("presentTimingFeaturesEXT",
+                        &structs->present_timing_features_ext);
+}
+
+template <typename Visitor>
 inline bool Iterate(Visitor* visitor,
                     VkJsonExtPrimitiveTopologyListRestart* structs) {
   return visitor->Visit("primitiveTopologyListRestartFeaturesEXT",
@@ -1302,6 +1334,16 @@ inline bool Iterate(Visitor* visitor,
 }
 
 template <typename Visitor>
+inline bool Iterate(Visitor* visitor,
+                    VkJsonExtRayTracingInvocationReorder* structs) {
+  return visitor->Visit(
+             "rayTracingInvocationReorderPropertiesEXT",
+             &structs->ray_tracing_invocation_reorder_properties_ext) &&
+         visitor->Visit("rayTracingInvocationReorderFeaturesEXT",
+                        &structs->ray_tracing_invocation_reorder_features_ext);
+}
+
+template <typename Visitor>
 inline bool Iterate(Visitor* visitor, VkJsonExtRgba10x6Formats* structs) {
   return visitor->Visit("RGBA10X6FormatsFeaturesEXT",
                         &structs->rgba10_x6_formats_features_ext);
@@ -1331,6 +1373,12 @@ template <typename Visitor>
 inline bool Iterate(Visitor* visitor, VkJsonExtScalarBlockLayout* structs) {
   return visitor->Visit("scalarBlockLayoutFeaturesEXT",
                         &structs->scalar_block_layout_features_ext);
+}
+
+template <typename Visitor>
+inline bool Iterate(Visitor* visitor, VkJsonExtShader64bitIndexing* structs) {
+  return visitor->Visit("shader64BitIndexingFeaturesEXT",
+                        &structs->shaderbit64_indexing_features_ext);
 }
 
 template <typename Visitor>
@@ -1396,6 +1444,14 @@ inline bool Iterate(Visitor* visitor, VkJsonExtShaderTileImage* structs) {
                         &structs->shader_tile_image_features_ext) &&
          visitor->Visit("shaderTileImagePropertiesEXT",
                         &structs->shader_tile_image_properties_ext);
+}
+
+template <typename Visitor>
+inline bool Iterate(Visitor* visitor,
+                    VkJsonExtShaderUniformBufferUnsizedArray* structs) {
+  return visitor->Visit(
+      "shaderUniformBufferUnsizedArrayFeaturesEXT",
+      &structs->shader_uniform_buffer_unsized_array_features_ext);
 }
 
 template <typename Visitor>
@@ -1570,6 +1626,14 @@ inline bool Iterate(Visitor* visitor, VkJsonKHRCooperativeMatrix* structs) {
 }
 
 template <typename Visitor>
+inline bool Iterate(Visitor* visitor, VkJsonKHRCopyMemoryIndirect* structs) {
+  return visitor->Visit("copyMemoryIndirectFeaturesKHR",
+                        &structs->copy_memory_indirect_features_khr) &&
+         visitor->Visit("copyMemoryIndirectPropertiesKHR",
+                        &structs->copy_memory_indirect_properties_khr);
+}
+
+template <typename Visitor>
 inline bool Iterate(Visitor* visitor, VkJsonKHRDepthClampZeroOne* structs) {
   return visitor->Visit("depthClampZeroOneFeaturesKHR",
                         &structs->depth_clamp_zero_one_features_khr);
@@ -1658,6 +1722,14 @@ inline bool Iterate(Visitor* visitor, VkJsonKHRLineRasterization* structs) {
                         &structs->line_rasterization_features_khr) &&
          visitor->Visit("lineRasterizationPropertiesKHR",
                         &structs->line_rasterization_properties_khr);
+}
+
+template <typename Visitor>
+inline bool Iterate(Visitor* visitor, VkJsonKHRMaintenance10* structs) {
+  return visitor->Visit("maintenance10FeaturesKHR",
+                        &structs->maintenance10_features_khr) &&
+         visitor->Visit("maintenance10PropertiesKHR",
+                        &structs->maintenance10_properties_khr);
 }
 
 template <typename Visitor>
@@ -1880,6 +1952,12 @@ template <typename Visitor>
 inline bool Iterate(Visitor* visitor, VkJsonKHRShaderFloatControls2* structs) {
   return visitor->Visit("shaderFloatControls2FeaturesKHR",
                         &structs->shader_float_controls2_features_khr);
+}
+
+template <typename Visitor>
+inline bool Iterate(Visitor* visitor, VkJsonKHRShaderFma* structs) {
+  return visitor->Visit("shaderFmaFeaturesKHR",
+                        &structs->shader_fma_features_khr);
 }
 
 template <typename Visitor>
@@ -2358,6 +2436,12 @@ inline bool Iterate(Visitor* visitor, VkJsonNVShadingRateImage* structs) {
 }
 
 template <typename Visitor>
+inline bool Iterate(Visitor* visitor, VkJsonQCOMDataGraphModel* structs) {
+  return visitor->Visit("dataGraphModelFeaturesQCOM",
+                        &structs->data_graph_model_features_qcom);
+}
+
+template <typename Visitor>
 inline bool Iterate(Visitor* visitor, VkJsonQCOMFilterCubicClamp* structs) {
   return visitor->Visit("cubicClampFeaturesQCOM",
                         &structs->cubic_clamp_features_qcom);
@@ -2473,6 +2557,13 @@ inline bool Iterate(Visitor* visitor,
                     VkJsonVALVEMutableDescriptorType* structs) {
   return visitor->Visit("mutableDescriptorTypeFeaturesVALVE",
                         &structs->mutable_descriptor_type_features_valve);
+}
+
+template <typename Visitor>
+inline bool Iterate(Visitor* visitor,
+                    VkJsonVALVEVideoEncodeRgbConversion* structs) {
+  return visitor->Visit("videoEncodeRgbConversionFeaturesVALVE",
+                        &structs->video_encode_rgb_conversion_features_valve);
 }
 
 template <typename Visitor>
@@ -2922,6 +3013,16 @@ inline bool Iterate(Visitor* visitor,
 
 template <typename Visitor>
 inline bool Iterate(Visitor* visitor,
+                    VkPhysicalDeviceCopyMemoryIndirectFeaturesKHR* features) {
+  return
+
+      visitor->Visit("indirectMemoryCopy", &features->indirectMemoryCopy) &&
+      visitor->Visit("indirectMemoryToImageCopy",
+                     &features->indirectMemoryToImageCopy);
+}
+
+template <typename Visitor>
+inline bool Iterate(Visitor* visitor,
                     VkPhysicalDeviceCopyMemoryIndirectFeaturesNV* features) {
   return
 
@@ -2931,7 +3032,7 @@ inline bool Iterate(Visitor* visitor,
 template <typename Visitor>
 inline bool Iterate(
     Visitor* visitor,
-    VkPhysicalDeviceCopyMemoryIndirectPropertiesNV* properties) {
+    VkPhysicalDeviceCopyMemoryIndirectPropertiesKHR* properties) {
   return
 
       visitor->Visit("supportedQueues", &properties->supportedQueues);
@@ -2992,6 +3093,14 @@ inline bool Iterate(
 
 template <typename Visitor>
 inline bool Iterate(Visitor* visitor,
+                    VkPhysicalDeviceCustomResolveFeaturesEXT* features) {
+  return
+
+      visitor->Visit("customResolve", &features->customResolve);
+}
+
+template <typename Visitor>
+inline bool Iterate(Visitor* visitor,
                     VkPhysicalDeviceDataGraphFeaturesARM* features) {
   return
 
@@ -3003,6 +3112,14 @@ inline bool Iterate(Visitor* visitor,
       visitor->Visit("dataGraphDescriptorBuffer",
                      &features->dataGraphDescriptorBuffer) &&
       visitor->Visit("dataGraphShaderModule", &features->dataGraphShaderModule);
+}
+
+template <typename Visitor>
+inline bool Iterate(Visitor* visitor,
+                    VkPhysicalDeviceDataGraphModelFeaturesQCOM* features) {
+  return
+
+      visitor->Visit("dataGraphModel", &features->dataGraphModel);
 }
 
 template <typename Visitor>
@@ -4333,6 +4450,28 @@ inline bool Iterate(Visitor* visitor,
 
 template <typename Visitor>
 inline bool Iterate(Visitor* visitor,
+                    VkPhysicalDeviceMaintenance10FeaturesKHR* features) {
+  return
+
+      visitor->Visit("maintenance10", &features->maintenance10);
+}
+
+template <typename Visitor>
+inline bool Iterate(Visitor* visitor,
+                    VkPhysicalDeviceMaintenance10PropertiesKHR* properties) {
+  return
+
+      visitor->Visit("rgba4OpaqueBlackSwizzled",
+                     &properties->rgba4OpaqueBlackSwizzled) &&
+      visitor->Visit("resolveSrgbFormatAppliesTransferFunction",
+                     &properties->resolveSrgbFormatAppliesTransferFunction) &&
+      visitor->Visit(
+          "resolveSrgbFormatSupportsTransferFunctionControl",
+          &properties->resolveSrgbFormatSupportsTransferFunctionControl);
+}
+
+template <typename Visitor>
+inline bool Iterate(Visitor* visitor,
                     VkPhysicalDeviceMaintenance3Properties* properties) {
   return
 
@@ -4493,7 +4632,7 @@ inline bool Iterate(Visitor* visitor,
 
 template <typename Visitor>
 inline bool Iterate(Visitor* visitor,
-                    VkPhysicalDeviceMemoryDecompressionFeaturesNV* features) {
+                    VkPhysicalDeviceMemoryDecompressionFeaturesEXT* features) {
   return
 
       visitor->Visit("memoryDecompression", &features->memoryDecompression);
@@ -4502,7 +4641,7 @@ inline bool Iterate(Visitor* visitor,
 template <typename Visitor>
 inline bool Iterate(
     Visitor* visitor,
-    VkPhysicalDeviceMemoryDecompressionPropertiesNV* properties) {
+    VkPhysicalDeviceMemoryDecompressionPropertiesEXT* properties) {
   return
 
       visitor->Visit("decompressionMethods",
@@ -4855,6 +4994,32 @@ inline bool Iterate(Visitor* visitor,
 }
 
 template <typename Visitor>
+inline bool Iterate(
+    Visitor* visitor,
+    VkPhysicalDevicePerformanceCountersByRegionFeaturesARM* features) {
+  return
+
+      visitor->Visit("performanceCountersByRegion",
+                     &features->performanceCountersByRegion);
+}
+
+template <typename Visitor>
+inline bool Iterate(
+    Visitor* visitor,
+    VkPhysicalDevicePerformanceCountersByRegionPropertiesARM* properties) {
+  return
+
+      visitor->Visit("maxPerRegionPerformanceCounters",
+                     &properties->maxPerRegionPerformanceCounters) &&
+      visitor->Visit("performanceCounterRegionSize",
+                     &properties->performanceCounterRegionSize) &&
+      visitor->Visit("rowStrideAlignment", &properties->rowStrideAlignment) &&
+      visitor->Visit("regionAlignment", &properties->regionAlignment) &&
+      visitor->Visit("identityTransformOrder",
+                     &properties->identityTransformOrder);
+}
+
+template <typename Visitor>
 inline bool Iterate(Visitor* visitor,
                     VkPhysicalDevicePerformanceQueryFeaturesKHR* features) {
   return
@@ -5035,6 +5200,17 @@ inline bool Iterate(
 
 template <typename Visitor>
 inline bool Iterate(Visitor* visitor,
+                    VkPhysicalDevicePresentTimingFeaturesEXT* features) {
+  return
+
+      visitor->Visit("presentTiming", &features->presentTiming) &&
+      visitor->Visit("presentAtAbsoluteTime",
+                     &features->presentAtAbsoluteTime) &&
+      visitor->Visit("presentAtRelativeTime", &features->presentAtRelativeTime);
+}
+
+template <typename Visitor>
+inline bool Iterate(Visitor* visitor,
                     VkPhysicalDevicePresentWait2FeaturesKHR* features) {
   return
 
@@ -5172,11 +5348,33 @@ inline bool Iterate(Visitor* visitor,
 template <typename Visitor>
 inline bool Iterate(
     Visitor* visitor,
+    VkPhysicalDeviceRayTracingInvocationReorderFeaturesEXT* features) {
+  return
+
+      visitor->Visit("rayTracingInvocationReorder",
+                     &features->rayTracingInvocationReorder);
+}
+
+template <typename Visitor>
+inline bool Iterate(
+    Visitor* visitor,
     VkPhysicalDeviceRayTracingInvocationReorderFeaturesNV* features) {
   return
 
       visitor->Visit("rayTracingInvocationReorder",
                      &features->rayTracingInvocationReorder);
+}
+
+template <typename Visitor>
+inline bool Iterate(
+    Visitor* visitor,
+    VkPhysicalDeviceRayTracingInvocationReorderPropertiesEXT* properties) {
+  return
+
+      visitor->Visit("rayTracingInvocationReorderReorderingHint",
+                     &properties->rayTracingInvocationReorderReorderingHint) &&
+      visitor->Visit("maxShaderBindingTableRecordIndex",
+                     &properties->maxShaderBindingTableRecordIndex);
 }
 
 template <typename Visitor>
@@ -5434,6 +5632,14 @@ inline bool Iterate(
 }
 
 template <typename Visitor>
+inline bool Iterate(Visitor* visitor,
+                    VkPhysicalDeviceShader64BitIndexingFeaturesEXT* features) {
+  return
+
+      visitor->Visit("shader64BitIndexing", &features->shader64BitIndexing);
+}
+
+template <typename Visitor>
 inline bool Iterate(
     Visitor* visitor,
     VkPhysicalDeviceShaderAtomicFloat16VectorFeaturesNV* features) {
@@ -5653,6 +5859,16 @@ inline bool Iterate(Visitor* visitor,
   return
 
       visitor->Visit("shaderFloatControls2", &features->shaderFloatControls2);
+}
+
+template <typename Visitor>
+inline bool Iterate(Visitor* visitor,
+                    VkPhysicalDeviceShaderFmaFeaturesKHR* features) {
+  return
+
+      visitor->Visit("shaderFmaFloat16", &features->shaderFmaFloat16) &&
+      visitor->Visit("shaderFmaFloat32", &features->shaderFmaFloat32) &&
+      visitor->Visit("shaderFmaFloat64", &features->shaderFmaFloat64);
 }
 
 template <typename Visitor>
@@ -5964,6 +6180,16 @@ inline bool Iterate(Visitor* visitor,
           &properties->shaderTileImageReadSampleFromPixelRateInvocation) &&
       visitor->Visit("shaderTileImageReadFromHelperInvocation",
                      &properties->shaderTileImageReadFromHelperInvocation);
+}
+
+template <typename Visitor>
+inline bool Iterate(
+    Visitor* visitor,
+    VkPhysicalDeviceShaderUniformBufferUnsizedArrayFeaturesEXT* features) {
+  return
+
+      visitor->Visit("shaderUniformBufferUnsizedArray",
+                     &features->shaderUniformBufferUnsizedArray);
 }
 
 template <typename Visitor>
@@ -6399,6 +6625,16 @@ inline bool Iterate(
 
       visitor->Visit("videoEncodeQuantizationMap",
                      &features->videoEncodeQuantizationMap);
+}
+
+template <typename Visitor>
+inline bool Iterate(
+    Visitor* visitor,
+    VkPhysicalDeviceVideoEncodeRgbConversionFeaturesVALVE* features) {
+  return
+
+      visitor->Visit("videoEncodeRgbConversion",
+                     &features->videoEncodeRgbConversion);
 }
 
 template <typename Visitor>
@@ -7636,6 +7872,10 @@ inline bool Iterate(Visitor* visitor, VkJsonDevice* device) {
       if (device->arm_format_pack.reported) {
         ret &= visitor->Visit("VK_ARM_format_pack", &device->arm_format_pack);
       }
+      if (device->arm_performance_counters_by_region.reported) {
+        ret &= visitor->Visit("VK_ARM_performance_counters_by_region",
+                              &device->arm_performance_counters_by_region);
+      }
       if (device->arm_pipeline_opacity_micromap.reported) {
         ret &= visitor->Visit("VK_ARM_pipeline_opacity_micromap",
                               &device->arm_pipeline_opacity_micromap);
@@ -7707,6 +7947,10 @@ inline bool Iterate(Visitor* visitor, VkJsonDevice* device) {
       if (device->ext_custom_border_color.reported) {
         ret &= visitor->Visit("VK_EXT_custom_border_color",
                               &device->ext_custom_border_color);
+      }
+      if (device->ext_custom_resolve.reported) {
+        ret &= visitor->Visit("VK_EXT_custom_resolve",
+                              &device->ext_custom_resolve);
       }
       if (device->ext_depth_bias_control.reported) {
         ret &= visitor->Visit("VK_EXT_depth_bias_control",
@@ -7856,6 +8100,10 @@ inline bool Iterate(Visitor* visitor, VkJsonDevice* device) {
         ret &= visitor->Visit("VK_EXT_map_memory_placed",
                               &device->ext_map_memory_placed);
       }
+      if (device->ext_memory_decompression.reported) {
+        ret &= visitor->Visit("VK_EXT_memory_decompression",
+                              &device->ext_memory_decompression);
+      }
       if (device->ext_memory_priority.reported) {
         ret &= visitor->Visit("VK_EXT_memory_priority",
                               &device->ext_memory_priority);
@@ -7918,6 +8166,10 @@ inline bool Iterate(Visitor* visitor, VkJsonDevice* device) {
         ret &= visitor->Visit("VK_EXT_pipeline_robustness",
                               &device->ext_pipeline_robustness);
       }
+      if (device->ext_present_timing.reported) {
+        ret &= visitor->Visit("VK_EXT_present_timing",
+                              &device->ext_present_timing);
+      }
       if (device->ext_primitive_topology_list_restart.reported) {
         ret &= visitor->Visit("VK_EXT_primitive_topology_list_restart",
                               &device->ext_primitive_topology_list_restart);
@@ -7938,6 +8190,10 @@ inline bool Iterate(Visitor* visitor, VkJsonDevice* device) {
             visitor->Visit("VK_EXT_rasterization_order_attachment_access",
                            &device->ext_rasterization_order_attachment_access);
       }
+      if (device->ext_ray_tracing_invocation_reorder.reported) {
+        ret &= visitor->Visit("VK_EXT_ray_tracing_invocation_reorder",
+                              &device->ext_ray_tracing_invocation_reorder);
+      }
       if (device->ext_rgba10x6_formats.reported) {
         ret &= visitor->Visit("VK_EXT_rgba10x6_formats",
                               &device->ext_rgba10x6_formats);
@@ -7956,6 +8212,10 @@ inline bool Iterate(Visitor* visitor, VkJsonDevice* device) {
       if (device->ext_scalar_block_layout.reported) {
         ret &= visitor->Visit("VK_EXT_scalar_block_layout",
                               &device->ext_scalar_block_layout);
+      }
+      if (device->ext_shader_64bit_indexing.reported) {
+        ret &= visitor->Visit("VK_EXT_shader_64bit_indexing",
+                              &device->ext_shader_64bit_indexing);
       }
       if (device->ext_shader_atomic_float.reported) {
         ret &= visitor->Visit("VK_EXT_shader_atomic_float",
@@ -7992,6 +8252,10 @@ inline bool Iterate(Visitor* visitor, VkJsonDevice* device) {
       if (device->ext_shader_tile_image.reported) {
         ret &= visitor->Visit("VK_EXT_shader_tile_image",
                               &device->ext_shader_tile_image);
+      }
+      if (device->ext_shader_uniform_buffer_unsized_array.reported) {
+        ret &= visitor->Visit("VK_EXT_shader_uniform_buffer_unsized_array",
+                              &device->ext_shader_uniform_buffer_unsized_array);
       }
       if (device->ext_subgroup_size_control.reported) {
         ret &= visitor->Visit("VK_EXT_subgroup_size_control",
@@ -8087,6 +8351,10 @@ inline bool Iterate(Visitor* visitor, VkJsonDevice* device) {
         ret &= visitor->Visit("VK_KHR_cooperative_matrix",
                               &device->khr_cooperative_matrix);
       }
+      if (device->khr_copy_memory_indirect.reported) {
+        ret &= visitor->Visit("VK_KHR_copy_memory_indirect",
+                              &device->khr_copy_memory_indirect);
+      }
       if (device->khr_depth_clamp_zero_one.reported) {
         ret &= visitor->Visit("VK_KHR_depth_clamp_zero_one",
                               &device->khr_depth_clamp_zero_one);
@@ -8142,6 +8410,10 @@ inline bool Iterate(Visitor* visitor, VkJsonDevice* device) {
       if (device->khr_line_rasterization.reported) {
         ret &= visitor->Visit("VK_KHR_line_rasterization",
                               &device->khr_line_rasterization);
+      }
+      if (device->khr_maintenance10.reported) {
+        ret &=
+            visitor->Visit("VK_KHR_maintenance10", &device->khr_maintenance10);
       }
       if (device->khr_maintenance2.reported) {
         ret &= visitor->Visit("VK_KHR_maintenance2", &device->khr_maintenance2);
@@ -8255,6 +8527,9 @@ inline bool Iterate(Visitor* visitor, VkJsonDevice* device) {
       if (device->khr_shader_float_controls2.reported) {
         ret &= visitor->Visit("VK_KHR_shader_float_controls2",
                               &device->khr_shader_float_controls2);
+      }
+      if (device->khr_shader_fma.reported) {
+        ret &= visitor->Visit("VK_KHR_shader_fma", &device->khr_shader_fma);
       }
       if (device->khr_shader_integer_dot_product.reported) {
         ret &= visitor->Visit("VK_KHR_shader_integer_dot_product",
@@ -8518,6 +8793,10 @@ inline bool Iterate(Visitor* visitor, VkJsonDevice* device) {
         ret &= visitor->Visit("VK_NV_shading_rate_image",
                               &device->nv_shading_rate_image);
       }
+      if (device->qcom_data_graph_model.reported) {
+        ret &= visitor->Visit("VK_QCOM_data_graph_model",
+                              &device->qcom_data_graph_model);
+      }
       if (device->qcom_filter_cubic_clamp.reported) {
         ret &= visitor->Visit("VK_QCOM_filter_cubic_clamp",
                               &device->qcom_filter_cubic_clamp);
@@ -8581,6 +8860,10 @@ inline bool Iterate(Visitor* visitor, VkJsonDevice* device) {
       if (device->valve_mutable_descriptor_type.reported) {
         ret &= visitor->Visit("VK_VALVE_mutable_descriptor_type",
                               &device->valve_mutable_descriptor_type);
+      }
+      if (device->valve_video_encode_rgb_conversion.reported) {
+        ret &= visitor->Visit("VK_VALVE_video_encode_rgb_conversion",
+                              &device->valve_video_encode_rgb_conversion);
       }
   }
   return ret;
