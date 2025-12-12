@@ -781,7 +781,7 @@ private:
 
 void SkiaRenderEngine::waitFence(SkiaGpuContext* context, base::borrowed_fd fenceFd) {
     // If the fence is already signaled, we can skip waiting on it.
-    if (FlagManager::getInstance().re_check_fence() && fenceFd.get() >= 0) {
+    if (fenceFd.get() >= 0) {
         if (sync_wait(fenceFd.get(), 0) >= 0) {
             return;
         }

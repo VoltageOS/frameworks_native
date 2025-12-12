@@ -141,7 +141,6 @@ void FlagManager::dump(std::string& result) const {
     DUMP_ACONFIG_FLAG(monitor_buffer_fences);
     DUMP_ACONFIG_FLAG(offload_gpu_composition);
     DUMP_ACONFIG_FLAG(readback_screenshot);
-    DUMP_ACONFIG_FLAG(re_check_fence);
     DUMP_ACONFIG_FLAG(re_powered_off_displays_inform_cache_budgets);
     DUMP_ACONFIG_FLAG(refresh_rate_overlay_on_external_display);
     DUMP_ACONFIG_FLAG(resync_on_tx_separate_timer);
@@ -314,7 +313,6 @@ FLAG_MANAGER_ACONFIG_FLAG(md_degrade_hdr, "");
 FLAG_MANAGER_ACONFIG_FLAG(mirror_uid_filtering, "");
 FLAG_MANAGER_ACONFIG_FLAG(monitor_buffer_fences, "");
 FLAG_MANAGER_ACONFIG_FLAG(offload_gpu_composition, "");
-FLAG_MANAGER_ACONFIG_FLAG(re_check_fence, "");
 FLAG_MANAGER_ACONFIG_FLAG(re_powered_off_displays_inform_cache_budgets, "");
 FLAG_MANAGER_ACONFIG_FLAG(readback_screenshot, "")
 FLAG_MANAGER_ACONFIG_FLAG(refresh_rate_overlay_on_external_display, "")

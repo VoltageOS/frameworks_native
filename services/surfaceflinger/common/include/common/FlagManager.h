@@ -71,7 +71,6 @@ public:
     bool mirror_uid_filtering() const;
     bool monitor_buffer_fences() const;
     bool offload_gpu_composition() const;
-    bool re_check_fence() const;
     bool re_powered_off_displays_inform_cache_budgets() const;
     bool readback_screenshot() const;
     bool refresh_rate_overlay_on_external_display() const;
