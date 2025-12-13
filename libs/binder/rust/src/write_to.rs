@@ -63,3 +63,26 @@ impl_primitive!(i64);
 impl_primitive!(u64);
 impl_primitive!(f32);
 impl_primitive!(f64);
+
+impl<T, const N: usize> WriteTo for [T; N]
+where
+    T: WriteTo,
+{
+    #[inline]
+    unsafe fn write_to(&self, target: *mut Self) {
+        for (i, elem) in self.iter().enumerate() {
+            // SAFETY: The source and target arrays are both arrays
+            // of identical sizes and types.
+            unsafe { elem.write_to(target.cast::<T>().add(i)) };
+        }
+    }
+
+    #[inline]
+    unsafe fn write_to_volatile(&self, target: *mut Self) {
+        for (i, elem) in self.iter().enumerate() {
+            // SAFETY: The source and target arrays are both arrays
+            // of identical sizes and types.
+            unsafe { elem.write_to_volatile(target.cast::<T>().add(i)) };
+        }
+    }
+}
