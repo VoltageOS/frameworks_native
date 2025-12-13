@@ -1,7 +1,6 @@
 //! Trait implemented by all AIDL `@FixedSize` types.
 
-use core::ptr;
-use zerocopy::{Immutable, IntoBytes};
+use zerocopy::Immutable;
 
 /// Trait for writing a struct to a byte buffer.
 ///
@@ -30,23 +29,37 @@ pub trait WriteTo: Immutable + Sized {
     unsafe fn write_to_volatile(&self, target: *mut Self);
 }
 
-impl<T> WriteTo for T
-where
-    T: Immutable + IntoBytes,
-{
-    #[inline]
-    unsafe fn write_to(&self, target: *mut Self) {
-        // SAFETY:
-        // * Caller ensures that `target` is valid for writing and sufficiently aligned.
-        // * We know that `Self: Immutable` and `self` is a shared reference, so the bytes in
-        //   `self` are not valid for writing during this call. Since `target` references only
-        //   bytes that are valid for writing, this means that `self` and `target` do not overlap.
-        unsafe { ptr::copy_nonoverlapping(self, target, 1) };
-    }
+macro_rules! impl_primitive {
+    {$ty:ty} => {
+        static_assertions::assert_impl_all!($ty: Copy);
 
-    #[inline]
-    unsafe fn write_to_volatile(&self, target: *mut Self) {
-        // SAFETY: Caller ensures that `target` is valid for writing and sufficiently aligned.
-        unsafe { target.write_volatile(ptr::read(self)) };
+        impl $crate::WriteTo for $ty {
+            #[inline]
+            unsafe fn write_to(&self, target: *mut Self) {
+                // SAFETY:
+                // * Caller ensures that `target` is valid for writing and sufficiently aligned.
+                // * We know that `Self: Copy` and `self` is a shared reference, so the bytes in
+                //   `self` are not valid for writing during this call. Since `target` references only
+                //   bytes that are valid for writing, this means that `self` and `target` do not overlap.
+                unsafe { *target = *self };
+            }
+
+            #[inline]
+            unsafe fn write_to_volatile(&self, target: *mut Self) {
+                // SAFETY: Caller ensures that `target` is valid for writing and sufficiently aligned.
+                unsafe { target.write_volatile(*self) };
+            }
+        }
     }
 }
+impl_primitive!(bool);
+impl_primitive!(i8);
+impl_primitive!(u8);
+impl_primitive!(i16);
+impl_primitive!(u16);
+impl_primitive!(i32);
+impl_primitive!(u32);
+impl_primitive!(i64);
+impl_primitive!(u64);
+impl_primitive!(f32);
+impl_primitive!(f64);
