@@ -311,7 +311,7 @@ void SkiaRenderEngine::SkSLCacheMonitor::store(const SkData& key, const SkData& 
 
 int SkiaRenderEngine::reportShadersCompiled() {
     if (FlagManager::getInstance().shader_disk_cache()) {
-        return ShaderCache::get().totalShadersCompiled();
+        return ShaderCache::get(this->backend()).totalShadersCompiled();
     } else {
         return mSkSLCacheMonitor.totalShadersCompiled();
     }
@@ -450,13 +450,13 @@ static bool needsToneMapping(ui::Dataspace sourceDataspace, ui::Dataspace destin
             sourceTransfer != destTransfer;
 }
 
-GrContextOptions::PersistentCache& SkiaRenderEngine::persistentCache(const void* identity,
-                                                                     ssize_t size) {
+GrContextOptions::PersistentCache& SkiaRenderEngine::ganeshPersistentCache(const void* identity,
+                                                                           ssize_t size) {
     if (FlagManager::getInstance().shader_disk_cache()) {
-        auto& cache = ShaderCache::get();
-        if (!mInitializedDiskCache) {
+        auto& cache = ShaderCache::get(renderengine::RenderEngine::SkiaBackend::Ganesh);
+        if (!mInitializedGaneshDiskCache) {
             cache.initShaderDiskCache(identity, size);
-            mInitializedDiskCache = true;
+            mInitializedGaneshDiskCache = true;
         }
         return cache;
     } else {
@@ -1557,7 +1557,7 @@ void SkiaRenderEngine::dump(std::string& result) {
     StringAppendF(&result, "RenderEngine is in protected context: %d\n", mInProtectedContext);
     int shadersCachedSinceLastCall = 0;
     if (FlagManager::getInstance().shader_disk_cache()) {
-        shadersCachedSinceLastCall = ShaderCache::get().shadersCachedSinceLastCall();
+        shadersCachedSinceLastCall = ShaderCache::get(this->backend()).shadersCachedSinceLastCall();
     } else {
         shadersCachedSinceLastCall = mSkSLCacheMonitor.shadersCachedSinceLastCall();
     }

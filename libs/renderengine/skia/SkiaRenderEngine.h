@@ -29,6 +29,7 @@
 #include <include/gpu/ganesh/GrBackendSemaphore.h>
 #include <include/gpu/ganesh/GrContextOptions.h>
 #include <renderengine/ExternalTexture.h>
+#include <renderengine/RenderEngine.h>
 #include <sys/types.h>
 
 #include <memory>
@@ -54,6 +55,10 @@ class SkData;
 struct SkPoint3;
 
 namespace android {
+
+namespace uirenderer::skiapipeline {
+class ShaderCache;
+}
 
 namespace renderengine {
 
@@ -146,9 +151,11 @@ protected:
 
     BoxShadowUtils mBoxShadowUtils;
 
-    GrContextOptions::PersistentCache& persistentCache(const void* identity, ssize_t size);
+    GrContextOptions::PersistentCache& ganeshPersistentCache(const void* identity, ssize_t size);
 
 private:
+    virtual SkiaBackend backend() const = 0;
+
     void mapExternalTextureBuffer(const sp<GraphicBuffer>& buffer,
                                   bool isRenderable) override final;
     void unmapExternalTextureBuffer(sp<GraphicBuffer>&& buffer) override final;
@@ -227,7 +234,7 @@ private:
     unique_ptr<SkiaGpuContext> mProtectedContext;
     bool mInProtectedContext = false;
 
-    bool mInitializedDiskCache = false;
+    bool mInitializedGaneshDiskCache = false;
     SkSLCacheMonitor mSkSLCacheMonitor;
 
     std::atomic<bool> mRenderDocCaptureNextFrame;
