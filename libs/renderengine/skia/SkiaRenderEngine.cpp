@@ -60,6 +60,7 @@
 #include <include/gpu/ganesh/GrTypes.h>
 #include <include/gpu/ganesh/SkSurfaceGanesh.h>
 #include <pthread.h>
+#include <src/codec/SkHdrAgtmPriv.h>
 #include <src/core/SkTraceEventCommon.h>
 #include <sync/sync.h>
 #include <ui/BlurRegion.h>
@@ -603,9 +604,25 @@ sk_sp<SkShader> SkiaRenderEngine::createRuntimeEffectShader(
         }
     }
 
-    if (graphicBuffer && parameters.layer.luts) {
-        shader = mLutShader.lutShader(shader, parameters.layer.luts,
-                                      parameters.layer.sourceDataspace);
+    if (graphicBuffer) {
+        if (parameters.layer.luts) {
+            shader = mLutShader.lutShader(shader, parameters.layer.luts,
+                                          parameters.layer.sourceDataspace);
+        } else {
+            std::optional<std::vector<uint8_t>> smpte2094_50;
+            status_t err = graphicBuffer->getSmpte2094_50(&smpte2094_50);
+
+            if (err == OK && smpte2094_50) {
+                auto smpte2094_50Data =
+                        SkData::MakeWithoutCopy(smpte2094_50->data(), smpte2094_50->size());
+                auto agtm = skhdr::Agtm::Make(smpte2094_50Data.get());
+                if (agtm) {
+                    SFTRACE_NAME("AGTM");
+                    shader = shader->makeWithColorFilter(
+                            agtm->makeColorFilter(std::log2(parameters.display.targetHdrSdrRatio)));
+                }
+            }
+        }
     }
 
     if (parameters.requiresLinearEffect) {
