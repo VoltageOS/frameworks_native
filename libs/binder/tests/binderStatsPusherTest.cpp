@@ -34,8 +34,13 @@ using namespace testing;
 using os::binder::BinderCallsStats;
 using os::binder::BinderSpamStats;
 
+#ifdef LIBBINDER_BINDER_OBSERVER_V2
+constexpr int64_t kSpamAggregationWindowSec = 1;
+constexpr int64_t kLatencyAggregationWindowSec = 1; // Same as spam for now
+#else
 constexpr int64_t kSpamAggregationWindowSec = 5;
 constexpr int64_t kLatencyAggregationWindowSec = 5; // Same as spam for now
+#endif
 
 // --- Mocks ---
 /**
