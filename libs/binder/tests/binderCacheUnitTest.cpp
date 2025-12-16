@@ -28,12 +28,6 @@
 
 using namespace android;
 
-#ifdef LIBBINDER_CLIENT_CACHE
-constexpr bool kUseLibbinderCache = true;
-#else
-constexpr bool kUseLibbinderCache = false;
-#endif
-
 #ifdef LIBBINDER_ADDSERVICE_CACHE
 constexpr bool kUseCacheInAddService = true;
 #else
@@ -180,7 +174,7 @@ public:
         fakeServiceManager->clearServices();
 
         sp<IBinder> result = mServiceManager->checkService(kCachedServiceName);
-        if (kUseCacheInAddService && kUseLibbinderCache) {
+        if (kUseCacheInAddService) {
             // If cache is enabled, we should get the binder.
             EXPECT_EQ(binder1, result);
         } else {
@@ -226,13 +220,7 @@ public:
         EXPECT_EQ(OK, mServiceManager->addService(kCachedServiceName, binder2));
 
         result = mServiceManager->checkService(kCachedServiceName);
-        if (kUseLibbinderCache) {
-            // If cache is enabled, we should get the binder to Service Manager.
-            EXPECT_EQ(binder1, result);
-        } else {
-            // If cache is disabled, then we should get the newer binder
-            EXPECT_EQ(binder2, result);
-        }
+        EXPECT_EQ(binder1, result);
     }
 
     sp<MockAidlServiceManager> fakeServiceManager;

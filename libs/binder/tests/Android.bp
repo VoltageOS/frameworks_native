@@ -74,7 +74,6 @@ cc_test {
         "libfakeservicemanager",
     ],
     defaults: [
-        "libbinder_client_cache_flag",
         "libbinder_addservice_cache_flag",
         "libbinder_remove_cache_static_list_flag",
     ],

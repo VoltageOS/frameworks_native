@@ -35,12 +35,6 @@ namespace android {
 // known socket that we expect the Unix Domain Socket servicemanager to be listening on.
 const char kUdsServiceManagerName[] = ANDROID_SOCKET_DIR "/rpc_servicemanager";
 
-#ifdef LIBBINDER_CLIENT_CACHE
-constexpr bool kUseCache = true;
-#else
-constexpr bool kUseCache = false;
-#endif
-
 #ifdef LIBBINDER_ADDSERVICE_CACHE
 constexpr bool kUseCacheInAddService = true;
 #else
@@ -162,10 +156,6 @@ bool BinderCacheWithInvalidation::isClientSideCachingEnabled(const std::string& 
 
 Status BackendUnifiedServiceManager::updateCache(const std::string& serviceName,
                                                  const os::Service& service) {
-    if (!kUseCache) {
-        return Status::ok();
-    }
-
     if (service.getTag() == os::Service::Tag::serviceWithMetadata) {
         auto serviceWithMetadata = service.get<os::Service::Tag::serviceWithMetadata>();
         return updateCache(serviceName, serviceWithMetadata.service,
@@ -209,9 +199,6 @@ Status BackendUnifiedServiceManager::updateCache(const std::string& serviceName,
 
 bool BackendUnifiedServiceManager::returnIfCached(const std::string& serviceName,
                                                   os::Service* _out) {
-    if (!kUseCache) {
-        return false;
-    }
     sp<IBinder> item = mCacheForGetService->getItem(serviceName);
     // TODO(b/363177618): Enable caching for binders which are always null.
     if (item != nullptr && item->isBinderAlive()) {
