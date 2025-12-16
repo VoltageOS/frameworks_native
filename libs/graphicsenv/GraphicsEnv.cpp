@@ -202,6 +202,14 @@ static sp<IGpuService> getGpuService() {
     return interface_cast<IGpuService>(binder);
 }
 
+GraphicsEnv::GraphicsEnv() : mZygoteDisableGlPreload(false) {
+    // RO properties cannot change at runtime, so it only needs to be queried once.
+    auto disableGlPreload = base::GetProperty("ro.zygote.disable_gl_preload", "");
+    if (!disableGlPreload.empty() && disableGlPreload == "true") {
+        mZygoteDisableGlPreload = true;
+    }
+}
+
 /*static*/ GraphicsEnv& GraphicsEnv::getInstance() {
     static GraphicsEnv env;
     return env;
@@ -658,7 +666,7 @@ void GraphicsEnv::getAngleFeatureOverrides(std::vector<const char*>& enabled,
         }
     }
 
-    if (mFeatureOverrides.mPackageFeatures.count(mPackageName)) {
+    if (!mPackageName.empty() && mFeatureOverrides.mPackageFeatures.count(mPackageName)) {
         for (const FeatureConfig& feature : mFeatureOverrides.mPackageFeatures[mPackageName]) {
             if (feature.mEnabled) {
                 enabled.push_back(feature.mFeatureName.c_str());
@@ -753,6 +761,10 @@ bool GraphicsEnv::shouldUseSystemAngle() {
 
 bool GraphicsEnv::shouldUseNativeDriver() {
     return mShouldUseNativeDriver;
+}
+
+bool GraphicsEnv::isZygoteDisableGlPreload() {
+    return mZygoteDisableGlPreload;
 }
 
 /**

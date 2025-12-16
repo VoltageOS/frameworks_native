@@ -684,6 +684,18 @@ void Loader::attempt_to_init_angle_backend(void* dso, egl_connection_t* cnx) {
         ALOGV("ANGLE GLES library loaded");
         cnx->angleLoaded = true;
         android::GraphicsEnv::getInstance().setDriverToLoad(android::GpuStatsInfo::Driver::ANGLE);
+        if (egl_flags::update_angle_feature_overrides_in_loader_open()) {
+            // ANGLE feature overrides need to be configured for both system services and apps. This
+            // is normally done in Loader::open() because the Zygote preloads the GL driver.
+            // However, when GL preloading is disabled, it needs to be done on every driver load.
+            // Also, it needs to be done when the system driver is unloaded to (for example) load
+            // ANGLE from an APK, which is safe because the Zygote can never unload the system
+            // driver.
+            if (android::GraphicsEnv::getInstance().isZygoteDisableGlPreload() ||
+                cnx->systemDriverUnloaded) {
+                android::GraphicsEnv::getInstance().updateAngleFeatureOverrides();
+            }
+        }
     } else {
         ALOGV("Native GLES library loaded");
         cnx->angleLoaded = false;
