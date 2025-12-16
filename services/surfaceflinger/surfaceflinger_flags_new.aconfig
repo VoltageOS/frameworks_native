@@ -124,6 +124,13 @@ flag {
 } # display_command_modeset
 
 flag {
+  name: "fence_handling"
+  namespace: "window_surfaces"
+  description: "Unblock main thread with asynchronous fence handling"
+  bug: "428611036"
+} # fence_handling
+
+flag {
   name: "follower_arbitrary_refresh_rate_selection"
   namespace: "desktop_display"
   description: "Enables selection of any refresh rate for the follower display instead of one matching the pacesetter."
