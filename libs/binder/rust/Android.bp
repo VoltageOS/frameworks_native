@@ -167,6 +167,7 @@ rust_library {
         "libdowncast_rs",
         "liblibc",
         "libbinder_rs_ndk_compat",
+        "libzerocopy",
     ],
     vendor: true,
 }
