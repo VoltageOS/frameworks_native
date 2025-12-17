@@ -20,9 +20,12 @@
 #include <android-base/result-gmock.h>
 #include <attestation/HmacKeyManager.h>
 #include <com_android_input_flags.h>
+#include <flag_macros.h>
+#include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <input/InputConsumer.h>
 #include <input/InputTransport.h>
+#include <input/ScopedFlagOverride.h>
 
 using namespace std::chrono_literals;
 
@@ -176,8 +179,6 @@ void TouchResamplingTest::receiveResponseUntilSequence(uint32_t seq) {
 void TouchResamplingTest::consumeInputEventEntries(const std::vector<InputEventEntry>& entries,
                                                    std::chrono::nanoseconds frameTime,
                                                    bool consumeBatches) {
-    ASSERT_GE(entries.size(), 1U) << "Must have at least 1 InputEventEntry to compare against";
-
     uint32_t consumeSeq;
     InputEvent* event;
 
@@ -185,7 +186,46 @@ void TouchResamplingTest::consumeInputEventEntries(const std::vector<InputEventE
             mConsumer->consume(&mEventFactory, consumeBatches, frameTime.count(), &consumeSeq,
                                &event);
 
-    ASSERT_THAT(result, Ok());
+    if (!consumeBatches) {
+        // When consumeBatches is false, mConsumer->consume only returns an event if a NEW message
+        // is received from the channel *and* that message is either not batchable
+        // (e.g., DOWN, UP) or causes a pending batch to be flushed.
+        if (!result.ok() && result.error().code() == WOULD_BLOCK) {
+            // This is the common case if no new message has arrived on the channel
+            // since the last call. No event should have been produced.
+            ASSERT_TRUE(entries.empty())
+                    << "consume(consumeBatches=false) returned WOULD_BLOCK, indicating no new "
+                    << "channel message was processed. Expected entries should be empty.";
+            return;
+        }
+
+        // If not WOULD_BLOCK, an event must have been consumed. This implies a new message
+        // arrived and was processed, resulting in an event.
+        ASSERT_THAT(result, Ok()) << "consume(consumeBatches=false) failed unexpectedly: "
+                                  << result.error().message();
+        ASSERT_FALSE(entries.empty()) << "consume(consumeBatches=false) returned an event, but the "
+                                         "expected entries list is empty.";
+    } else { // consumeBatches == true
+        // When consumeBatches is true, mConsumer->consume will always try to produce an event
+        // from any buffered batches if the channel has no new messages (WOULD_BLOCK).
+        // An error result here would likely indicate a more serious issue like NO_MEMORY.
+        ASSERT_THAT(result, Ok()) << "consume(consumeBatches=true) failed unexpectedly: "
+                                  << result.error().message();
+
+        if (event == nullptr) {
+            // This means consumeBatch was called but determined no batched events were ready
+            // to be dispatched for the given frameTime.
+            ASSERT_TRUE(entries.empty())
+                    << "consume(consumeBatches=true) returned OK but no event (event == nullptr), "
+                    << "indicating no batch was ready. Expected entries should be empty.";
+            return;
+        }
+        // An event was successfully consumed from a batch.
+        ASSERT_FALSE(entries.empty()) << "consume(consumeBatches=true) returned an event, but the "
+                                         "expected entries list is empty.";
+    }
+
+    ASSERT_TRUE(event != nullptr) << "Result is OK, but no event was returned.";
     MotionEvent* motionEvent = static_cast<MotionEvent*>(event);
 
     ASSERT_EQ(entries.size() - 1, motionEvent->getHistorySize());
@@ -927,6 +967,185 @@ TEST_F(TouchResamplingTest, EventsOnDifferentDisplaysAreNotResampled) {
             {20ms, {{0, 30, 30}}, AMOTION_EVENT_ACTION_MOVE, ui::LogicalDisplayId(1)},
     };
     consumeInputEventEntries(expectedEntries, frameTime, /*consumeBatches=*/true);
+}
+
+/*
+ * When an ACTION_UP occurs and there are no pending move events, we expect that the ACTION_UP is
+ * resampled to the last resampled ACTION_MOVE's coordinate. Note this applies when the
+ * fix_action_up_resampling flag is enabled.
+ */
+TEST_F(TouchResamplingTest, ActionUpUsesLastConsumedResampledStateNoPendingMoves) {
+    SCOPED_FLAG_OVERRIDE(fix_action_up_resampling, true);
+
+    std::chrono::nanoseconds frameTime;
+    std::vector<InputEventEntry> entries, expectedEntries;
+
+    // Initial ACTION_DOWN
+    entries = {
+            //     id  x   y
+            {0ms, {{0, 10, 10}}, AMOTION_EVENT_ACTION_DOWN},
+    };
+    publishInputEventEntries(entries);
+    frameTime = 5ms;
+    consumeInputEventEntries(entries, frameTime, /*consumeBatches=*/true);
+
+    // Two ACTION_MOVE events to establish a resampling history
+    entries = {
+            //      id  x   y
+            {10ms, {{0, 20, 20}}, AMOTION_EVENT_ACTION_MOVE},
+            {20ms, {{0, 30, 30}}, AMOTION_EVENT_ACTION_MOVE},
+    };
+    publishInputEventEntries(entries);
+
+    // Consume the batch, frameTime will cause extrapolation
+    frameTime = 35ms; // RESAMPLE_LATENCY is 5ms, so sampleTime is 30ms
+    // Extrapolation limit: 20ms + (20ms - 10ms) / 2 = 25ms
+    expectedEntries = {
+            //      id  x   y
+            {10ms, {{0, 20, 20}}, AMOTION_EVENT_ACTION_MOVE},
+            {20ms, {{0, 30, 30}}, AMOTION_EVENT_ACTION_MOVE},
+            {25ms, {{0, 35, 35, .isResampled = true}}, AMOTION_EVENT_ACTION_MOVE},
+    };
+    consumeInputEventEntries(expectedEntries, frameTime, /*consumeBatches=*/true);
+    // At this point, TouchState::lastResample is based on the 25ms resampled event (x=35, y=35)
+
+    // Publish ACTION_UP
+    entries = {
+            //      id  x   y
+            {60ms, {{0, 205, 205}}, AMOTION_EVENT_ACTION_UP},
+    };
+    publishInputEventEntries(entries);
+
+    expectedEntries = {
+            //      id  x   y
+            {60ms, {{0, 35, 35, .isResampled = true}}, AMOTION_EVENT_ACTION_UP},
+    };
+
+    consumeInputEventEntries(expectedEntries, -1ms, /*consumeBatches=*/false);
+}
+
+/*
+ * A test for the legacy behaviour of the test above. The expected behaviour is to not resample
+ * the ACTION_UP event coordinates.
+ */
+TEST_F(TouchResamplingTest, ActionUpUsesLastConsumedResampledStateNoPendingMoves_legacy) {
+    SCOPED_FLAG_OVERRIDE(fix_action_up_resampling, false);
+
+    std::chrono::nanoseconds frameTime;
+    std::vector<InputEventEntry> entries, expectedEntries;
+
+    // Initial ACTION_DOWN
+    entries = {
+            //     id  x   y
+            {0ms, {{0, 10, 10}}, AMOTION_EVENT_ACTION_DOWN},
+    };
+    publishInputEventEntries(entries);
+    frameTime = 5ms;
+    consumeInputEventEntries(entries, frameTime, /*consumeBatches=*/true);
+
+    // Two ACTION_MOVE events to establish a resampling history
+    entries = {
+            //      id  x   y
+            {10ms, {{0, 20, 20}}, AMOTION_EVENT_ACTION_MOVE},
+            {20ms, {{0, 30, 30}}, AMOTION_EVENT_ACTION_MOVE},
+    };
+    publishInputEventEntries(entries);
+
+    // Consume the batch, frameTime will cause extrapolation
+    frameTime = 35ms; // RESAMPLE_LATENCY is 5ms, so sampleTime is 30ms
+    // Extrapolation limit: 20ms + (20ms - 10ms) / 2 = 25ms
+    expectedEntries = {
+            //      id  x   y
+            {10ms, {{0, 20, 20}}, AMOTION_EVENT_ACTION_MOVE},
+            {20ms, {{0, 30, 30}}, AMOTION_EVENT_ACTION_MOVE},
+            {25ms, {{0, 35, 35, .isResampled = true}}, AMOTION_EVENT_ACTION_MOVE},
+    };
+    consumeInputEventEntries(expectedEntries, frameTime, /*consumeBatches=*/true);
+    // At this point, TouchState::lastResample is based on the 25ms resampled event (x=35, y=35)
+
+    // Publish ACTION_UP
+    entries = {
+            //      id  x   y
+            {60ms, {{0, 205, 205}}, AMOTION_EVENT_ACTION_UP},
+    };
+    publishInputEventEntries(entries);
+
+    expectedEntries = {
+            //      id  x   y
+            {60ms, {{0, 205, 205}}, AMOTION_EVENT_ACTION_UP},
+    };
+
+    consumeInputEventEntries(expectedEntries, -1ms, /*consumeBatches=*/false);
+}
+
+/*
+ * Similar to above, however we don't resample as the previously resampled batched move coordinates
+ * are invalid in regards to lastResample given that we have pending moves. Therefore we just use
+ * the ACTION_UP's actual coordinates.
+ */
+TEST_F(TouchResamplingTest, ActionUpUsesLastConsumedResampledStatePendingMoves) {
+    std::chrono::nanoseconds frameTime;
+    std::vector<InputEventEntry> entries, expectedEntries;
+
+    // Initial ACTION_DOWN
+    entries = {
+            //     id  x   y
+            {0ms, {{0, 10, 10}}, AMOTION_EVENT_ACTION_DOWN},
+    };
+    publishInputEventEntries(entries);
+    frameTime = 5ms;
+    consumeInputEventEntries(entries, frameTime, /*consumeBatches=*/true);
+
+    // Two ACTION_MOVE events to establish a resampling history
+    entries = {
+            //      id  x   y
+            {10ms, {{0, 20, 20}}, AMOTION_EVENT_ACTION_MOVE},
+            {20ms, {{0, 30, 30}}, AMOTION_EVENT_ACTION_MOVE},
+    };
+    publishInputEventEntries(entries);
+
+    // Consume the batch, frameTime will cause extrapolation
+    frameTime = 35ms; // RESAMPLE_LATENCY is 5ms, so sampleTime is 30ms
+    // Extrapolation limit: 20ms + (20ms - 10ms) / 2 = 25ms
+    expectedEntries = {
+            //      id  x   y
+            {10ms, {{0, 20, 20}}, AMOTION_EVENT_ACTION_MOVE},
+            {20ms, {{0, 30, 30}}, AMOTION_EVENT_ACTION_MOVE},
+            {25ms, {{0, 35, 35, .isResampled = true}}, AMOTION_EVENT_ACTION_MOVE},
+    };
+    consumeInputEventEntries(expectedEntries, frameTime, /*consumeBatches=*/true);
+    // At this point, TouchState::lastResample is based on the 25ms resampled event (x=35, y=35)
+
+    // Publish more ACTION_MOVEs (new batch), NOT consumed yet.
+    entries = {
+            //      id  x   y
+            {40ms, {{0, 100, 100}}, AMOTION_EVENT_ACTION_MOVE},
+            {50ms, {{0, 200, 200}}, AMOTION_EVENT_ACTION_MOVE},
+    };
+    publishInputEventEntries(entries);
+
+    // Publish ACTION_UP
+    entries = {
+            //      id  x   y
+            {60ms, {{0, 205, 205}}, AMOTION_EVENT_ACTION_UP},
+    };
+    publishInputEventEntries(entries);
+
+    expectedEntries = {
+            //      id  x   y
+            {40ms, {{0, 100, 100}}, AMOTION_EVENT_ACTION_MOVE},
+            {50ms, {{0, 200, 200}}, AMOTION_EVENT_ACTION_MOVE},
+    };
+
+    // The batched moves are consumed, but the ACTION_UP is deferred to the next consume cycle.
+    consumeInputEventEntries(expectedEntries, -1ms, /*consumeBatches=*/false);
+
+    expectedEntries = {
+            //      id  x   y
+            {60ms, {{0, 205, 205}}, AMOTION_EVENT_ACTION_UP},
+    };
+
+    consumeInputEventEntries(expectedEntries, -1ms, /*consumeBatches=*/false);
 }
 
 } // namespace android
