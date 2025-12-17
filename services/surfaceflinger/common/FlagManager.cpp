@@ -143,7 +143,6 @@ void FlagManager::dump(std::string& result) const {
     DUMP_ACONFIG_FLAG(readback_screenshot);
     DUMP_ACONFIG_FLAG(re_powered_off_displays_inform_cache_budgets);
     DUMP_ACONFIG_FLAG(refresh_rate_overlay_on_external_display);
-    DUMP_ACONFIG_FLAG(resync_on_tx_separate_timer);
     DUMP_ACONFIG_FLAG(set_power_mode_async);
     DUMP_ACONFIG_FLAG(use_content_priority_for_jank_classification);
     DUMP_ACONFIG_FLAG(use_experimental_jank_classification);
@@ -317,7 +316,6 @@ FLAG_MANAGER_ACONFIG_FLAG(offload_gpu_composition, "");
 FLAG_MANAGER_ACONFIG_FLAG(re_powered_off_displays_inform_cache_budgets, "");
 FLAG_MANAGER_ACONFIG_FLAG(readback_screenshot, "")
 FLAG_MANAGER_ACONFIG_FLAG(refresh_rate_overlay_on_external_display, "")
-FLAG_MANAGER_ACONFIG_FLAG(resync_on_tx_separate_timer, "");
 FLAG_MANAGER_ACONFIG_FLAG(set_power_mode_async, "");
 FLAG_MANAGER_ACONFIG_FLAG(use_content_priority_for_jank_classification, "");
 FLAG_MANAGER_ACONFIG_FLAG(use_experimental_jank_classification, "");
