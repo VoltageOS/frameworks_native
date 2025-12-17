@@ -175,7 +175,6 @@ void FlagManager::dump(std::string& result) const {
     DUMP_ACONFIG_FLAG(shader_disk_cache);
     DUMP_ACONFIG_FLAG(skip_invisible_windows_in_input);
     DUMP_ACONFIG_FLAG(stable_edid_ids);
-    DUMP_ACONFIG_FLAG(stop_layer);
     DUMP_ACONFIG_FLAG(synced_resolution_switch);
     DUMP_ACONFIG_FLAG(true_hdr_screenshots);
     DUMP_ACONFIG_FLAG(vulkan_renderengine);
@@ -286,7 +285,6 @@ FLAG_MANAGER_ACONFIG_FLAG(restore_blur_step, "debug.renderengine.restore_blur_st
 FLAG_MANAGER_ACONFIG_FLAG(shader_disk_cache, "");
 FLAG_MANAGER_ACONFIG_FLAG(skip_invisible_windows_in_input, "");
 FLAG_MANAGER_ACONFIG_FLAG(stable_edid_ids, "debug.sf.stable_edid_ids")
-FLAG_MANAGER_ACONFIG_FLAG(stop_layer, "");
 FLAG_MANAGER_ACONFIG_FLAG(synced_resolution_switch, "");
 FLAG_MANAGER_ACONFIG_FLAG(true_hdr_screenshots, "debug.sf.true_hdr_screenshots");
 FLAG_MANAGER_ACONFIG_FLAG(vulkan_renderengine, "debug.renderengine.vulkan")
