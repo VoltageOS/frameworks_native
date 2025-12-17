@@ -262,7 +262,6 @@ FLAG_MANAGER_ACONFIG_FLAG(correct_dpi_with_display_size, "");
 FLAG_MANAGER_ACONFIG_FLAG(deprecate_frame_tracker, "");
 FLAG_MANAGER_ACONFIG_FLAG(disable_synthetic_vsync_for_performance, "");
 FLAG_MANAGER_ACONFIG_FLAG(display_command_modeset, "debug.sf.display_command_modeset")
-FLAG_MANAGER_ACONFIG_FLAG(fence_handling, "");
 FLAG_MANAGER_ACONFIG_FLAG(follower_arbitrary_refresh_rate_selection,
                           "debug.sf.follower_arbitrary_refresh_rate_selection");
 FLAG_MANAGER_ACONFIG_FLAG(follower_display_backpressure, "debug.sf.follower_display_backpressure");
