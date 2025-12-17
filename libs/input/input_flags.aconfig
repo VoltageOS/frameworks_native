@@ -231,16 +231,6 @@ flag {
 }
 
 flag {
-  name: "use_separate_xy_dpi_scaling_for_mice"
-  namespace: "input"
-  description: "Use the xDpi and yDpi values to scale mouse moves"
-  bug: "432649760"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
-}
-
-flag {
   name: "touchpad_down_time_fix"
   namespace: "input"
   description: "Fix the down times on HOVER_EXIT and BUTTON_PRESS events emitted when a button press occurs on a touchpad"
