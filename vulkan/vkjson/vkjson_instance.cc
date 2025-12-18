@@ -4014,6 +4014,7 @@ VkJsonDevice VkJsonGetDevice(VkPhysicalDevice physical_device) {
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_MEMORY_MODEL_FEATURES;
     device.vulkan_memory_model_features.pNext = features.pNext;
     features.pNext = &device.vulkan_memory_model_features;
+
     vkGetPhysicalDeviceFeatures2(physical_device, &features);
   }
 
@@ -4042,6 +4043,11 @@ VkJsonDevice VkJsonGetDevice(VkPhysicalDevice physical_device) {
       device.formats.insert(std::make_pair(format, format_properties));
     }
 
+    device.core13.properties.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_PROPERTIES;
+    device.core13.properties.pNext = properties.pNext;
+    properties.pNext = &device.core13.properties;
+
     device.inline_uniform_block_properties.sType =
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_INLINE_UNIFORM_BLOCK_PROPERTIES;
     device.inline_uniform_block_properties.pNext = properties.pNext;
@@ -4066,11 +4072,6 @@ VkJsonDevice VkJsonGetDevice(VkPhysicalDevice physical_device) {
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TEXEL_BUFFER_ALIGNMENT_PROPERTIES;
     device.texel_buffer_alignment_properties.pNext = properties.pNext;
     properties.pNext = &device.texel_buffer_alignment_properties;
-
-    device.core13.properties.sType =
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_PROPERTIES;
-    device.core13.properties.pNext = properties.pNext;
-    properties.pNext = &device.core13.properties;
 
     vkGetPhysicalDeviceProperties2(physical_device, &properties);
 
@@ -4156,6 +4157,11 @@ VkJsonDevice VkJsonGetDevice(VkPhysicalDevice physical_device) {
       device.formats.insert(std::make_pair(format, format_properties));
     }
 
+    device.core14.properties.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_4_PROPERTIES;
+    device.core14.properties.pNext = properties.pNext;
+    properties.pNext = &device.core14.properties;
+
     device.host_image_copy_properties.sType =
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_IMAGE_COPY_PROPERTIES;
     device.host_image_copy_properties.pNext = properties.pNext;
@@ -4190,11 +4196,6 @@ VkJsonDevice VkJsonGetDevice(VkPhysicalDevice physical_device) {
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_ATTRIBUTE_DIVISOR_PROPERTIES;
     device.vertex_attribute_divisor_properties.pNext = properties.pNext;
     properties.pNext = &device.vertex_attribute_divisor_properties;
-
-    device.core14.properties.sType =
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_4_PROPERTIES;
-    device.core14.properties.pNext = properties.pNext;
-    properties.pNext = &device.core14.properties;
 
     vkGetPhysicalDeviceProperties2(physical_device, &properties);
 
