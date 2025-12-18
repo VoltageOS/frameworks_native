@@ -35,12 +35,6 @@ namespace android {
 // known socket that we expect the Unix Domain Socket servicemanager to be listening on.
 const char kUdsServiceManagerName[] = ANDROID_SOCKET_DIR "/rpc_servicemanager";
 
-#ifdef LIBBINDER_ADDSERVICE_CACHE
-constexpr bool kUseCacheInAddService = true;
-#else
-constexpr bool kUseCacheInAddService = false;
-#endif
-
 using AidlServiceManager = android::os::IServiceManager;
 using android::os::IAccessor;
 using binder::Status;
@@ -346,7 +340,7 @@ Status BackendUnifiedServiceManager::addService(const ::std::string& name,
         Status status =
                 mTheRealServiceManager->addService(name, service, allowIsolated, dumpPriority);
         // mEnableAddServiceCache is true by default.
-        if (kUseCacheInAddService && mEnableAddServiceCache && status.isOk()) {
+        if (mEnableAddServiceCache && status.isOk()) {
             return updateCache(name, service,
                                dumpPriority & android::os::IServiceManager::FLAG_IS_LAZY_SERVICE);
         }

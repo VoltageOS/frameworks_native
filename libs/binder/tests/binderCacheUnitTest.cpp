@@ -28,12 +28,6 @@
 
 using namespace android;
 
-#ifdef LIBBINDER_ADDSERVICE_CACHE
-constexpr bool kUseCacheInAddService = true;
-#else
-constexpr bool kUseCacheInAddService = false;
-#endif
-
 // A service name which is in the static list of cachable services
 const String16 kCachedServiceName = String16("isub");
 
@@ -160,13 +154,7 @@ public:
         fakeServiceManager->clearServices();
 
         sp<IBinder> result = mServiceManager->checkService(kCachedServiceName);
-        if (kUseCacheInAddService) {
-            // If cache is enabled, we should get the binder.
-            EXPECT_EQ(binder1, result);
-        } else {
-            // If cache is disabled, then we should get the null binder
-            EXPECT_EQ(nullptr, result);
-        }
+        EXPECT_EQ(binder1, result);
     }
     sp<MockAidlServiceManager> fakeServiceManager;
     sp<android::IServiceManager> mServiceManager;
