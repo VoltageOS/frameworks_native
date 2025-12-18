@@ -34,12 +34,6 @@ constexpr bool kUseCacheInAddService = true;
 constexpr bool kUseCacheInAddService = false;
 #endif
 
-#ifdef LIBBINDER_REMOVE_CACHE_STATIC_LIST
-constexpr bool kRemoveStaticList = true;
-#else
-constexpr bool kRemoveStaticList = false;
-#endif
-
 // A service name which is in the static list of cachable services
 const String16 kCachedServiceName = String16("isub");
 
@@ -138,19 +132,11 @@ public:
 };
 
 TEST_F(LibbinderCacheRemoveStaticList, AddLocalServiceAndConfirmCacheMiss) {
-    if (!kRemoveStaticList) {
-        GTEST_SKIP() << "Skipping as feature is not enabled";
-        return;
-    }
     sp<IBinder> binder1 = sp<BBinder>::make();
     cacheAddServiceAndConfirmCacheMiss(binder1);
 }
 
 TEST_F(LibbinderCacheRemoveStaticList, AddRemoteServiceAndConfirmCacheMiss) {
-    if (!kRemoveStaticList) {
-        GTEST_SKIP() << "Skipping as feature is not enabled";
-        return;
-    }
     sp<IBinder> binder1 = defaultServiceManager()->checkService(kServerName);
     ASSERT_NE(binder1, nullptr);
     cacheAddServiceAndConfirmCacheMiss(binder1);
@@ -293,30 +279,6 @@ TEST_F(LibbinderCacheTest, NullBinderNotCached) {
 
     // This should return the newly added service.
     result = mServiceManager->checkService(kCachedServiceName);
-    EXPECT_EQ(binder2, result);
-}
-
-// TODO(b/333854840): Remove this test removing the static list
-TEST_F(LibbinderCacheTest, DoNotCacheServiceNotInList) {
-    if (kRemoveStaticList) {
-        GTEST_SKIP() << "Skipping test as static list is disabled";
-        return;
-    }
-
-    sp<IBinder> binder1 = sp<BBinder>::make();
-    sp<IBinder> binder2 = sp<BBinder>::make();
-    String16 serviceName = String16("NewLibbinderCacheTest");
-    // Add a service
-    EXPECT_EQ(OK, mServiceManager->addService(serviceName, binder1));
-    // Get the service. This shouldn't caches it.
-    sp<IBinder> result = mServiceManager->checkService(serviceName);
-    ASSERT_EQ(binder1, result);
-
-    // Add the different binder and replace the service.
-    EXPECT_EQ(OK, mServiceManager->addService(serviceName, binder2));
-
-    // Confirm that we get the new service
-    result = mServiceManager->checkService(serviceName);
     EXPECT_EQ(binder2, result);
 }
 

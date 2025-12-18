@@ -520,28 +520,6 @@ cc_library_shared {
 }
 
 soong_config_module_type {
-    name: "libbinder_remove_cache_static_list_config",
-    module_type: "cc_defaults",
-    config_namespace: "libbinder",
-    bool_variables: ["release_libbinder_remove_cache_static_list"],
-    properties: [
-        "cflags",
-    ],
-}
-
-libbinder_remove_cache_static_list_config {
-    name: "libbinder_remove_cache_static_list_flag",
-    soong_config_variables: {
-        release_libbinder_remove_cache_static_list: {
-            cflags: ["-DLIBBINDER_REMOVE_CACHE_STATIC_LIST"],
-            conditions_default: {
-                cflags: ["-DNO_LIBBINDER_REMOVE_CACHE_STATIC_LIST"],
-            },
-        },
-    },
-}
-
-soong_config_module_type {
     name: "libbinder_addservice_cache_config",
     module_type: "cc_defaults",
     config_namespace: "libbinder",
@@ -592,7 +570,6 @@ cc_defaults {
     defaults: [
         "libbinder_defer_bc_request_freeze_notification_flag_default",
         "libbinder_addservice_cache_flag",
-        "libbinder_remove_cache_static_list_flag",
         "libbinder_freeze_use_flush_eagerly_flag_default",
     ],
     srcs: [

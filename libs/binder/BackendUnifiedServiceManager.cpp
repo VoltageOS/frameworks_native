@@ -41,12 +41,6 @@ constexpr bool kUseCacheInAddService = true;
 constexpr bool kUseCacheInAddService = false;
 #endif
 
-#ifdef LIBBINDER_REMOVE_CACHE_STATIC_LIST
-constexpr bool kRemoveStaticList = true;
-#else
-constexpr bool kRemoveStaticList = false;
-#endif
-
 using AidlServiceManager = android::os::IServiceManager;
 using android::os::IAccessor;
 using binder::Status;
@@ -145,13 +139,7 @@ bool BinderCacheWithInvalidation::isClientSideCachingEnabled(const std::string& 
               serviceName.c_str());
         return false;
     }
-    if (kRemoveStaticList) return true;
-    for (const char* name : kStaticCachableList) {
-        if (name == serviceName) {
-            return true;
-        }
-    }
-    return false;
+    return true;
 }
 
 Status BackendUnifiedServiceManager::updateCache(const std::string& serviceName,
@@ -168,7 +156,7 @@ Status BackendUnifiedServiceManager::updateCache(const std::string& serviceName,
                                                  const sp<IBinder>& binder, bool isServiceLazy) {
     std::string traceStr;
     // Don't cache if service is lazy
-    if (kRemoveStaticList && isServiceLazy) {
+    if (isServiceLazy) {
         return Status::ok();
     }
     if (atrace_is_tag_enabled(ATRACE_TAG_AIDL)) {
@@ -184,7 +172,7 @@ Status BackendUnifiedServiceManager::updateCache(const std::string& serviceName,
                                       "BinderCacheWithInvalidation::updateCache failed: "
                                       "isBinderAlive_false");
     }
-    // If we reach here with kRemoveStaticList=true then we know service isn't lazy
+    // If we reach here we know service isn't lazy
     else if (mCacheForGetService->isClientSideCachingEnabled(serviceName)) {
         binder::ScopedTrace aidlTrace(ATRACE_TAG_AIDL,
                                       "BinderCacheWithInvalidation::updateCache successful");
