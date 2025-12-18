@@ -1146,6 +1146,33 @@ binder_status_t AParcel_reset(AParcel* parcel) __INTRODUCED_IN(31);
 int32_t AParcel_getDataSize(const AParcel* parcel) __INTRODUCED_IN(31);
 
 /**
+ * Gets the capacity of the parcel.
+ *
+ * Available since API level 37.
+ *
+ * \param parcel The parcel of which to get the capacity.
+ *
+ * \return The capacity of the parcel in bytes.
+ */
+size_t AParcel_getDataCapacity(const AParcel* parcel) __INTRODUCED_IN(37);
+
+/**
+ * Sets the capacity of the parcel.
+ *
+ * Available since API level 37.
+ *
+ * Capacity can only grow. If the provided capacity is less than the current
+ * capacity, the parcel is left unchanged. If the provided capacity is less
+ * than the parcel data size, the parcel is left unchanged.
+ *
+ * \param parcel The parcel to modify.
+ * \param capacity The new capacity in bytes.
+ *
+ * \return STATUS_OK on success.
+ */
+binder_status_t AParcel_setDataCapacity(AParcel* parcel, size_t capacity) __INTRODUCED_IN(37);
+
+/**
  * Copy the data of a parcel to other parcel.
  *
  * Available since API level 31.

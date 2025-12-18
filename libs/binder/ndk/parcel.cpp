@@ -268,6 +268,19 @@ binder_status_t AParcel_setDataPosition(const AParcel* parcel, int32_t position)
     return STATUS_OK;
 }
 
+size_t AParcel_getDataCapacity(const AParcel* parcel) {
+    return parcel->get()->dataCapacity();
+}
+
+binder_status_t AParcel_setDataCapacity(AParcel* parcel, size_t capacity) {
+    if (capacity < 0) {
+        return STATUS_BAD_VALUE;
+    }
+
+    status_t status = parcel->get()->setDataCapacity(capacity);
+    return PruneStatusT(status);
+}
+
 int32_t AParcel_getDataPosition(const AParcel* parcel) {
     return parcel->get()->dataPosition();
 }
