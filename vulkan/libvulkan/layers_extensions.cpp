@@ -40,8 +40,10 @@
 #include <ziparchive/zip_archive.h>
 
 #include <com_android_graphics_libvulkan_flags.h>
-
 using namespace com::android::graphics::libvulkan;
+
+#include <VulkanProperties.sysprop.h>
+using namespace android::sysprop;
 
 // TODO(b/143296676): This file currently builds up global data structures as it
 // loads, and never cleans them up. This means we're doing heap allocations
