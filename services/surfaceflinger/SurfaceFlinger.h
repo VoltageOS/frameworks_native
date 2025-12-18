@@ -922,6 +922,9 @@ private:
 
         std::function<bool(const frontend::LayerSnapshot&, bool& outStopTraversal)>
                 snapshotFilterFn{nullptr};
+
+        // A bitmask for filtering layers that have specific screen capture flags.
+        uint32_t exclusionMask;
     };
 
     /*

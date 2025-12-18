@@ -8014,25 +8014,26 @@ void SurfaceFlinger::captureDisplay(const DisplayCaptureArgs& args,
         return;
     }
 
-    ScreenshotArgs screenshotArgs{.captureTypeVariant = args.displayToken,
-                                  .snapshotRequest =
-                                          SnapshotRequestArgs{.uid = gui::Uid{static_cast<uid_t>(
-                                                                      captureArgs.uid)},
-                                                              .excludeLayerIds =
-                                                                      excludeLayerIds.value()},
-                                  .sourceCrop = gui::aidl_utils::fromARect(captureArgs.sourceCrop),
-                                  .size = ui::Size(args.width, args.height),
-                                  .dataspace = static_cast<ui::Dataspace>(captureArgs.dataspace),
-                                  .disableBlur = false,
-                                  .isGrayscale = captureArgs.grayscale,
-                                  .isSecure =
-                                          captureArgs.secureLayerMode == SecureLayerMode::Capture,
-                                  .includeProtected = captureArgs.protectedLayerMode ==
-                                          ProtectedLayerMode::Capture,
-                                  .preserveDisplayColors = captureArgs.preserveDisplayColors,
-                                  .requireDpuReadback =
-                                          captureArgs.captureMode == CaptureMode::RequireOptimized,
-                                  .debugName = "ScreenCapture"};
+    ScreenshotArgs
+            screenshotArgs{.captureTypeVariant = args.displayToken,
+                           .snapshotRequest =
+                                   SnapshotRequestArgs{.uid = gui::Uid{static_cast<uid_t>(
+                                                               captureArgs.uid)},
+                                                       .excludeLayerIds = excludeLayerIds.value(),
+                                                       .exclusionMask = static_cast<uint32_t>(
+                                                               captureArgs.exclusionMask)},
+                           .sourceCrop = gui::aidl_utils::fromARect(captureArgs.sourceCrop),
+                           .size = ui::Size(args.width, args.height),
+                           .dataspace = static_cast<ui::Dataspace>(captureArgs.dataspace),
+                           .disableBlur = false,
+                           .isGrayscale = captureArgs.grayscale,
+                           .isSecure = captureArgs.secureLayerMode == SecureLayerMode::Capture,
+                           .includeProtected =
+                                   captureArgs.protectedLayerMode == ProtectedLayerMode::Capture,
+                           .preserveDisplayColors = captureArgs.preserveDisplayColors,
+                           .requireDpuReadback =
+                                   captureArgs.captureMode == CaptureMode::RequireOptimized,
+                           .debugName = "ScreenCapture"};
 
     captureScreenCommon(screenshotArgs, static_cast<ui::PixelFormat>(captureArgs.pixelFormat),
                         captureListener);
@@ -8103,28 +8104,28 @@ void SurfaceFlinger::captureLayers(const LayerCaptureArgs& args,
         return;
     }
 
-    ScreenshotArgs screenshotArgs{.captureTypeVariant = LayerHandle::getLayerId(args.layerHandle),
-                                  .snapshotRequest =
-                                          SnapshotRequestArgs{.uid = gui::Uid{static_cast<uid_t>(
-                                                                      captureArgs.uid)},
-                                                              .rootLayerId =
-                                                                      LayerHandle::getLayerId(
-                                                                              args.layerHandle),
-                                                              .excludeLayerIds =
-                                                                      excludeLayerIds.value(),
-                                                              .childrenOnly = args.childrenOnly},
-                                  .sourceCrop = gui::aidl_utils::fromARect(captureArgs.sourceCrop),
-                                  .dataspace = static_cast<ui::Dataspace>(captureArgs.dataspace),
-                                  .frameScaleX = captureArgs.frameScaleX,
-                                  .frameScaleY = captureArgs.frameScaleY,
-                                  .disableBlur = false,
-                                  .isGrayscale = captureArgs.grayscale,
-                                  .isSecure =
-                                          captureArgs.secureLayerMode == SecureLayerMode::Capture,
-                                  .includeProtected = captureArgs.protectedLayerMode ==
-                                          ProtectedLayerMode::Capture,
-                                  .preserveDisplayColors = captureArgs.preserveDisplayColors,
-                                  .debugName = "ScreenCapture"};
+    ScreenshotArgs
+            screenshotArgs{.captureTypeVariant = LayerHandle::getLayerId(args.layerHandle),
+                           .snapshotRequest =
+                                   SnapshotRequestArgs{.uid = gui::Uid{static_cast<uid_t>(
+                                                               captureArgs.uid)},
+                                                       .rootLayerId = LayerHandle::getLayerId(
+                                                               args.layerHandle),
+                                                       .excludeLayerIds = excludeLayerIds.value(),
+                                                       .childrenOnly = args.childrenOnly,
+                                                       .exclusionMask = static_cast<uint32_t>(
+                                                               captureArgs.exclusionMask)},
+                           .sourceCrop = gui::aidl_utils::fromARect(captureArgs.sourceCrop),
+                           .dataspace = static_cast<ui::Dataspace>(captureArgs.dataspace),
+                           .frameScaleX = captureArgs.frameScaleX,
+                           .frameScaleY = captureArgs.frameScaleY,
+                           .disableBlur = false,
+                           .isGrayscale = captureArgs.grayscale,
+                           .isSecure = captureArgs.secureLayerMode == SecureLayerMode::Capture,
+                           .includeProtected =
+                                   captureArgs.protectedLayerMode == ProtectedLayerMode::Capture,
+                           .preserveDisplayColors = captureArgs.preserveDisplayColors,
+                           .debugName = "ScreenCapture"};
 
     captureScreenCommon(screenshotArgs, static_cast<ui::PixelFormat>(captureArgs.pixelFormat),
                         captureListener);
@@ -9471,7 +9472,7 @@ SurfaceFlinger::getLayerSnapshotsForScreenshots(const SnapshotRequestArgs& args)
     };
 
     std::vector<std::pair<Layer*, sp<LayerFE>>> layers;
-    if (args.rootLayerId || !args.excludeLayerIds.empty()) {
+    if (args.rootLayerId || !args.excludeLayerIds.empty() || args.exclusionMask) {
         // Create and update LayerSnapshotBuilder args before iterating through snapshots
         frontend::LayerSnapshotBuilder::Args
                 builderArgs{.root = args.rootLayerId
@@ -9493,7 +9494,8 @@ SurfaceFlinger::getLayerSnapshotsForScreenshots(const SnapshotRequestArgs& args)
                             .genericLayerMetadataKeyMap = getGenericLayerMetadataKeyMap(),
                             .skipRoundCornersWhenProtected =
                                     !getRenderEngine().supportsProtectedContent(),
-                            .renderResourceCache = mIpcCache.get()};
+                            .renderResourceCache = mIpcCache.get(),
+                            .exclusionMask = args.exclusionMask};
         if (args.rootLayerId) {
             if (builderArgs.root.hasLayerCycle()) {
                 return base::unexpected(BAD_VALUE);
