@@ -79,7 +79,7 @@ protected:
                                   const std::vector<Pointer>& pointers, ui::LogicalDisplayId);
     void publishInputEventEntries(const std::vector<InputEventEntry>& entries);
     void consumeInputEventEntries(const std::vector<InputEventEntry>& entries,
-                                  std::chrono::nanoseconds frameTime);
+                                  std::chrono::nanoseconds frameTime, bool consumeBatches);
     void receiveResponseUntilSequence(uint32_t seq);
 };
 
@@ -174,15 +174,17 @@ void TouchResamplingTest::receiveResponseUntilSequence(uint32_t seq) {
  * must contain identical values for the action field.
  */
 void TouchResamplingTest::consumeInputEventEntries(const std::vector<InputEventEntry>& entries,
-                                                   std::chrono::nanoseconds frameTime) {
+                                                   std::chrono::nanoseconds frameTime,
+                                                   bool consumeBatches) {
     ASSERT_GE(entries.size(), 1U) << "Must have at least 1 InputEventEntry to compare against";
 
     uint32_t consumeSeq;
     InputEvent* event;
 
     auto [result, unfinishedInputMessages] =
-            mConsumer->consume(&mEventFactory, /*consumeBatches=*/true, frameTime.count(),
-                               &consumeSeq, &event);
+            mConsumer->consume(&mEventFactory, consumeBatches, frameTime.count(), &consumeSeq,
+                               &event);
+
     ASSERT_THAT(result, Ok());
     MotionEvent* motionEvent = static_cast<MotionEvent*>(event);
 
@@ -258,7 +260,7 @@ TEST_F(TouchResamplingTest, EventIsResampled) {
             //      id  x   y
             {0ms, {{0, 10, 20}}, AMOTION_EVENT_ACTION_DOWN},
     };
-    consumeInputEventEntries(expectedEntries, frameTime);
+    consumeInputEventEntries(expectedEntries, frameTime, /*consumeBatches=*/true);
 
     // Two ACTION_MOVE events 10 ms apart that move in X direction and stay still in Y
     entries = {
@@ -274,7 +276,7 @@ TEST_F(TouchResamplingTest, EventIsResampled) {
             {20ms, {{0, 30, 30}}, AMOTION_EVENT_ACTION_MOVE},
             {25ms, {{0, 35, 30, .isResampled = true}}, AMOTION_EVENT_ACTION_MOVE},
     };
-    consumeInputEventEntries(expectedEntries, frameTime);
+    consumeInputEventEntries(expectedEntries, frameTime, /*consumeBatches=*/true);
 }
 
 /**
@@ -297,7 +299,7 @@ TEST_F(TouchResamplingTest, EventIsResampledWithDifferentId) {
             //      id  x   y
             {0ms, {{1, 10, 20}}, AMOTION_EVENT_ACTION_DOWN},
     };
-    consumeInputEventEntries(expectedEntries, frameTime);
+    consumeInputEventEntries(expectedEntries, frameTime, /*consumeBatches=*/true);
 
     // Two ACTION_MOVE events 10 ms apart that move in X direction and stay still in Y
     entries = {
@@ -313,7 +315,7 @@ TEST_F(TouchResamplingTest, EventIsResampledWithDifferentId) {
             {20ms, {{1, 30, 30}}, AMOTION_EVENT_ACTION_MOVE},
             {25ms, {{1, 35, 30, .isResampled = true}}, AMOTION_EVENT_ACTION_MOVE},
     };
-    consumeInputEventEntries(expectedEntries, frameTime);
+    consumeInputEventEntries(expectedEntries, frameTime, /*consumeBatches=*/true);
 }
 
 /**
@@ -335,7 +337,7 @@ TEST_F(TouchResamplingTest, StylusEventIsResampled) {
             //      id  x   y
             {0ms, {{0, 10, 20, .toolType = ToolType::STYLUS}}, AMOTION_EVENT_ACTION_DOWN},
     };
-    consumeInputEventEntries(expectedEntries, frameTime);
+    consumeInputEventEntries(expectedEntries, frameTime, /*consumeBatches=*/true);
 
     // Two ACTION_MOVE events 10 ms apart that move in X direction and stay still in Y
     entries = {
@@ -353,7 +355,7 @@ TEST_F(TouchResamplingTest, StylusEventIsResampled) {
              {{0, 35, 30, .toolType = ToolType::STYLUS, .isResampled = true}},
              AMOTION_EVENT_ACTION_MOVE},
     };
-    consumeInputEventEntries(expectedEntries, frameTime);
+    consumeInputEventEntries(expectedEntries, frameTime, /*consumeBatches=*/true);
 }
 
 /**
@@ -375,7 +377,7 @@ TEST_F(TouchResamplingTest, MouseEventIsResampled) {
             //      id  x   y
             {0ms, {{0, 10, 20, .toolType = ToolType::MOUSE}}, AMOTION_EVENT_ACTION_DOWN},
     };
-    consumeInputEventEntries(expectedEntries, frameTime);
+    consumeInputEventEntries(expectedEntries, frameTime, /*consumeBatches=*/true);
 
     // Two ACTION_MOVE events 10 ms apart that move in X direction and stay still in Y
     entries = {
@@ -393,7 +395,7 @@ TEST_F(TouchResamplingTest, MouseEventIsResampled) {
              {{0, 35, 30, .toolType = ToolType::MOUSE, .isResampled = true}},
              AMOTION_EVENT_ACTION_MOVE},
     };
-    consumeInputEventEntries(expectedEntries, frameTime);
+    consumeInputEventEntries(expectedEntries, frameTime, /*consumeBatches=*/true);
 }
 
 /**
@@ -415,7 +417,7 @@ TEST_F(TouchResamplingTest, MouseEventIsResampledClearingRelativeAxes) {
             //      id  x   y
             {0ms, {{0, 10, 20, .toolType = ToolType::MOUSE}}, AMOTION_EVENT_ACTION_DOWN},
     };
-    consumeInputEventEntries(expectedEntries, frameTime);
+    consumeInputEventEntries(expectedEntries, frameTime, /*consumeBatches=*/true);
 
     // Two ACTION_MOVE events 10 ms apart that move in X direction and stay still in Y.
     // In the resampled event, RELATIVE_X and RELATIVE_Y are cleared to zero.
@@ -452,7 +454,7 @@ TEST_F(TouchResamplingTest, MouseEventIsResampledClearingRelativeAxes) {
                               {AMOTION_EVENT_AXIS_RELATIVE_Y, 0}}}},
              AMOTION_EVENT_ACTION_MOVE},
     };
-    consumeInputEventEntries(expectedEntries, frameTime);
+    consumeInputEventEntries(expectedEntries, frameTime, /*consumeBatches=*/true);
 }
 
 /**
@@ -474,7 +476,7 @@ TEST_F(TouchResamplingTest, PalmEventIsNotResampled) {
             //      id  x   y
             {0ms, {{0, 10, 20, .toolType = ToolType::PALM}}, AMOTION_EVENT_ACTION_DOWN},
     };
-    consumeInputEventEntries(expectedEntries, frameTime);
+    consumeInputEventEntries(expectedEntries, frameTime, /*consumeBatches=*/true);
 
     // Two ACTION_MOVE events 10 ms apart that move in X direction and stay still in Y
     entries = {
@@ -489,7 +491,7 @@ TEST_F(TouchResamplingTest, PalmEventIsNotResampled) {
             {10ms, {{0, 20, 30, .toolType = ToolType::PALM}}, AMOTION_EVENT_ACTION_MOVE},
             {20ms, {{0, 30, 30, .toolType = ToolType::PALM}}, AMOTION_EVENT_ACTION_MOVE},
     };
-    consumeInputEventEntries(expectedEntries, frameTime);
+    consumeInputEventEntries(expectedEntries, frameTime, /*consumeBatches=*/true);
 }
 
 /**
@@ -511,7 +513,7 @@ TEST_F(TouchResamplingTest, SampleTimeEqualsEventTime) {
             //      id  x   y
             {0ms, {{0, 10, 20}}, AMOTION_EVENT_ACTION_DOWN},
     };
-    consumeInputEventEntries(expectedEntries, frameTime);
+    consumeInputEventEntries(expectedEntries, frameTime, /*consumeBatches=*/true);
 
     // Two ACTION_MOVE events 10 ms apart that move in X direction and stay still in Y
     entries = {
@@ -527,7 +529,7 @@ TEST_F(TouchResamplingTest, SampleTimeEqualsEventTime) {
             {20ms, {{0, 30, 30}}, AMOTION_EVENT_ACTION_MOVE},
             // no resampled event because the time of resample falls exactly on the existing event
     };
-    consumeInputEventEntries(expectedEntries, frameTime);
+    consumeInputEventEntries(expectedEntries, frameTime, /*consumeBatches=*/true);
 }
 
 /**
@@ -551,7 +553,7 @@ TEST_F(TouchResamplingTest, ResampledValueIsUsedForIdenticalCoordinates) {
             //      id  x   y
             {0ms, {{0, 10, 20}}, AMOTION_EVENT_ACTION_DOWN},
     };
-    consumeInputEventEntries(expectedEntries, frameTime);
+    consumeInputEventEntries(expectedEntries, frameTime, /*consumeBatches=*/true);
 
     // Two ACTION_MOVE events 10 ms apart that move in X direction and stay still in Y
     entries = {
@@ -567,7 +569,7 @@ TEST_F(TouchResamplingTest, ResampledValueIsUsedForIdenticalCoordinates) {
             {20ms, {{0, 30, 30}}, AMOTION_EVENT_ACTION_MOVE},
             {25ms, {{0, 35, 30, .isResampled = true}}, AMOTION_EVENT_ACTION_MOVE},
     };
-    consumeInputEventEntries(expectedEntries, frameTime);
+    consumeInputEventEntries(expectedEntries, frameTime, /*consumeBatches=*/true);
 
     // Coordinate value 30 has been resampled to 35. When a new event comes in with value 30 again,
     // the system should still report 35.
@@ -586,7 +588,7 @@ TEST_F(TouchResamplingTest, ResampledValueIsUsedForIdenticalCoordinates) {
              {{0, 35, 30, .isResampled = true}},
              AMOTION_EVENT_ACTION_MOVE}, // resampled event, rewritten
     };
-    consumeInputEventEntries(expectedEntries, frameTime);
+    consumeInputEventEntries(expectedEntries, frameTime, /*consumeBatches=*/true);
 }
 
 TEST_F(TouchResamplingTest, OldEventReceivedAfterResampleOccurs) {
@@ -605,7 +607,7 @@ TEST_F(TouchResamplingTest, OldEventReceivedAfterResampleOccurs) {
             //      id  x   y
             {0ms, {{0, 10, 20}}, AMOTION_EVENT_ACTION_DOWN},
     };
-    consumeInputEventEntries(expectedEntries, frameTime);
+    consumeInputEventEntries(expectedEntries, frameTime, /*consumeBatches=*/true);
 
     // Two ACTION_MOVE events 10 ms apart that move in X direction and stay still in Y
     entries = {
@@ -621,7 +623,7 @@ TEST_F(TouchResamplingTest, OldEventReceivedAfterResampleOccurs) {
             {20ms, {{0, 30, 30}}, AMOTION_EVENT_ACTION_MOVE},
             {25ms, {{0, 35, 30, .isResampled = true}}, AMOTION_EVENT_ACTION_MOVE},
     };
-    consumeInputEventEntries(expectedEntries, frameTime);
+    consumeInputEventEntries(expectedEntries, frameTime, /*consumeBatches=*/true);
     // Above, the resampled event is at 25ms rather than at 30 ms = 35ms - RESAMPLE_LATENCY
     // because we are further bound by how far we can extrapolate by the "last time delta".
     // That's 50% of (20 ms - 10ms) => 5ms. So we can't predict more than 5 ms into the future
@@ -644,7 +646,7 @@ TEST_F(TouchResamplingTest, OldEventReceivedAfterResampleOccurs) {
              {{0, 45, 30, .isResampled = true}},
              AMOTION_EVENT_ACTION_MOVE}, // resampled event, rewritten
     };
-    consumeInputEventEntries(expectedEntries, frameTime);
+    consumeInputEventEntries(expectedEntries, frameTime, /*consumeBatches=*/true);
 }
 
 // Similar to OldEventReceivedAfterResampleOccurs, but axis values are set and verified.
@@ -664,7 +666,7 @@ TEST_F(TouchResamplingTest, OldEventReceivedAfterResampleOccursVerifyAxes) {
             //      id  x   y
             {0ms, {{0, 10, 20}}, AMOTION_EVENT_ACTION_DOWN},
     };
-    consumeInputEventEntries(expectedEntries, frameTime);
+    consumeInputEventEntries(expectedEntries, frameTime, /*consumeBatches=*/true);
 
     // Two ACTION_MOVE events 10 ms apart that move in X direction and stay still in Y
     entries = {
@@ -700,7 +702,7 @@ TEST_F(TouchResamplingTest, OldEventReceivedAfterResampleOccursVerifyAxes) {
                               {AMOTION_EVENT_AXIS_GESTURE_SCROLL_Y_DISTANCE, 0}}}},
              AMOTION_EVENT_ACTION_MOVE},
     };
-    consumeInputEventEntries(expectedEntries, frameTime);
+    consumeInputEventEntries(expectedEntries, frameTime, /*consumeBatches=*/true);
     // Above, the resampled event is at 25ms rather than at 30 ms = 35ms - RESAMPLE_LATENCY
     // because we are further bound by how far we can extrapolate by the "last time delta".
     // That's 50% of (20 ms - 10ms) => 5ms. So we can't predict more than 5 ms into the future
@@ -731,7 +733,7 @@ TEST_F(TouchResamplingTest, OldEventReceivedAfterResampleOccursVerifyAxes) {
                               {AMOTION_EVENT_AXIS_GESTURE_SCROLL_Y_DISTANCE, 0}}}},
              AMOTION_EVENT_ACTION_MOVE}, // axis values are cleared
     };
-    consumeInputEventEntries(expectedEntries, frameTime);
+    consumeInputEventEntries(expectedEntries, frameTime, /*consumeBatches=*/true);
 }
 
 TEST_F(TouchResamplingTest, TwoPointersAreResampledIndependently) {
@@ -759,7 +761,7 @@ TEST_F(TouchResamplingTest, TwoPointersAreResampledIndependently) {
             //      id  x   y
             {0ms, {{0, 100, 100}}, AMOTION_EVENT_ACTION_DOWN},
     };
-    consumeInputEventEntries(expectedEntries, frameTime);
+    consumeInputEventEntries(expectedEntries, frameTime, /*consumeBatches=*/true);
 
     entries = {
             //       id  x   y
@@ -772,7 +774,7 @@ TEST_F(TouchResamplingTest, TwoPointersAreResampledIndependently) {
             {10ms, {{0, 100, 100}}, AMOTION_EVENT_ACTION_MOVE},
             // no resampled value because frameTime - RESAMPLE_LATENCY == eventTime
     };
-    consumeInputEventEntries(expectedEntries, frameTime);
+    consumeInputEventEntries(expectedEntries, frameTime, /*consumeBatches=*/true);
 
     // Second pointer id=1 appears
     entries = {
@@ -786,7 +788,7 @@ TEST_F(TouchResamplingTest, TwoPointersAreResampledIndependently) {
             {15ms, {{0, 100, 100}, {1, 500, 500}}, actionPointer1Down},
             // no resampled value because frameTime - RESAMPLE_LATENCY == eventTime
     };
-    consumeInputEventEntries(expectedEntries, frameTime);
+    consumeInputEventEntries(expectedEntries, frameTime, /*consumeBatches=*/true);
 
     // Both pointers move
     entries = {
@@ -804,7 +806,7 @@ TEST_F(TouchResamplingTest, TwoPointersAreResampledIndependently) {
              {{0, 130, 130, .isResampled = true}, {1, 650, 650, .isResampled = true}},
              AMOTION_EVENT_ACTION_MOVE},
     };
-    consumeInputEventEntries(expectedEntries, frameTime);
+    consumeInputEventEntries(expectedEntries, frameTime, /*consumeBatches=*/true);
 
     // Both pointers move again
     entries = {
@@ -829,7 +831,7 @@ TEST_F(TouchResamplingTest, TwoPointersAreResampledIndependently) {
              {{0, 135, 135, .isResampled = true}, {1, 750, 750, .isResampled = true}},
              AMOTION_EVENT_ACTION_MOVE},
     };
-    consumeInputEventEntries(expectedEntries, frameTime);
+    consumeInputEventEntries(expectedEntries, frameTime, /*consumeBatches=*/true);
 
     // First pointer id=0 leaves the screen
     if (input_flags::fix_action_up_resampling()) {
@@ -865,7 +867,7 @@ TEST_F(TouchResamplingTest, TwoPointersAreResampledIndependently) {
             // no resampled event for ACTION_POINTER_UP
         };
     }
-    consumeInputEventEntries(expectedEntries, frameTime);
+    consumeInputEventEntries(expectedEntries, frameTime, /*consumeBatches=*/true);
 
     // Remaining pointer id=1 is still present, but doesn't move
     entries = {
@@ -883,7 +885,7 @@ TEST_F(TouchResamplingTest, TwoPointersAreResampledIndependently) {
              */
             {95ms, {{1, 575, 575, .isResampled = true}}, AMOTION_EVENT_ACTION_MOVE},
     };
-    consumeInputEventEntries(expectedEntries, frameTime);
+    consumeInputEventEntries(expectedEntries, frameTime, /*consumeBatches=*/true);
 }
 
 TEST_F(TouchResamplingTest, EventsOnDifferentDisplaysAreNotResampled) {
@@ -902,7 +904,7 @@ TEST_F(TouchResamplingTest, EventsOnDifferentDisplaysAreNotResampled) {
             //      id  x   y
             {0ms, {{0, 10, 20}}, AMOTION_EVENT_ACTION_DOWN},
     };
-    consumeInputEventEntries(expectedEntries, frameTime);
+    consumeInputEventEntries(expectedEntries, frameTime, /*consumeBatches=*/true);
 
     // Two ACTION_MOVE events 10 ms apart that move in X direction and stay still in Y, but on
     // different displays.
@@ -919,12 +921,12 @@ TEST_F(TouchResamplingTest, EventsOnDifferentDisplaysAreNotResampled) {
             //      id  x   y
             {10ms, {{0, 20, 30}}, AMOTION_EVENT_ACTION_MOVE, ui::LogicalDisplayId::DEFAULT},
     };
-    consumeInputEventEntries(expectedEntries, frameTime);
+    consumeInputEventEntries(expectedEntries, frameTime, /*consumeBatches=*/true);
     expectedEntries = {
             //      id  x   y
             {20ms, {{0, 30, 30}}, AMOTION_EVENT_ACTION_MOVE, ui::LogicalDisplayId(1)},
     };
-    consumeInputEventEntries(expectedEntries, frameTime);
+    consumeInputEventEntries(expectedEntries, frameTime, /*consumeBatches=*/true);
 }
 
 } // namespace android
