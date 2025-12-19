@@ -75,8 +75,8 @@
 #include <memory>
 #include <numeric>
 
+#include <renderengine/ColorSpaces.h>
 #include "Cache.h"
-#include "ColorSpaces.h"
 #include "ShaderCache.h"
 #include "compat/SkiaGpuContext.h"
 #include "filters/BlurFilter.h"
