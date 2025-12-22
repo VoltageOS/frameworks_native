@@ -4218,20 +4218,22 @@ VkJsonDevice VkJsonGetDevice(VkPhysicalDevice physical_device) {
       vkGetPhysicalDeviceProperties2(physical_device, &properties);
     }
 
-    if (device.core14.properties.copySrcLayoutCount > 0 ||
-        device.core14.properties.copyDstLayoutCount > 0) {
-      if (device.core14.properties.copySrcLayoutCount > 0) {
-        device.core14.copy_src_layouts.resize(
-            device.core14.properties.copySrcLayoutCount);
-        device.core14.properties.pCopySrcLayouts =
-            device.core14.copy_src_layouts.data();
-      }
+    if (device.core14.properties.copyDstLayoutCount > 0 ||
+        device.core14.properties.copySrcLayoutCount > 0) {
       if (device.core14.properties.copyDstLayoutCount > 0) {
         device.core14.copy_dst_layouts.resize(
             device.core14.properties.copyDstLayoutCount);
         device.core14.properties.pCopyDstLayouts =
             device.core14.copy_dst_layouts.data();
       }
+
+      if (device.core14.properties.copySrcLayoutCount > 0) {
+        device.core14.copy_src_layouts.resize(
+            device.core14.properties.copySrcLayoutCount);
+        device.core14.properties.pCopySrcLayouts =
+            device.core14.copy_src_layouts.data();
+      }
+
       vkGetPhysicalDeviceProperties2(physical_device, &properties);
     }
 

@@ -993,21 +993,9 @@ VkJsonDevice VkJsonGetDevice(VkPhysicalDevice physical_device) {
       f.write(f"    vkGetPhysicalDeviceProperties2(physical_device, &properties);\n\n")
       write_list_resizing_codeblock(f, vk_version_data)
 
-      # Specific logic for 1.4 copySrcLayouts
-      if v_str == "1_4":
-        f.write("""\
-    if (device.core14.properties.copySrcLayoutCount > 0 || device.core14.properties.copyDstLayoutCount > 0 ) {
-      if (device.core14.properties.copySrcLayoutCount > 0) {
-        device.core14.copy_src_layouts.resize(device.core14.properties.copySrcLayoutCount);
-        device.core14.properties.pCopySrcLayouts = device.core14.copy_src_layouts.data();
-      }
-      if (device.core14.properties.copyDstLayoutCount > 0) {
-        device.core14.copy_dst_layouts.resize(device.core14.properties.copyDstLayoutCount);
-        device.core14.properties.pCopyDstLayouts = device.core14.copy_dst_layouts.data();
-      }
-      vkGetPhysicalDeviceProperties2(physical_device, &properties);
-    }
-    \n""")
+      core_list_resize_logic = util.generate_core_list_resizing_logic(v_str, VK_PROPERTIES_SETTER_LINE)
+      if core_list_resize_logic:
+          f.write(f'\n{core_list_resize_logic}\n')
 
       # Feature Initialization
       if v_str == "1_2":
