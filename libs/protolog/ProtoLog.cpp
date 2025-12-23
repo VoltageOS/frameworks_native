@@ -270,10 +270,9 @@ public:
 
     ~VarArgumentProvider() override { va_end(current_args_); }
 
-    void newPass() override {
-        va_end(current_args_);
-        va_copy(current_args_, original_args_);
-    }
+    void newPass() override { va_copy(current_args_, original_args_); }
+
+    void endPass() override { va_end(current_args_); }
 
     long long nextInt() override { return va_arg(current_args_, int); }
 
@@ -359,6 +358,8 @@ void Log(ProtoLogLevel level, const std::string_view group, const char* format,
                     }
                     p++;
                 }
+
+                args_provider.endPass();
                 return needsIncrementalState;
             });
 }
@@ -410,6 +411,8 @@ void Log(ProtoLogLevel level, const std::string_view group, uint64_t messageHash
                         }
                     }
                 }
+
+                args_provider.endPass();
                 return needsIncrementalState;
             });
 }
