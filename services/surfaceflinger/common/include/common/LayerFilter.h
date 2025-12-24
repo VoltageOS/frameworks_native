@@ -24,10 +24,6 @@ namespace android {
 struct LayerFilter {
     ui::LayerStack layerStack;
 
-    // True if the layer is only output to internal displays, i.e. excluded from screenshots, screen
-    // recordings, and mirroring to virtual or external displays. Used for display cutout overlays.
-    bool toInternalDisplay = false;
-
     // When true for Output LayerFilters, this indicates the Output respects the skipScreenshot
     // flag (i.e. the Output is used to take a screenshot). When true for Layer LayerFilters, it
     // means the layer has requested to be skipped in screenshots.
@@ -44,7 +40,7 @@ struct LayerFilter {
 };
 
 inline bool operator==(LayerFilter lhs, LayerFilter rhs) {
-    return lhs.layerStack == rhs.layerStack && lhs.toInternalDisplay == rhs.toInternalDisplay;
+    return lhs.layerStack == rhs.layerStack && lhs.skipScreenshot == rhs.skipScreenshot;
 }
 
 } // namespace android

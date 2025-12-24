@@ -1138,17 +1138,6 @@ private:
     // region of all screens presenting this layer stack.
     void invalidateLayerStack(const LayerFilter& layerFilter, const Region& dirty);
 
-    LayerFilter makeLayerFilterForDisplay(DisplayIdVariant displayId, ui::LayerStack layerStack)
-            REQUIRES(mStateLock) {
-        return {.layerStack = layerStack,
-                .toInternalDisplay =
-                        asPhysicalDisplayId(displayId)
-                                .and_then(display::getPhysicalDisplay(mPhysicalDisplays))
-                                .transform(&display::PhysicalDisplay::isInternal)
-                                .value_or(false),
-                .skipScreenshot = false};
-    }
-
     ui::Size findLargestFramebufferSizeLocked() const REQUIRES(mStateLock);
 
     /*
