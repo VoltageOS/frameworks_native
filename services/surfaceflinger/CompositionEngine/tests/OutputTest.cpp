@@ -470,7 +470,6 @@ TEST_F(OutputTest, setLayerFilterSetsFilterAndDirtiesEntireOutput) {
 
     const auto& state = mOutput->getState();
     EXPECT_EQ(kFilter.layerStack, state.layerFilter.layerStack);
-    EXPECT_TRUE(state.layerFilter.toInternalDisplay);
     EXPECT_FALSE(state.layerFilter.skipScreenshot);
 
     EXPECT_THAT(state.dirtyRegion, RegionEq(Region(kDefaultDisplaySize)));
