@@ -303,6 +303,7 @@ TEST_F(DisplaySetConfigurationTest, configuresPhysicalDisplay) {
 
     const auto& filter = mDisplay->getState().layerFilter;
     EXPECT_EQ(ui::UNASSIGNED_LAYER_STACK, filter.layerStack);
+    EXPECT_FALSE(filter.toInternalDisplay);
     EXPECT_FALSE(filter.skipScreenshot);
 }
 
@@ -323,6 +324,7 @@ TEST_F(DisplaySetConfigurationTest, configuresHalVirtualDisplay) {
 
     const auto& filter = mDisplay->getState().layerFilter;
     EXPECT_EQ(ui::UNASSIGNED_LAYER_STACK, filter.layerStack);
+    EXPECT_FALSE(filter.toInternalDisplay);
     EXPECT_FALSE(filter.skipScreenshot);
 }
 
@@ -343,6 +345,7 @@ TEST_F(DisplaySetConfigurationTest, configuresGpuVirtualDisplay) {
 
     const auto& filter = mDisplay->getState().layerFilter;
     EXPECT_EQ(ui::UNASSIGNED_LAYER_STACK, filter.layerStack);
+    EXPECT_FALSE(filter.toInternalDisplay);
     EXPECT_FALSE(filter.skipScreenshot);
 }
 

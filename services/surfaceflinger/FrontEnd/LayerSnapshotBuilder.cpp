@@ -343,6 +343,7 @@ LayerSnapshot LayerSnapshotBuilder::getRootSnapshot() {
     snapshot.stretchEffect = {};
     snapshot.edgeExtensionEffect = {};
     snapshot.outputFilter.layerStack = ui::DEFAULT_LAYER_STACK;
+    snapshot.outputFilter.toInternalDisplay = false;
     snapshot.outputFilter.skipScreenshot = false;
     snapshot.isSecure = false;
     snapshot.color.a = 1.0_hf;
