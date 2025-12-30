@@ -202,11 +202,16 @@ auto LayerHistory::summarize(nsecs_t now) -> Summary {
 
             const float layerArea = transformed.getWidth() * transformed.getHeight();
             float weight = mDisplayArea ? layerArea / mDisplayArea : 0.0f;
-            const std::string categoryString = vote.category == FrameRateCategory::Default
-                    ? ""
-                    : base::StringPrintf("category=%s", ftl::enum_string(vote.category).c_str());
-            SFTRACE_FORMAT_INSTANT("%s %s %s (%.2f)", ftl::enum_string(vote.type).c_str(),
-                                   to_string(vote.fps).c_str(), categoryString.c_str(), weight);
+
+            if (CC_UNLIKELY(SFTRACE_ENABLED())) {
+                const std::string categoryString = vote.category == FrameRateCategory::Default
+                        ? ""
+                        : base::StringPrintf("category=%s",
+                                             ftl::enum_string(vote.category).c_str());
+                SFTRACE_FORMAT_INSTANT("%s %s %s (%.2f)", ftl::enum_string(vote.type).c_str(),
+                                       to_string(vote.fps).c_str(), categoryString.c_str(), weight);
+            }
+
             summary.push_back({
                     .name = info->getName(),
                     .ownerUid = info->getOwnerUid(),
@@ -343,12 +348,14 @@ void LayerHistory::partitionLayers(nsecs_t now) {
                 }
             } else {
                 if (hasFrameRateOpinionArr && !frameRate.isVoteValidForMrr(isVrrDisplay)) {
-                    SFTRACE_FORMAT_INSTANT("Reset layer to ignore explicit vote on MRR %s: %s "
-                                           "%s %s",
-                                           info->getName().c_str(),
-                                           ftl::enum_string(frameRate.vote.type).c_str(),
-                                           to_string(frameRate.vote.rate).c_str(),
-                                           ftl::enum_string(frameRate.category).c_str());
+                    if (CC_UNLIKELY(SFTRACE_ENABLED())) {
+                        SFTRACE_FORMAT_INSTANT("Reset layer to ignore explicit vote on MRR %s: %s "
+                                               "%s %s",
+                                               info->getName().c_str(),
+                                               ftl::enum_string(frameRate.vote.type).c_str(),
+                                               to_string(frameRate.vote.rate).c_str(),
+                                               ftl::enum_string(frameRate.category).c_str());
+                    }
                 }
                 info->resetLayerVote();
             }
