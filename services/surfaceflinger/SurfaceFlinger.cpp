@@ -4289,7 +4289,8 @@ sp<DisplayDevice> SurfaceFlinger::setupNewDisplayDeviceInternal(
                                              mode.getPeakFps());
     }
 
-    display->setLayerFilter({.layerStack = state.layerStack, .skipScreenshot = false});
+    display->setLayerFilter(
+            makeLayerFilterForDisplay(display->getDisplayIdVariant(), state.layerStack));
     display->setProjection(state.orientation, state.layerStackSpaceRect,
                            state.orientedDisplaySpaceRect);
     display->setDisplayName(state.displayName);
@@ -4546,9 +4547,8 @@ void SurfaceFlinger::processDisplayChanged(const wp<IBinder>& displayToken,
 
     if (const auto display = getDisplayDeviceLocked(displayToken)) {
         if (currentState.layerStack != drawingState.layerStack) {
-            display->setLayerFilter({
-                .layerStack = currentState.layerStack,
-                .skipScreenshot = false});
+            display->setLayerFilter(makeLayerFilterForDisplay(display->getDisplayIdVariant(),
+                                                              currentState.layerStack));
         }
         if (currentState.flags != drawingState.flags) {
             display->setFlags(currentState.flags);
