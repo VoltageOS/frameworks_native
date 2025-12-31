@@ -46,11 +46,18 @@ private:
     sk_sp<SkRuntimeEffect> mLowSampleBlurEffect;
     sk_sp<SkRuntimeEffect> mHighSampleBlurEffect;
 
+    mutable sk_sp<SkImage> mCachedBlurredImage;
+    mutable uint32_t mCachedInputUniqueID = 0;
+    mutable uint32_t mCachedBlurRadius = 0;
+    mutable SkRect mCachedBlurRect = SkRect::MakeEmpty();
+
     void blurInto(const sk_sp<SkSurface>& drawSurface, const sk_sp<SkImage>& readImage,
-                  const float radius, const float alpha, const sk_sp<SkRuntimeEffect>&) const;
+                  const float radius, const float alpha, const float saturation,
+                  const sk_sp<SkRuntimeEffect>&) const;
 
     void blurInto(const sk_sp<SkSurface>& drawSurface, const sk_sp<SkShader> input,
-                  const float radius, const float alpha, const sk_sp<SkRuntimeEffect>&) const;
+                  const float radius, const float alpha, const float saturation,
+                  const sk_sp<SkRuntimeEffect>&) const;
 };
 
 } // namespace skia

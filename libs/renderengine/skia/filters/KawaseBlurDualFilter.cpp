@@ -47,6 +47,7 @@ const SkString kEffectSource_KawaseBlurDualFilter_LowSampleBlurEffect(R"(
     uniform float in_blurOffset;
     uniform float in_crossFade;
     uniform float in_weightedCrossFade;
+    uniform float in_saturation;
 
     const float2 STEP_0 = float2( 0.707106781, 0.707106781);
     const float2 STEP_1 = float2( 0.707106781, -0.707106781);
@@ -60,6 +61,9 @@ const SkString kEffectSource_KawaseBlurDualFilter_LowSampleBlurEffect(R"(
         c += child.eval(xy + STEP_1 * in_blurOffset).rgb;
         c += child.eval(xy + STEP_2 * in_blurOffset).rgb;
         c += child.eval(xy + STEP_3 * in_blurOffset).rgb;
+
+        half lum = dot(c, half3(0.2126, 0.7152, 0.0722));
+        c = mix(half3(lum), c, in_saturation);
 
         return half4(c * in_weightedCrossFade, in_crossFade);
     }
@@ -102,7 +106,7 @@ KawaseBlurDualFilter::KawaseBlurDualFilter(RuntimeEffectManager& effectManager)
 
 void KawaseBlurDualFilter::blurInto(const sk_sp<SkSurface>& drawSurface,
                                     const sk_sp<SkImage>& readImage, const float radius,
-                                    const float alpha,
+                                    const float alpha, const float saturation,
                                     const sk_sp<SkRuntimeEffect>& blurEffect) const {
     const float scale = static_cast<float>(drawSurface->width()) / readImage->width();
     SkMatrix blurMatrix = SkMatrix::Scale(scale, scale);
@@ -110,11 +114,11 @@ void KawaseBlurDualFilter::blurInto(const sk_sp<SkSurface>& drawSurface,
              readImage->makeShader(SkTileMode::kClamp, SkTileMode::kClamp,
                                    SkSamplingOptions(SkFilterMode::kLinear, SkMipmapMode::kNone),
                                    blurMatrix),
-             radius, alpha, blurEffect);
+             radius, alpha, saturation, blurEffect);
 }
 
 void KawaseBlurDualFilter::blurInto(const sk_sp<SkSurface>& drawSurface, sk_sp<SkShader> input,
-                                    const float radius, const float alpha,
+                                    const float radius, const float alpha, const float saturation,
                                     const sk_sp<SkRuntimeEffect>& blurEffect) const {
     SkPaint paint;
     if (radius == 0) {
@@ -126,6 +130,7 @@ void KawaseBlurDualFilter::blurInto(const sk_sp<SkSurface>& drawSurface, sk_sp<S
         if (blurEffect == mLowSampleBlurEffect) {
             blurBuilder.uniform("in_crossFade") = alpha;
             blurBuilder.uniform("in_weightedCrossFade") = alpha * 0.2f;
+            blurBuilder.uniform("in_saturation") = saturation;
         }
         blurBuilder.uniform("in_blurOffset") = radius;
         paint.setShader(blurBuilder.makeShader(nullptr));
@@ -137,13 +142,19 @@ void KawaseBlurDualFilter::blurInto(const sk_sp<SkSurface>& drawSurface, sk_sp<S
 sk_sp<SkImage> KawaseBlurDualFilter::generate(SkiaGpuContext* context, const uint32_t blurRadius,
                                               const sk_sp<SkImage> input,
                                               const SkRect& blurRect) const {
+
+    if (mCachedBlurredImage && mCachedInputUniqueID == input->uniqueID() &&
+        mCachedBlurRadius == blurRadius && mCachedBlurRect == blurRect) {
+        return mCachedBlurredImage;
+    }
+
     // Apply a conversion factor of (1 / sqrt(3)) to match Skia's built-in blur as used by
     // RenderEffect. See the comment in SkBlurMask.cpp for reasoning behind this.
-    const float radius = blurRadius * 0.57735f;
+    const float radius = blurRadius * 0.57735f * 6.0f;
 
     // Use a variable number of blur passes depending on the radius. The non-integer part of this
     // calculation is used to mix the final pass into the second-last with an alpha blend.
-    constexpr int kMaxSurfaces = 3;
+    constexpr int kMaxSurfaces = 4;
     const float filterDepth = std::min(kMaxSurfaces - 1.0f, radius * kInputScale / 2.5f);
     const int filterPasses = std::min(kMaxSurfaces - 1, static_cast<int>(ceil(filterDepth)));
 
@@ -160,14 +171,15 @@ sk_sp<SkImage> KawaseBlurDualFilter::generate(SkiaGpuContext* context, const uin
     sk_sp<SkSurface> surfaces[kMaxSurfaces] =
             {filterPasses >= 0 ? makeSurface(1 * kInverseInputScale) : nullptr,
              filterPasses >= 1 ? makeSurface(2 * kInverseInputScale) : nullptr,
-             filterPasses >= 2 ? makeSurface(4 * kInverseInputScale) : nullptr};
+             filterPasses >= 2 ? makeSurface(4 * kInverseInputScale) : nullptr,
+             filterPasses >= 3 ? makeSurface(8 * kInverseInputScale) : nullptr};
 
     // These weights for scaling offsets per-pass are handpicked to look good at 1 <= radius <= 250.
     static const float kWeights[5] = {
             1.0f, // 1st downsampling pass
             1.0f, // 2nd downsampling pass
             1.0f, // 3rd downsampling pass
-            0.0f, // 1st upscaling pass. Set to zero to upscale without blurring for performance.
+            1.0f, // 1st upscaling pass. Set to zero to upscale without blurring for performance.
             1.0f, // 2nd upscaling pass
     };
 
@@ -194,20 +206,26 @@ sk_sp<SkImage> KawaseBlurDualFilter::generate(SkiaGpuContext* context, const uin
                                   SkSamplingOptions(SkFilterMode::kLinear, SkMipmapMode::kNone),
                                   blurMatrix);
         blurInto(surfaces[0], std::move(sourceShader), kWeights[0] * step, 1.0f,
-                 mLowSampleBlurEffect);
+                 1.0f, mLowSampleBlurEffect);
     }
     // Next the remaining downscale blur passes.
     for (int i = 0; i < filterPasses; i++) {
         // Blur with the higher sample effect into the smaller buffers, for better visual quality.
         blurInto(surfaces[i + 1], surfaces[i]->makeTemporaryImage(), kWeights[1 + i] * step, 1.0f,
-                 i == 0 ? mLowSampleBlurEffect : mHighSampleBlurEffect);
+                 1.0f, i == 0 ? mLowSampleBlurEffect : mHighSampleBlurEffect);
     }
     // Finally blur+upscale back to our original size.
     for (int i = filterPasses - 1; i >= 0; i--) {
+        float sat = (i == 0) ? 1.5f : 1.0f;
         blurInto(surfaces[i], surfaces[i + 1]->makeTemporaryImage(), kWeights[4 - i] * step,
-                 std::min(1.0f, filterDepth - i), mLowSampleBlurEffect);
+                 std::min(1.0f, filterDepth - i), sat, mLowSampleBlurEffect);
     }
-    return surfaces[0]->makeTemporaryImage();
+    mCachedInputUniqueID = input->uniqueID();
+    mCachedBlurRadius = blurRadius;
+    mCachedBlurRect = blurRect;
+    mCachedBlurredImage = surfaces[0]->makeTemporaryImage();
+
+    return mCachedBlurredImage;
 }
 
 } // namespace skia

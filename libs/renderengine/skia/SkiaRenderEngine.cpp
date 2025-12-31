@@ -337,8 +337,8 @@ SkiaRenderEngine::SkiaRenderEngine(Threaded threaded, PixelFormat pixelFormat,
             break;
         }
         case BlurAlgorithm::Kawase: {
-            ALOGD("Background Blurs Enabled (Kawase algorithm)");
-            mBlurFilter = new KawaseBlurFilter(mRuntimeEffectManager);
+            ALOGD("Background Blurs Enabled (Forced Dual Kawase)");
+            mBlurFilter = new KawaseBlurDualFilter(mRuntimeEffectManager);
             break;
         }
         case BlurAlgorithm::KawaseDualFilter: {
