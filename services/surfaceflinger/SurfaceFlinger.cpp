@@ -1410,37 +1410,30 @@ void SurfaceFlinger::setDesiredMode(display::DisplayModeRequest desiredMode) {
 
     switch (mDisplayModeController.setDesiredMode(displayId, std::move(desiredMode))) {
         case DesiredModeAction::InitiateDisplayModeSwitch: {
-            const auto selectorPtr = mDisplayModeController.selectorPtrFor(displayId);
-            if (!selectorPtr) break;
-
-            const auto activeMode = selectorPtr->getActiveMode();
-            const Fps renderRate = activeMode.fps;
-
-            // DisplayModeController::setDesiredMode updated the render rate, so inform Scheduler.
-            mScheduler->setRenderRate(displayId, renderRate, true /* applyImmediately */);
-
             // Schedule a new frame to initiate the display mode switch.
             scheduleComposite(FrameHint::kNone);
 
-            // Start receiving vsync samples now, so that we can detect a period
-            // switch.
-            mScheduler->resyncToHardwareVsync(displayId, true /* allowToEnable */,
-                                              mode.modePtr.get());
+            // Resync to hardware VSYNC now to detect a period switch, and restore render
+            // rate to schedule the next frame as soon as possible.
+            using Opts = scheduler::Scheduler::ResyncToModeOpts;
+            mScheduler->resyncToMode(mode, Opts::PeakRenderRate);
 
             // As we called to set period, we will call to onRefreshRateChangeCompleted once
             // VsyncController model is locked.
             mScheduler->modulateVsync(displayId, &VsyncModulator::onRefreshRateChangeInitiated);
-
-            mScheduler->updatePhaseConfiguration(displayId, mode.fps);
             mScheduler->setModeChangePending(displayId, true);
 
             // The mode set to switch resolution is not initiated until the display transaction that
             // resizes the display. DM sends this transaction in response to a mode change event, so
             // emit the event now, not when finalizing the mode change as for a refresh rate switch.
-            if (FlagManager::getInstance().synced_resolution_switch() &&
-                !mode.matchesResolution(activeMode)) {
-                mScheduler->onDisplayModeChanged(displayId, mode,
-                                                 /*clearContentRequirements*/ true);
+            if (FlagManager::getInstance().synced_resolution_switch()) {
+                if (const auto selectorPtr = mDisplayModeController.selectorPtrFor(displayId)) {
+                    const auto activeMode = selectorPtr->getActiveMode();
+                    if (!mode.matchesResolution(activeMode)) {
+                        mScheduler->onDisplayModeChanged(displayId, mode,
+                                                         /*clearContentRequirements*/ true);
+                    }
+                }
             }
             break;
         }
@@ -1596,31 +1589,13 @@ void SurfaceFlinger::dropModeRequest(display::DisplayModeRequest&& request) {
 }
 
 void SurfaceFlinger::applyActiveMode(PhysicalDisplayId displayId) {
-    const auto activeModeOpt = mDisplayModeController.getDesiredMode(displayId);
-    auto activeModePtr = activeModeOpt->mode.modePtr;
-    const auto renderFps = activeModeOpt->mode.fps;
-
+    mScheduler->resyncToMode(mDisplayModeController.getDesiredMode(displayId)->mode);
     dropModeRequest(displayId);
-
-    constexpr bool kAllowToEnable = true;
-    mScheduler->resyncToHardwareVsync(displayId, kAllowToEnable, std::move(activeModePtr).take());
-
-    mScheduler->setRenderRate(displayId, renderFps, /*applyImmediately*/ true);
-    mScheduler->updatePhaseConfiguration(displayId, renderFps);
 }
 
 void SurfaceFlinger::applyActiveMode(display::DisplayModeRequest&& activeMode) {
-    auto activeModePtr = activeMode.mode.modePtr;
-    const auto displayId = activeModePtr->getPhysicalDisplayId();
-    const auto renderFps = activeMode.mode.fps;
-
+    mScheduler->resyncToMode(activeMode.mode);
     dropModeRequest(std::move(activeMode));
-
-    constexpr bool kAllowToEnable = true;
-    mScheduler->resyncToHardwareVsync(displayId, kAllowToEnable, std::move(activeModePtr).take());
-
-    mScheduler->setRenderRate(displayId, renderFps, /*applyImmediately*/ true);
-    mScheduler->updatePhaseConfiguration(displayId, renderFps);
 }
 
 void SurfaceFlinger::initiateDisplayModeChanges() {
