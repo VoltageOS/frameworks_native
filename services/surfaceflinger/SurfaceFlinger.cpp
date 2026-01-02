@@ -1870,7 +1870,7 @@ status_t SurfaceFlinger::getOverlaySupport(gui::OverlayProperties* outProperties
     if (aidlProperties.lutProperties) {
         std::vector<gui::LutProperties> outLutProperties;
         for (auto properties : *aidlProperties.lutProperties) {
-            if (!properties) {
+            if (properties) {
                 gui::LutProperties currentProperties;
                 currentProperties.dimension =
                         static_cast<gui::LutProperties::Dimension>(properties->dimension);
