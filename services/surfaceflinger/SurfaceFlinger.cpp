@@ -5767,7 +5767,7 @@ uint32_t SurfaceFlinger::updateLayerCallbacksAndStats(const FrameTimelineInfo& f
     if (layer == nullptr) {
         for (auto& [listener, callbackIds] : s.listeners) {
             mTransactionCallbackInvoker.addCallbackHandle(
-                    sp<CallbackHandle>::make(listener, callbackIds, s.surface));
+                    CallbackHandle{listener, callbackIds, s.surface});
         }
         return 0;
     }
@@ -5775,11 +5775,11 @@ uint32_t SurfaceFlinger::updateLayerCallbacksAndStats(const FrameTimelineInfo& f
         layer->onDisconnect();
     }
 
-    std::vector<sp<CallbackHandle>> callbackHandles;
+    std::vector<CallbackHandle> callbackHandles;
     if ((what & layer_state_t::eHasListenerCallbacksChanged) && (!filteredListeners.empty())) {
+        callbackHandles.reserve(filteredListeners.size());
         for (auto& [listener, callbackIds] : filteredListeners) {
-            callbackHandles.emplace_back(
-                    sp<CallbackHandle>::make(listener, callbackIds, s.surface));
+            callbackHandles.emplace_back(listener, callbackIds, s.surface);
         }
     }
 
@@ -5872,7 +5872,8 @@ uint32_t SurfaceFlinger::updateLayerCallbacksAndStats(const FrameTimelineInfo& f
     bool willPresentCurrentTransaction = requestedLayerState &&
             (requestedLayerState->hasReadyFrame() ||
              requestedLayerState->willReleaseBufferOnLatch());
-    if (layer->setTransactionCompletedListeners(callbackHandles, willPresentCurrentTransaction))
+    if (layer->setTransactionCompletedListeners(std::move(callbackHandles),
+                                                willPresentCurrentTransaction))
         flags |= eTraversalNeeded;
 
     return flags;
