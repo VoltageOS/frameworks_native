@@ -23,7 +23,7 @@
 
 namespace android::os {
 
-// TODO(b/345186129): remove this once flag android_os_vibrator_haptics_scale_v2_enabled removed
+// TODO(b/360314386): remove this once we finish migrating to scale factor.
 enum class HapticLevel : int32_t {
     MUTE = -100,
     VERY_LOW = -2,
@@ -36,13 +36,12 @@ enum class HapticLevel : int32_t {
 class HapticScale {
 private:
 HapticLevel mLevel = HapticLevel::NONE;
-float mScaleFactor = -1.0f; // undefined, use haptic level to define scale factor
+float mScaleFactor = 1.0f;
 float mAdaptiveScaleFactor = 1.0f;
 
 public:
     explicit HapticScale(HapticLevel level, float scaleFactor, float adaptiveScaleFactor)
           : mLevel(level), mScaleFactor(scaleFactor), mAdaptiveScaleFactor(adaptiveScaleFactor) {}
-    explicit HapticScale(HapticLevel level) : mLevel(level) {}
     constexpr HapticScale() {}
 
     HapticLevel getLevel() const { return mLevel; }
@@ -71,9 +70,9 @@ std::string toString() const {
     return os.str();
 }
 
-static HapticScale mute() { return os::HapticScale(os::HapticLevel::MUTE); }
+static HapticScale mute() { return os::HapticScale(os::HapticLevel::MUTE, 0.0f, 0.0f); }
 
-static HapticScale none() { return os::HapticScale(os::HapticLevel::NONE); }
+static HapticScale none() { return os::HapticScale(os::HapticLevel::NONE, 1.0f, 1.0f); }
 };
 
 bool isValidHapticScale(HapticScale scale);
