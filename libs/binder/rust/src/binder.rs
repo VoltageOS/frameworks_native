@@ -1378,6 +1378,7 @@ macro_rules! declare_binder_enum {
         $( #[$attr] )*
         #[derive(Default, Copy, Clone, PartialOrd, Ord, PartialEq, Eq, Hash, zerocopy::Immutable)]
         #[allow(missing_docs)]
+        #[repr(C)]
         pub struct $enum(pub $backing);
         impl $enum {
             $( $( #[$value_attr] )* #[allow(missing_docs)] pub const $name: Self = Self($value); )*
