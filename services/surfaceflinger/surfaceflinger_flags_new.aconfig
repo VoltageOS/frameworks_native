@@ -128,7 +128,7 @@ flag {
 
 flag {
   name: "display_command_modeset"
-  namespace: "desktop_display"
+  namespace: "core_graphics"
   description: "Guards use of the new display command modeset"
   bug: "373900661"
 } # display_command_modeset
