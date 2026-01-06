@@ -1649,6 +1649,40 @@ TEST_F(ServiceTest, CreateAppData_WithPcc) {
     EXPECT_TRUE(exists(pccCePath + "/cache"));
 }
 
+TEST_F(ServiceTest, CreateAppData_WithPcc_InodeCheck) {
+    LOG(INFO) << "CreateAppData_WithPcc_InodeCheck";
+    android::os::CreateAppDataResult result;
+    android::os::CreateAppDataArgs args;
+    args.packageName = "com.foo";
+    args.uuid = testUuid;
+    args.userId = kTestUserId;
+    args.appId = kTestAppId;
+    args.pccId = kTestPccAppId;
+    args.seInfo = "default";
+    args.flags = FLAG_STORAGE_CE | FLAG_STORAGE_DE;
+
+    ASSERT_BINDER_SUCCESS(service->createAppData(args, &result));
+
+    // Verify PCC directories were created
+    const std::string pccCePath = "user/0/com.foo-pcc";
+    const std::string pccDePath = "user_de/0/com.foo-pcc";
+    EXPECT_TRUE(exists(pccCePath));
+    EXPECT_TRUE(exists(pccDePath));
+
+    // Verify that the returned inode values are valid.
+    EXPECT_GT(result.pccCeDataInode, 0);
+    EXPECT_GT(result.pccDeDataInode, 0);
+
+    // Verify that the returned inode values match the actual inodes on disk.
+    struct stat pccCeStat;
+    EXPECT_EQ(::stat(get_full_path(pccCePath).c_str(), &pccCeStat), 0);
+    EXPECT_EQ(static_cast<int64_t>(pccCeStat.st_ino), result.pccCeDataInode);
+
+    struct stat pccDeStat;
+    EXPECT_EQ(::stat(get_full_path(pccDePath).c_str(), &pccDeStat), 0);
+    EXPECT_EQ(static_cast<int64_t>(pccDeStat.st_ino), result.pccDeDataInode);
+}
+
 TEST_F(ServiceTest, CreateAppData_PccDowngrade) {
     LOG(INFO) << "CreateAppData_PccDowngrade";
     android::os::CreateAppDataResult result;
