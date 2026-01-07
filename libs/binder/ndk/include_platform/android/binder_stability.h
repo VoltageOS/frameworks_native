@@ -123,4 +123,38 @@ __attribute__((weak))
 #endif  // defined(__ANDROID_MIN_SDK_VERSION__) && __ANDROID_MIN_SDK_VERSION__ < 30
 void AIBinder_markVintfStability(AIBinder* binder);
 
+/**
+ * Returns true if the binder declares VINTF stability, and thus needs to be declared in the
+ * VINTF manifest, or else false.
+ *
+ * For more information on stability see:
+ * https://source.android.com/docs/core/architecture/aidl/aidl-hals
+ */
+#if defined(__ANDROID_MIN_SDK_VERSION__) && __ANDROID_MIN_SDK_VERSION__ < 37
+__attribute__((weak))
+#endif  // defined(__ANDROID_MIN_SDK_VERSION__) && __ANDROID_MIN_SDK_VERSION__ < 37
+bool AIBinder_requiresVintfDeclaration(AIBinder* binder);
+
+/**
+ * Returns true if the binder declares vendor stability, or else false.
+ *
+ * For more information on stability see:
+ * https://source.android.com/docs/core/architecture/aidl/aidl-hals
+ */
+#if defined(__ANDROID_MIN_SDK_VERSION__) && __ANDROID_MIN_SDK_VERSION__ < 37
+__attribute__((weak))
+#endif  // defined(__ANDROID_MIN_SDK_VERSION__) && __ANDROID_MIN_SDK_VERSION__ < 37
+bool AIBinder_isVendorStable(AIBinder* binder);
+
+/**
+ * Returns true if the binder declares system stability, or else false.
+ *
+ * For more information on stability see:
+ * https://source.android.com/docs/core/architecture/aidl/aidl-hals
+ */
+#if defined(__ANDROID_MIN_SDK_VERSION__) && __ANDROID_MIN_SDK_VERSION__ < 37
+__attribute__((weak))
+#endif  // defined(__ANDROID_MIN_SDK_VERSION__) && __ANDROID_MIN_SDK_VERSION__ < 37
+bool AIBinder_isSystemStable(AIBinder* binder);
+
 __END_DECLS
