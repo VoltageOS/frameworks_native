@@ -87,7 +87,6 @@ public:
     bool deprecate_frame_tracker() const;
     bool disable_synthetic_vsync_for_performance() const;
     bool display_command_modeset() const;
-    bool follower_arbitrary_refresh_rate_selection() const;
     bool follower_display_backpressure() const;
     bool force_slower_follower_gpu_composition() const;
     bool frame_rate_category_mrr() const;
@@ -115,6 +114,8 @@ public:
     bool window_blur_kawase2_preallocate_buffers() const;
     /// IMPORTANT - please keep alphabetize to reduce merge conflicts
 
+    bool follower_arbitrary_refresh_rate_selection_combined() const;
+
 protected:
     // overridden for unit tests
     virtual std::optional<bool> getBoolProperty(const char*) const;
@@ -125,6 +126,9 @@ private:
 
     FlagManager() = default;
     FlagManager(const FlagManager&) = delete;
+
+    bool follower_arbitrary_refresh_rate_selection() const;
+    bool follower_arbitrary_refresh_rate_selection_platform() const;
 
     void dumpFlag(std::string& result, bool readonly, const char* name,
                   std::function<bool()> getter) const;
