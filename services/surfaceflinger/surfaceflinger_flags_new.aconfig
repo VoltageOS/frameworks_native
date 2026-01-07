@@ -162,6 +162,13 @@ flag {
 } # follower_display_backpressure
 
 flag {
+  name: "follower_display_backpressure_platform"
+  namespace: "core_graphics"
+  description: "Platform flag to skips presentation on a follower display if there is a pending present for the next follower vsync. Enables follower displays to present even when their refresh rate does not match the pacesetter display."
+  bug: "374072507"
+} # follower_display_backpressure_platform
+
+flag {
   name: "force_slower_follower_gpu_composition"
   namespace: "desktop_display"
   description: "Force slower connected displays to be GPU composited."

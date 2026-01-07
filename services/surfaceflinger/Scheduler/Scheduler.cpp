@@ -433,7 +433,7 @@ void Scheduler::onFrameSignal(ICompositor& compositor, VsyncId vsyncId,
         targets.try_emplace(pacesetterPtr->displayId, &pacesetterPtr->targeterPtr->target());
 
         const bool followerDisplayBackpressure =
-                FlagManager::getInstance().follower_display_backpressure();
+                FlagManager::getInstance().follower_display_backpressure_combined();
         if (!followerDisplayBackpressure) {
             expectedVsyncTime = pacesetterPtr->targeterPtr->target().expectedPresentTime();
         }

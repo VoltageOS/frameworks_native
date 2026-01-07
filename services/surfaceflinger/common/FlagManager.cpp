@@ -159,6 +159,7 @@ void FlagManager::dump(std::string& result) const {
     DUMP_ACONFIG_FLAG(follower_arbitrary_refresh_rate_selection);
     DUMP_ACONFIG_FLAG(follower_arbitrary_refresh_rate_selection_platform);
     DUMP_ACONFIG_FLAG(follower_display_backpressure);
+    DUMP_ACONFIG_FLAG(follower_display_backpressure_platform);
     DUMP_ACONFIG_FLAG(force_slower_follower_gpu_composition);
     DUMP_ACONFIG_FLAG(frame_rate_category_mrr);
     DUMP_ACONFIG_FLAG(graphite_renderengine);
@@ -267,6 +268,8 @@ FLAG_MANAGER_ACONFIG_FLAG(follower_arbitrary_refresh_rate_selection,
 FLAG_MANAGER_ACONFIG_FLAG(follower_arbitrary_refresh_rate_selection_platform,
                           "debug.sf.follower_arbitrary_refresh_rate_selection_platform");
 FLAG_MANAGER_ACONFIG_FLAG(follower_display_backpressure, "debug.sf.follower_display_backpressure");
+FLAG_MANAGER_ACONFIG_FLAG(follower_display_backpressure_platform,
+                          "debug.sf.follower_display_backpressure_platform");
 FLAG_MANAGER_ACONFIG_FLAG(force_slower_follower_gpu_composition,
                           "debug.sf.force_slower_follower_gpu_composition");
 FLAG_MANAGER_ACONFIG_FLAG(frame_rate_category_mrr, "debug.sf.frame_rate_category_mrr")
@@ -328,5 +331,9 @@ FLAG_MANAGER_ACONFIG_FLAG_IMPORTED(luts_api, "", android::hardware::flags);
 bool FlagManager::follower_arbitrary_refresh_rate_selection_combined() const {
     return follower_arbitrary_refresh_rate_selection() ||
             follower_arbitrary_refresh_rate_selection_platform();
+}
+
+bool FlagManager::follower_display_backpressure_combined() const {
+    return follower_display_backpressure() || follower_display_backpressure_platform();
 }
 } // namespace android
