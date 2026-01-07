@@ -37,6 +37,8 @@ cc_test {
         "-Wextra",
     ],
     static_libs: [
+        "android.os.vibrator.flags-aconfig-cc",
+        "libflagtest",
         "libgtest",
         "liblog",
         "libvibrator",
@@ -46,5 +48,6 @@ cc_test {
         "libbase",
         "libbinder",
         "libutils",
+        "server_configurable_flags",
     ],
 }
