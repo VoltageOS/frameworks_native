@@ -176,6 +176,13 @@ flag {
 } # force_slower_follower_gpu_composition
 
 flag {
+  name: "force_slower_follower_gpu_composition_platform"
+  namespace: "core_graphics"
+  description: "Platform flag to force slower connected displays to be GPU composited."
+  bug: "389982803"
+} # force_slower_follower_gpu_composition_platform
+
+flag {
   name: "force_compile_graphite_renderengine"
   namespace: "core_graphics"
   description: "Compile Skia's Graphite Vulkan backend in RenderEngine, but do NOT enable it, unless graphite_renderengine is also set. It can also be enabled with the debug.renderengine.graphite system property for testing. In contrast, the graphite_renderengine flag both compiles AND enables Graphite in RenderEngine."

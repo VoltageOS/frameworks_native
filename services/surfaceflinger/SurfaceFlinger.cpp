@@ -3544,7 +3544,7 @@ void SurfaceFlinger::setForcedClientCompositionLayerStacks(
         return;
     }
 
-    if (!FlagManager::getInstance().force_slower_follower_gpu_composition()) {
+    if (!FlagManager::getInstance().force_slower_follower_gpu_composition_combined()) {
         return;
     }
 
