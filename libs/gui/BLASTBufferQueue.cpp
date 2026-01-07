@@ -245,8 +245,18 @@ BLASTBufferQueue::BLASTBufferQueue(const std::string& name, bool updateDestinati
 BLASTBufferQueue::~BLASTBufferQueue() {
     TransactionCompletedListener::getInstance()->removeQueueStallListener(this);
 
-    if (mTransactionReadyCallback) {
-        mTransactionReadyCallback(mSyncTransaction);
+    std::function<void(SurfaceComposerClient::Transaction*)> callback;
+    SurfaceComposerClient::Transaction* transaction;
+    {
+        std::lock_guard<std::mutex> lock(mMutex);
+        callback = mTransactionReadyCallback;
+        transaction = mSyncTransaction;
+        mTransactionReadyCallback = nullptr;
+        mSyncTransaction = nullptr;
+    }
+
+    if (callback) {
+        callback(transaction);
     }
 
     if (mPendingTransactions.empty()) {
