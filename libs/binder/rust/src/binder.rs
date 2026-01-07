@@ -1376,7 +1376,8 @@ macro_rules! declare_binder_enum {
         }
     } => {
         $( #[$attr] )*
-        #[derive(Default, Copy, Clone, PartialOrd, Ord, PartialEq, Eq, Hash, zerocopy::Immutable)]
+        #[derive(Default, Copy, Clone, PartialOrd, Ord, PartialEq, Eq, Hash)]
+        #[derive(zerocopy::Immutable, zerocopy::TryFromBytes)]
         #[allow(missing_docs)]
         #[repr(C)]
         pub struct $enum(pub $backing);
