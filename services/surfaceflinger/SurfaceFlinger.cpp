@@ -941,7 +941,7 @@ void SurfaceFlinger::init() FTL_FAKE_GUARD(kMainThreadContext) {
                            .setImageCacheSize(maxFrameBufferAcquiredBuffers)
                            .setEnableProtectedContext(enable_protected_contents(false))
                            .setPrecacheToneMapperShaderOnly(false)
-                           .setBlurAlgorithm(chooseBlurAlgorithm(mSupportsBlur))
+                           .setBlurAlgorithm(chooseBlurAlgorithm(true))
                            .setContextPriority(
                                    useContextPriority
                                            ? renderengine::RenderEngine::ContextPriority::Realtime
