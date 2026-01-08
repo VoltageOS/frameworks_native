@@ -151,6 +151,7 @@ void FlagManager::dump(std::string& result) const {
     DUMP_ACONFIG_FLAG(bugfix_resize_virtual_display_surfaces);
     DUMP_ACONFIG_FLAG(cache_when_source_crop_layer_only_moved);
     DUMP_ACONFIG_FLAG(connected_display_hdr_v2);
+    DUMP_ACONFIG_FLAG(connected_display_hdr_v3);
     DUMP_ACONFIG_FLAG(correct_dpi_with_display_size);
     DUMP_ACONFIG_FLAG(deprecate_frame_tracker);
     DUMP_ACONFIG_FLAG(disable_synthetic_vsync_for_performance);
@@ -256,6 +257,7 @@ FLAG_MANAGER_LEGACY_SERVER_FLAG(use_skia_tracing, PROPERTY_SKIA_ATRACE_ENABLED,
 FLAG_MANAGER_ACONFIG_FLAG(cache_when_source_crop_layer_only_moved,
                           "debug.sf.cache_source_crop_only_moved")
 FLAG_MANAGER_ACONFIG_FLAG(connected_display_hdr_v2, "debug.sf.connected_display_hdr_v2");
+FLAG_MANAGER_ACONFIG_FLAG(connected_display_hdr_v3, "debug.sf.connected_display_hdr_v3");
 FLAG_MANAGER_ACONFIG_FLAG(correct_dpi_with_display_size, "");
 FLAG_MANAGER_ACONFIG_FLAG(deprecate_frame_tracker, "");
 FLAG_MANAGER_ACONFIG_FLAG(disable_synthetic_vsync_for_performance, "");
