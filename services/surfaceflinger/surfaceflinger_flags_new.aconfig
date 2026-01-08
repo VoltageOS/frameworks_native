@@ -148,6 +148,13 @@ flag {
 } # follower_arbitrary_refresh_rate_selection
 
 flag {
+  name: "follower_arbitrary_refresh_rate_selection_platform"
+  namespace: "core_graphics"
+  description: "Platform flag to enable selection of any refresh rate for the follower display instead of one matching the pacesetter."
+  bug: "371584290"
+} # follower_arbitrary_refresh_rate_selection_platform
+
+flag {
   name: "follower_display_backpressure"
   namespace: "desktop_display"
   description: "Skips presentation on a follower display if there is a pending present for the next follower vsync. Enables follower displays to present even when their refresh rate does not match the pacesetter display."
@@ -155,11 +162,25 @@ flag {
 } # follower_display_backpressure
 
 flag {
+  name: "follower_display_backpressure_platform"
+  namespace: "core_graphics"
+  description: "Platform flag to skips presentation on a follower display if there is a pending present for the next follower vsync. Enables follower displays to present even when their refresh rate does not match the pacesetter display."
+  bug: "374072507"
+} # follower_display_backpressure_platform
+
+flag {
   name: "force_slower_follower_gpu_composition"
   namespace: "desktop_display"
   description: "Force slower connected displays to be GPU composited."
   bug: "389982803"
 } # force_slower_follower_gpu_composition
+
+flag {
+  name: "force_slower_follower_gpu_composition_platform"
+  namespace: "core_graphics"
+  description: "Platform flag to force slower connected displays to be GPU composited."
+  bug: "389982803"
+} # force_slower_follower_gpu_composition_platform
 
 flag {
   name: "force_compile_graphite_renderengine"

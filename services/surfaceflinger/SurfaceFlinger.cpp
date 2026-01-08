@@ -2580,7 +2580,7 @@ void SurfaceFlinger::updateLayerHistory(nsecs_t now) {
     for (const auto& snapshot : mLayerSnapshotBuilder.getSnapshots()) {
         using Changes = frontend::RequestedLayerState::Changes;
         if (snapshot->path.isClone() &&
-            !FlagManager::getInstance().follower_arbitrary_refresh_rate_selection()) {
+            !FlagManager::getInstance().follower_arbitrary_refresh_rate_selection_combined()) {
             continue;
         }
 
@@ -3544,7 +3544,7 @@ void SurfaceFlinger::setForcedClientCompositionLayerStacks(
         return;
     }
 
-    if (!FlagManager::getInstance().force_slower_follower_gpu_composition()) {
+    if (!FlagManager::getInstance().force_slower_follower_gpu_composition_combined()) {
         return;
     }
 

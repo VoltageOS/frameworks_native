@@ -157,8 +157,11 @@ void FlagManager::dump(std::string& result) const {
     DUMP_ACONFIG_FLAG(display_command_modeset);
     DUMP_ACONFIG_FLAG(fence_handling);
     DUMP_ACONFIG_FLAG(follower_arbitrary_refresh_rate_selection);
+    DUMP_ACONFIG_FLAG(follower_arbitrary_refresh_rate_selection_platform);
     DUMP_ACONFIG_FLAG(follower_display_backpressure);
+    DUMP_ACONFIG_FLAG(follower_display_backpressure_platform);
     DUMP_ACONFIG_FLAG(force_slower_follower_gpu_composition);
+    DUMP_ACONFIG_FLAG(force_slower_follower_gpu_composition_platform);
     DUMP_ACONFIG_FLAG(frame_rate_category_mrr);
     DUMP_ACONFIG_FLAG(graphite_renderengine);
     DUMP_ACONFIG_FLAG(hdcp_level_hal);
@@ -263,9 +266,15 @@ FLAG_MANAGER_ACONFIG_FLAG(display_command_modeset, "debug.sf.display_command_mod
 FLAG_MANAGER_ACONFIG_FLAG(fence_handling, "");
 FLAG_MANAGER_ACONFIG_FLAG(follower_arbitrary_refresh_rate_selection,
                           "debug.sf.follower_arbitrary_refresh_rate_selection");
+FLAG_MANAGER_ACONFIG_FLAG(follower_arbitrary_refresh_rate_selection_platform,
+                          "debug.sf.follower_arbitrary_refresh_rate_selection_platform");
 FLAG_MANAGER_ACONFIG_FLAG(follower_display_backpressure, "debug.sf.follower_display_backpressure");
+FLAG_MANAGER_ACONFIG_FLAG(follower_display_backpressure_platform,
+                          "debug.sf.follower_display_backpressure_platform");
 FLAG_MANAGER_ACONFIG_FLAG(force_slower_follower_gpu_composition,
                           "debug.sf.force_slower_follower_gpu_composition");
+FLAG_MANAGER_ACONFIG_FLAG(force_slower_follower_gpu_composition_platform,
+                          "debug.sf.force_slower_follower_gpu_composition_platform");
 FLAG_MANAGER_ACONFIG_FLAG(frame_rate_category_mrr, "debug.sf.frame_rate_category_mrr")
 FLAG_MANAGER_ACONFIG_FLAG(graphite_renderengine, "debug.renderengine.graphite")
 FLAG_MANAGER_ACONFIG_FLAG(hdcp_level_hal, "")
@@ -321,4 +330,18 @@ FLAG_MANAGER_ACONFIG_FLAG(use_experimental_jank_classification, "");
 FLAG_MANAGER_ACONFIG_FLAG_IMPORTED(correct_virtual_display_power_state, "",
                                    android::companion::virtualdevice::flags)
 FLAG_MANAGER_ACONFIG_FLAG_IMPORTED(luts_api, "", android::hardware::flags);
+
+bool FlagManager::follower_arbitrary_refresh_rate_selection_combined() const {
+    return follower_arbitrary_refresh_rate_selection() ||
+            follower_arbitrary_refresh_rate_selection_platform();
+}
+
+bool FlagManager::follower_display_backpressure_combined() const {
+    return follower_display_backpressure() || follower_display_backpressure_platform();
+}
+
+bool FlagManager::force_slower_follower_gpu_composition_combined() const {
+    return force_slower_follower_gpu_composition() ||
+            force_slower_follower_gpu_composition_platform();
+}
 } // namespace android
