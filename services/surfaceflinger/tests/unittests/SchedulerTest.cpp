@@ -454,6 +454,7 @@ TEST_F(SchedulerTest, chooseRefreshRateForContentSelectsMaxRefreshRate) {
 
 TEST_F(SchedulerTest, chooseRefreshRateForContentFollowerModeChangeRequest) {
     SET_FLAG_FOR_TEST(flags::follower_arbitrary_refresh_rate_selection, true);
+    SET_FLAG_FOR_TEST(flags::modeset_state_machine, true);
 
     // Configure pacesetter display to 120Hz.
     const LayerFilter pacesetterLayerStack = {.layerStack = {.id = 0}};
@@ -502,6 +503,7 @@ TEST_F(SchedulerTest, chooseRefreshRateForContentFollowerModeChangeRequest) {
 
 TEST_F(SchedulerTest, chooseRefreshRateForContentFollowerModeChangeRequestPacesetterCantSwitch) {
     SET_FLAG_FOR_TEST(flags::follower_arbitrary_refresh_rate_selection, true);
+    SET_FLAG_FOR_TEST(flags::modeset_state_machine, true);
 
     // Configure pacesetter display to 120Hz.
     const DisplayModes kDisplay1ModesOneMode = makeModes(kDisplay1Mode120);
@@ -783,6 +785,8 @@ TEST_F(SchedulerTest, chooseDisplayModesMultipleDisplays) {
 
 TEST_F(SchedulerTest, chooseDisplayModesMultipleDisplaysArbitraryFollowersIdle) {
     SET_FLAG_FOR_TEST(flags::follower_arbitrary_refresh_rate_selection, true);
+    SET_FLAG_FOR_TEST(flags::modeset_state_machine, true);
+
     mScheduler->registerDisplay(kDisplayId1, ui::DisplayConnectionType::Internal,
                                 std::make_shared<RefreshRateSelector>(kDisplay1Modes,
                                                                       kDisplay1Mode60->getId()));
@@ -866,6 +870,7 @@ TEST_F(SchedulerTest, chooseDisplayModesMultipleDisplaysArbitraryFollowersIdle) 
 
 TEST_F(SchedulerTest, chooseDisplayModesMultipleDisplaysArbitraryFollowersPowerMode) {
     SET_FLAG_FOR_TEST(flags::follower_arbitrary_refresh_rate_selection, true);
+    SET_FLAG_FOR_TEST(flags::modeset_state_machine, true);
     mScheduler->registerDisplay(kDisplayId1, ui::DisplayConnectionType::Internal,
                                 std::make_shared<RefreshRateSelector>(kDisplay1Modes,
                                                                       kDisplay1Mode60->getId()));
@@ -1967,6 +1972,7 @@ FTL_FAKE_GUARD(kMainThreadContext) {
 
 TEST_F(SchedulerTest, selectorPtrForLayerStack) FTL_FAKE_GUARD(kMainThreadContext) {
     SET_FLAG_FOR_TEST(flags::follower_arbitrary_refresh_rate_selection, true);
+    SET_FLAG_FOR_TEST(flags::modeset_state_machine, true);
 
     auto selector1 =
             std::make_shared<RefreshRateSelector>(kDisplay1Modes, kDisplay1Mode60->getId());
