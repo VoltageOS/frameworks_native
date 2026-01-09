@@ -124,6 +124,7 @@ rust_library {
         "libdowncast_rs",
         "liblibc",
         "liblog_rust",
+        "libstatic_assertions",
         "libzerocopy",
         "libbinder_rs_ndk_compat",
     ],
@@ -176,6 +177,7 @@ rust_library {
     no_std_rlibs: [
         "libbinder_ndk_sys",
         "libbinder_rs_ndk_compat",
+        "libstatic_assertions",
         "libzerocopy",
     ],
 }
@@ -195,6 +197,7 @@ rust_library {
         "libdowncast_rs",
         "liblibc",
         "libbinder_rs_ndk_compat",
+        "libstatic_assertions",
         "libzerocopy",
     ],
     vendor: true,
@@ -412,6 +415,7 @@ rust_test {
         "libdowncast_rs",
         "liblibc",
         "liblog_rust",
+        "libstatic_assertions",
         "libzerocopy",
         "libbinder_rs_ndk_compat",
     ],
@@ -433,6 +437,7 @@ rust_test {
     ],
     no_std_rlibs: [
         "libbinder_ndk_sys",
+        "libstatic_assertions",
         "libzerocopy",
     ],
 }
