@@ -1073,7 +1073,7 @@ bool Scheduler::canAnySelectorSwitch() const {
             return true;
         }
     }
-    return false;
+    return true;
 }
 
 void Scheduler::chooseRefreshRateForContent(
