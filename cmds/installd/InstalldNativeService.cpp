@@ -3763,6 +3763,43 @@ binder::Status InstalldNativeService::createOrDeletePccDirectoryLocked(
     return res;
 }
 
+binder::Status InstalldNativeService::destroyPccData(const std::optional<std::string>& uuid,
+                                                     const std::string& packageName, int32_t userId,
+                                                     int32_t flags, int64_t ceDataInode) {
+    ENFORCE_UID(AID_SYSTEM);
+    ENFORCE_VALID_USER(userId);
+    CHECK_ARGUMENT_UUID(uuid);
+    CHECK_ARGUMENT_PACKAGE_NAME(packageName);
+
+    LOCK_PACKAGE_USER();
+
+    const char* uuid_ = uuid ? uuid->c_str() : nullptr;
+    const std::string pccPackageName = packageName + kPccDataSuffix;
+
+    binder::Status res = ok();
+
+    if (flags & FLAG_STORAGE_CE) {
+        auto pccPath = create_data_user_ce_package_path(uuid_, userId, pccPackageName.c_str(),
+                                                        ceDataInode);
+
+        if (rename_delete_dir_contents_and_dir(pccPath, /* ignore_if_missing= */ true) != 0) {
+            PLOG(ERROR) << "Failed to delete PCC CE directory: " << pccPath;
+            res = error("Failed to delete PCC CE directory: " + pccPath);
+        }
+    }
+
+    if (flags & FLAG_STORAGE_DE) {
+        auto pccPath = create_data_user_de_package_path(uuid_, userId, pccPackageName.c_str());
+
+        if (rename_delete_dir_contents_and_dir(pccPath, /* ignore_if_missing= */ true) != 0) {
+            PLOG(ERROR) << "Failed to delete PCC DE directory: " << pccPath;
+            res = error("Failed to delete PCC DE directory: " + pccPath);
+        }
+    }
+
+    return res;
+}
+
 binder::Status InstalldNativeService::clearCeDirectoryLocked(const std::string& path,
                                                              int32_t flags) {
     binder::Status res = ok();
