@@ -1285,7 +1285,8 @@ void SurfaceFlinger::getDynamicDisplayInfoInternal(ui::DynamicDisplayInfo*& info
                 scheduler::Scheduler::getPresentationDeadline(peakFps,
                                                               Duration::fromNs(
                                                                       outMode.sfVsyncOffset));
-        if (FlagManager::getInstance().connected_display_hdr_v2()) {
+        if (FlagManager::getInstance().connected_display_hdr_v2() ||
+            FlagManager::getInstance().connected_display_hdr_v3()) {
             filterHdrTypes(display->getHdrCapabilities().getSupportedHdrTypes(), outMode);
         } else {
             excludeDolbyVisionIf4k30Present(display->getHdrCapabilities().getSupportedHdrTypes(),
