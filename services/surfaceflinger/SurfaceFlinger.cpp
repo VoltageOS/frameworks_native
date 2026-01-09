@@ -3158,8 +3158,7 @@ SurfaceFlinger::RefreshArgsPartition SurfaceFlinger::addOutputsToRefreshArgs(
 }
 
 std::future<void> SurfaceFlinger::offloadGpuCompositedDisplays(
-        compositionengine::CompositionRefreshArgs offloadedRefreshArgs,
-        std::vector<std::pair<Layer*, LayerFE*>> offloadedLayers) {
+        compositionengine::CompositionRefreshArgs offloadedRefreshArgs) {
     auto offloadedCompositionPromise = std::make_shared<std::promise<void>>();
     auto offloadedCompositionFuture = offloadedCompositionPromise->get_future();
 
@@ -3301,8 +3300,7 @@ CompositeResultsPerDisplay SurfaceFlinger::composite(
     std::optional<std::future<void>> offloadedCompositionFuture;
     if (optionalOffloadedRefreshArgs) {
         offloadedCompositionFuture =
-                offloadGpuCompositedDisplays(std::move(*optionalOffloadedRefreshArgs),
-                                             offloadedLayers);
+                offloadGpuCompositedDisplays(std::move(*optionalOffloadedRefreshArgs));
     }
 
     mCompositionEngine->present(mainThreadRefreshArgs);
