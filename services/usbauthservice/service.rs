@@ -198,6 +198,7 @@ mod tests {
         let device_info = create_test_device(&device_syspath);
         let device_with_state = UsbDeviceInfoWithState {
             info: device_info.clone(),
+            interfaces: vec![],
             authorized: false,
             is_deferred: false,
         };

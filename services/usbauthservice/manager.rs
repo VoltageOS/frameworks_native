@@ -490,11 +490,13 @@ mod tests {
 
         manager.processed_devices.push(UsbDeviceInfoWithState {
             info: UsbAuthDeviceInfo { syspath: "authorized".to_string(), ..Default::default() },
+            interfaces: vec![],
             authorized: true,
             is_deferred: false,
         });
         manager.processed_devices.push(UsbDeviceInfoWithState {
             info: UsbAuthDeviceInfo { syspath: "unauthorized".to_string(), ..Default::default() },
+            interfaces: vec![],
             authorized: false,
             is_deferred: false,
         });
@@ -521,6 +523,7 @@ mod tests {
 
         let device = UsbDeviceInfoWithState {
             info: UsbAuthDeviceInfo { syspath: "test_device".to_string(), ..Default::default() },
+            interfaces: vec![],
             authorized: false,
             is_deferred: false,
         };
