@@ -1285,7 +1285,8 @@ void SurfaceFlinger::getDynamicDisplayInfoInternal(ui::DynamicDisplayInfo*& info
                 scheduler::Scheduler::getPresentationDeadline(peakFps,
                                                               Duration::fromNs(
                                                                       outMode.sfVsyncOffset));
-        if (FlagManager::getInstance().connected_display_hdr_v2()) {
+        if (FlagManager::getInstance().connected_display_hdr_v2() ||
+            FlagManager::getInstance().connected_display_hdr_v3()) {
             filterHdrTypes(display->getHdrCapabilities().getSupportedHdrTypes(), outMode);
         } else {
             excludeDolbyVisionIf4k30Present(display->getHdrCapabilities().getSupportedHdrTypes(),
@@ -1875,7 +1876,7 @@ status_t SurfaceFlinger::getOverlaySupport(gui::OverlayProperties* outProperties
     if (aidlProperties.lutProperties) {
         std::vector<gui::LutProperties> outLutProperties;
         for (auto properties : *aidlProperties.lutProperties) {
-            if (!properties) {
+            if (properties) {
                 gui::LutProperties currentProperties;
                 currentProperties.dimension =
                         static_cast<gui::LutProperties::Dimension>(properties->dimension);
@@ -2580,7 +2581,7 @@ void SurfaceFlinger::updateLayerHistory(nsecs_t now) {
     for (const auto& snapshot : mLayerSnapshotBuilder.getSnapshots()) {
         using Changes = frontend::RequestedLayerState::Changes;
         if (snapshot->path.isClone() &&
-            !FlagManager::getInstance().follower_arbitrary_refresh_rate_selection()) {
+            !FlagManager::getInstance().follower_arbitrary_refresh_rate_selection_combined()) {
             continue;
         }
 
@@ -3157,8 +3158,7 @@ SurfaceFlinger::RefreshArgsPartition SurfaceFlinger::addOutputsToRefreshArgs(
 }
 
 std::future<void> SurfaceFlinger::offloadGpuCompositedDisplays(
-        compositionengine::CompositionRefreshArgs offloadedRefreshArgs,
-        std::vector<std::pair<Layer*, LayerFE*>> offloadedLayers) {
+        compositionengine::CompositionRefreshArgs offloadedRefreshArgs) {
     auto offloadedCompositionPromise = std::make_shared<std::promise<void>>();
     auto offloadedCompositionFuture = offloadedCompositionPromise->get_future();
 
@@ -3300,8 +3300,7 @@ CompositeResultsPerDisplay SurfaceFlinger::composite(
     std::optional<std::future<void>> offloadedCompositionFuture;
     if (optionalOffloadedRefreshArgs) {
         offloadedCompositionFuture =
-                offloadGpuCompositedDisplays(std::move(*optionalOffloadedRefreshArgs),
-                                             offloadedLayers);
+                offloadGpuCompositedDisplays(std::move(*optionalOffloadedRefreshArgs));
     }
 
     mCompositionEngine->present(mainThreadRefreshArgs);
@@ -3544,7 +3543,7 @@ void SurfaceFlinger::setForcedClientCompositionLayerStacks(
         return;
     }
 
-    if (!FlagManager::getInstance().force_slower_follower_gpu_composition()) {
+    if (!FlagManager::getInstance().force_slower_follower_gpu_composition_combined()) {
         return;
     }
 
