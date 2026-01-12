@@ -592,7 +592,7 @@ protected:
             return mSurfaceListener->needsReleaseNotify();
         }
 
-        virtual void onBufferDetached(int slot) override {
+        virtual void onBufferDetached(int slot, uint64_t /*bufferId*/) {
             mSurfaceListener->onBufferDetached(slot);
         }
 
