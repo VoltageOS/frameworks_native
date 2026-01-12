@@ -489,25 +489,21 @@ protected:
               : mParent(parent), mSurfaceListener(listener) {}
         virtual ~ProducerListenerProxy() {}
 
-        virtual void onBufferReleased() {
-            mSurfaceListener->onBufferReleased();
-        }
+        virtual void onBufferReleased() override { mSurfaceListener->onBufferReleased(); }
 
-        virtual bool needsReleaseNotify() {
+        virtual bool needsReleaseNotify() override {
             return mSurfaceListener->needsReleaseNotify();
         }
 
-        virtual void onBufferDetached(int slot) { mSurfaceListener->onBufferDetached(slot); }
+        virtual void onBufferDetached(int slot) override {
+            mSurfaceListener->onBufferDetached(slot);
+        }
 
-        virtual void onBuffersDiscarded(const std::vector<int32_t>& slots);
+        virtual void onBuffersDiscarded(const std::vector<int32_t>& slots) override;
 #if COM_ANDROID_GRAPHICS_LIBGUI_FLAGS(BQ_CONSUMER_ATTACH_CALLBACK)
-        virtual void onBufferAttached() {
-            mSurfaceListener->onBufferAttached();
-        }
+        virtual void onBufferAttached() override { mSurfaceListener->onBufferAttached(); }
 
-        virtual bool needsAttachNotify() {
-            return mSurfaceListener->needsAttachNotify();
-        }
+        virtual bool needsAttachNotify() override { return mSurfaceListener->needsAttachNotify(); }
 #endif
     private:
         wp<Surface> mParent;
