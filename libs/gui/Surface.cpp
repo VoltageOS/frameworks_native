@@ -2395,6 +2395,11 @@ int Surface::disconnect(int api, IGraphicBufferProducer::DisconnectMode mode) {
     return err;
 }
 
+void Surface::setProducerControlledByApp(bool controlledByApp) {
+    Mutex::Autolock lock(mMutex);
+    mProducerControlledByApp = controlledByApp;
+}
+
 int Surface::detachNextBuffer(sp<GraphicBuffer>* outBuffer,
         sp<Fence>* outFence) {
     ATRACE_CALL();
