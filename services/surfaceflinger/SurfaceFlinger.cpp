@@ -1410,6 +1410,7 @@ void SurfaceFlinger::setDesiredMode(display::DisplayModeRequest desiredMode) {
     const bool emitEvent = desiredMode.emitEvent;
 
     using DesiredModeAction = display::DisplayModeController::DesiredModeAction;
+    using ResyncToModeOpts = scheduler::Scheduler::ResyncToModeOpts;
 
     switch (mDisplayModeController.setDesiredMode(displayId, std::move(desiredMode))) {
         case DesiredModeAction::InitiateDisplayModeSwitch: {
@@ -1418,8 +1419,7 @@ void SurfaceFlinger::setDesiredMode(display::DisplayModeRequest desiredMode) {
 
             // Resync to hardware VSYNC now to detect a period switch, and restore render
             // rate to schedule the next frame as soon as possible.
-            using Opts = scheduler::Scheduler::ResyncToModeOpts;
-            mScheduler->resyncToMode(mode, Opts::PeakRenderRate);
+            mScheduler->resyncToMode(mode, ResyncToModeOpts::PeakRenderRate);
 
             // As we called to set period, we will call to onRefreshRateChangeCompleted once
             // VsyncController model is locked.
@@ -1440,6 +1440,11 @@ void SurfaceFlinger::setDesiredMode(display::DisplayModeRequest desiredMode) {
             }
             break;
         }
+        case DesiredModeAction::MergeDisplayModeSwitch:
+            if (FlagManager::getInstance().modeset_state_machine()) {
+                mScheduler->resyncToMode(mode, ResyncToModeOpts::PeakRenderRate);
+            }
+            break;
         case DesiredModeAction::InitiateRenderRateSwitch:
             mScheduler->setRenderRate(displayId, mode.fps, /*applyImmediately*/ false);
             mScheduler->updatePhaseConfiguration(displayId, mode.fps);
