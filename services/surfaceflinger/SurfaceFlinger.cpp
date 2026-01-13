@@ -4130,8 +4130,12 @@ std::optional<DisplayModeId> SurfaceFlinger::processHotplugConnect(
         PhysicalDisplayId displayId, hal::HWDisplayId hwcDisplayId,
         display::DisplayIdentificationInfo&& info, const char* displayString,
         HWComposer::HotplugEvent event) {
-    if (FlagManager::getInstance().stable_edid_ids() &&
-        info.hotplugStatus == display::HotplugStatus::Connected && hasDisplayWithId(displayId)) {
+    // Hotplug reconnect and LinkUnstable events maintain the display ID that was previously
+    // generated for the display. Skip display ID duplication checks for those.
+    const bool shouldCheckForIdDuplication = FlagManager::getInstance().stable_edid_ids() &&
+            info.hotplugStatus != display::HotplugStatus::Reconnected &&
+            event != HWComposer::HotplugEvent::LinkUnstable;
+    if (shouldCheckForIdDuplication && hasDisplayWithId(displayId)) {
         ALOGE("Display with HAL ID %" PRIu64 " produced a duplicate display ID %" PRIu64 ".",
               hwcDisplayId, displayId.value);
         return std::nullopt;
