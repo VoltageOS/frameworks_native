@@ -664,6 +664,7 @@ void CreateInfoWrapper::FilterExtension(const char* name) {
             case ProcHook::KHR_get_surface_capabilities2:
             case ProcHook::GOOGLE_surfaceless_query:
             case ProcHook::EXT_surface_maintenance1:
+            case ProcHook::KHR_surface_maintenance1:
                 hook_extensions_.set(ext_bit);
                 // return now as these extensions do not require HAL support
                 return;
@@ -688,6 +689,7 @@ void CreateInfoWrapper::FilterExtension(const char* name) {
             case ProcHook::EXT_hdr_metadata:
             case ProcHook::EXT_private_data:
             case ProcHook::EXT_swapchain_maintenance1:
+            case ProcHook::KHR_swapchain_maintenance1:
             case ProcHook::ANDROID_external_memory_android_hardware_buffer:
             case ProcHook::ANDROID_native_buffer:
             case ProcHook::GOOGLE_display_timing:
@@ -737,7 +739,8 @@ void CreateInfoWrapper::FilterExtension(const char* name) {
                 // return now as these extensions do not require HAL support
                 return;
             case ProcHook::EXT_swapchain_maintenance1:
-                // map VK_KHR_swapchain_maintenance1 to KHR_external_fence_fd
+            case ProcHook::KHR_swapchain_maintenance1:
+                // map VK_{EXT,KHR}_swapchain_maintenance1 to KHR_external_fence_fd
                 name = VK_KHR_EXTERNAL_FENCE_FD_EXTENSION_NAME;
                 ext_bit = ProcHook::KHR_external_fence_fd;
                 break;
@@ -765,6 +768,7 @@ void CreateInfoWrapper::FilterExtension(const char* name) {
             case ProcHook::EXT_debug_report:
             case ProcHook::EXT_swapchain_colorspace:
             case ProcHook::EXT_surface_maintenance1:
+            case ProcHook::KHR_surface_maintenance1:
             case ProcHook::GOOGLE_surfaceless_query:
             case ProcHook::ANDROID_native_buffer:
             case ProcHook::EXTENSION_CORE_1_0:
@@ -819,8 +823,10 @@ void CreateInfoWrapper::FilterExtension(const char* name) {
         if (ext_bit != ProcHook::EXTENSION_UNKNOWN) {
             if (ext_bit == ProcHook::ANDROID_native_buffer)
                 hook_extensions_.set(ProcHook::KHR_swapchain);
-            if (ext_bit == ProcHook::KHR_external_fence_fd)
+            if (ext_bit == ProcHook::KHR_external_fence_fd) {
                 hook_extensions_.set(ProcHook::EXT_swapchain_maintenance1);
+                hook_extensions_.set(ProcHook::KHR_swapchain_maintenance1);
+            }
 
             hal_extensions_.set(ext_bit);
         }
@@ -966,6 +972,12 @@ VkResult EnumerateInstanceExtensionProperties(
     loader_extensions.push_back({
         VK_EXT_SURFACE_MAINTENANCE_1_EXTENSION_NAME,
         VK_EXT_SURFACE_MAINTENANCE_1_SPEC_VERSION});
+
+    if (flags::khr_swapchain_maintenance1()) {
+        loader_extensions.push_back({
+                VK_KHR_SURFACE_MAINTENANCE_1_EXTENSION_NAME,
+                VK_KHR_SURFACE_MAINTENANCE_1_SPEC_VERSION});
+    }
 
     static const VkExtensionProperties loader_debug_report_extension = {
         VK_EXT_DEBUG_REPORT_EXTENSION_NAME, VK_EXT_DEBUG_REPORT_SPEC_VERSION,
@@ -1227,6 +1239,12 @@ VkResult EnumerateDeviceExtensionProperties(
         loader_extensions.push_back({
                 VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME,
                 VK_EXT_SWAPCHAIN_MAINTENANCE_1_SPEC_VERSION});
+
+        if (flags::khr_swapchain_maintenance1()) {
+            loader_extensions.push_back({
+                    VK_KHR_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME,
+                    VK_KHR_SWAPCHAIN_MAINTENANCE_1_SPEC_VERSION});
+        }
     }
 
     VkPhysicalDeviceProperties pDeviceProperties;
@@ -1807,6 +1825,7 @@ static void PopulateLoaderImplementedFeatures(VkPhysicalDevice physicalDevice,
             }
 
             case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SWAPCHAIN_MAINTENANCE_1_FEATURES_EXT: {
+                // (same enum as VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SWAPCHAIN_MAINTENANCE_1_FEATURES_KHR)
                 auto smf = reinterpret_cast<VkPhysicalDeviceSwapchainMaintenance1FeaturesEXT *>(
                         pFeats);
                 smf->swapchainMaintenance1 = true;

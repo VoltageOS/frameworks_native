@@ -3412,6 +3412,15 @@ VkResult ReleaseSwapchainImagesEXT(VkDevice /*device*/,
     return VK_SUCCESS;
 }
 
+VKAPI_ATTR
+VkResult ReleaseSwapchainImagesKHR(VkDevice device,
+                                   const VkReleaseSwapchainImagesInfoKHR* pReleaseInfo) {
+    ATRACE_CALL();
+
+    // Just forward to the EXT version, it's the same.
+    return ReleaseSwapchainImagesEXT(device, pReleaseInfo);
+}
+
 uint64_t GetSwapchainPreallocatedDataSlot(VkSwapchainKHR swapchain, int index) {
     return SwapchainFromHandle(swapchain)->private_data[index];
 }
