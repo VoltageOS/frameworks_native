@@ -1414,16 +1414,20 @@ VkResult GetPhysicalDeviceSurfacePresentModesKHR(VkPhysicalDevice pdev,
         if (!surfaceless_enabled) {
             return VK_ERROR_SURFACE_LOST_KHR;
         }
+
         // Support for VK_GOOGLE_surfaceless_query.  The primary purpose of this
         // extension for this function is for
         // VK_PRESENT_MODE_SHARED_DEMAND_REFRESH_KHR and
-        // VK_PRESENT_MODE_SHARED_CONTINUOUS_REFRESH_KHR.  We technically cannot
-        // know if VK_PRESENT_MODE_SHARED_MAILBOX_KHR is supported without a
-        // surface, and that cannot be relied upon.  Therefore, don't return it.
+        // VK_PRESENT_MODE_SHARED_CONTINUOUS_REFRESH_KHR.
+        //
+        // VK_PRESENT_MODE_FIFO_KHR is always supported for any surface.
+        //
+        // The GOOGLE_surfaceless_query spec requires that these three
+        // be the only present modes reported for a surfaceless query.
+        //
+        // Other present modes must be queried using a surface handle.
+
         present_modes.push_back(VK_PRESENT_MODE_FIFO_KHR);
-        if (flags::present_mode_fifo_latest_ready_ext2()) {
-            present_modes.push_back(VK_PRESENT_MODE_FIFO_LATEST_READY_EXT);
-        }
     } else {
         ANativeWindow* window = SurfaceFromHandle(surface)->window.get();
 
