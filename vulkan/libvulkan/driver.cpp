@@ -1400,6 +1400,33 @@ void DestroyInstance(VkInstance instance,
     FreeInstanceData(&data, *pAllocator);
 }
 
+static bool ValidateEnabledFeatures(VkDeviceCreateInfo const *pCreateInfo) {
+
+    // Walk the pNext chain looking for feature structs that may try to
+    // enable an unsupported feature in a loader-implemented extension.
+
+    for (auto pFeatures = reinterpret_cast<VkBaseInStructure const *>(pCreateInfo->pNext);
+            pFeatures;
+            pFeatures = reinterpret_cast<VkBaseInStructure const *>(pFeatures->pNext)) {
+
+        switch (pFeatures->sType) {
+            case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PRESENT_TIMING_FEATURES_EXT: {
+                if (flags::present_timing_ext()) {
+                    auto *p = reinterpret_cast<VkPhysicalDevicePresentTimingFeaturesEXT const *>(pFeatures);
+                    if (p->presentAtRelativeTime)
+                        return false;
+                }
+            } break;
+
+            default:
+                break;
+        }
+
+    }
+
+    return true;
+}
+
 VkResult CreateDevice(VkPhysicalDevice physicalDevice,
                       const VkDeviceCreateInfo* pCreateInfo,
                       const VkAllocationCallbacks* pAllocator,
@@ -1430,6 +1457,13 @@ VkResult CreateDevice(VkPhysicalDevice physicalDevice,
         return VK_ERROR_OUT_OF_HOST_MEMORY;
 
     data->hook_extensions |= wrapper.GetHookExtensions();
+
+    // Reject device creation if the app attempts to enable unsupported features
+    // for extensions implemented by the loader.
+    if (!ValidateEnabledFeatures(pCreateInfo)) {
+        FreeDeviceData(data, data_allocator);
+        return VK_ERROR_FEATURE_NOT_PRESENT;
+    }
 
     // call into the driver
     VkDevice dev;
@@ -1796,6 +1830,14 @@ static void PopulateLoaderImplementedFeatures(VkPhysicalDevice physicalDevice,
                     timingsFeatures->presentTiming = true;
                     timingsFeatures->presentAtAbsoluteTime = true;
                     timingsFeatures->presentAtRelativeTime = false;
+                }
+            } break;
+
+            case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PRESENT_MODE_FIFO_LATEST_READY_FEATURES_EXT: {
+                if (flags::present_mode_fifo_latest_ready_ext2()) {
+                    auto * features = reinterpret_cast<
+                        VkPhysicalDevicePresentModeFifoLatestReadyFeaturesEXT *>(pFeats);
+                    features->presentModeFifoLatestReady = VK_TRUE;
                 }
             } break;
 
