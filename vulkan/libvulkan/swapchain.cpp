@@ -336,7 +336,8 @@ struct Swapchain {
               uint32_t num_images_,
               VkPresentModeKHR present_mode,
               int pre_transform_,
-              int64_t refresh_duration_)
+              int64_t refresh_duration_,
+              uint32_t num_private_data_slots)
         : surface(surface_),
           num_images(num_images_),
           mailbox_mode(present_mode == VK_PRESENT_MODE_MAILBOX_KHR),
@@ -344,7 +345,8 @@ struct Swapchain {
           frame_timestamps_enabled(false),
           refresh_duration(refresh_duration_),
           acquire_next_image_timeout(-1),
-          shared(IsSharedPresentMode(present_mode)) {
+          shared(IsSharedPresentMode(present_mode)),
+          private_data(num_private_data_slots) {
     }
 
     VkResult get_refresh_duration(uint64_t& outRefreshDuration)
@@ -371,6 +373,7 @@ struct Swapchain {
     int64_t refresh_duration;
     nsecs_t acquire_next_image_timeout;
     bool shared;
+    std::vector<uint64_t> private_data;
 
     struct Image {
         Image()
@@ -1570,6 +1573,16 @@ static void DestroySwapchainInternal(VkDevice device,
         allocator = &GetData(device).allocator;
     }
 
+    {
+        // remove from any private data slots
+        auto& device_data = GetData(device);
+        std::lock_guard lock(device_data.private_data_mutex);
+
+        for (auto slot : device_data.private_data_slots) {
+            slot->erase(reinterpret_cast<uint64_t>(swapchain_handle));
+        }
+    }
+
     swapchain->~Swapchain();
     allocator->pfnFree(allocator->pUserData, swapchain);
 }
@@ -2194,7 +2207,8 @@ VkResult CreateSwapchainKHR(VkDevice device,
     Swapchain* swapchain = new (mem)
         Swapchain(surface, num_images, create_info->presentMode,
                   TranslateVulkanToNativeTransform(create_info->preTransform),
-                  refresh_duration);
+                  refresh_duration,
+                  GetData(device).num_preallocated_private_data_slots);
     VkSwapchainImageCreateInfoANDROID swapchain_image_create = {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wold-style-cast"
@@ -3392,6 +3406,14 @@ VkResult ReleaseSwapchainImagesEXT(VkDevice /*device*/,
     }
 
     return VK_SUCCESS;
+}
+
+uint64_t GetSwapchainPreallocatedDataSlot(VkSwapchainKHR swapchain, int index) {
+    return SwapchainFromHandle(swapchain)->private_data[index];
+}
+
+void SetSwapchainPreallocatedDataSlot(VkSwapchainKHR swapchain, int index, uint64_t value) {
+    SwapchainFromHandle(swapchain)->private_data[index] = value;
 }
 
 }  // namespace driver

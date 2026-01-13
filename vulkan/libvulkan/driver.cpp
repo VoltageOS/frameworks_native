@@ -686,6 +686,7 @@ void CreateInfoWrapper::FilterExtension(const char* name) {
             case ProcHook::KHR_swapchain:
             case ProcHook::KHR_swapchain_mutable_format:
             case ProcHook::EXT_hdr_metadata:
+            case ProcHook::EXT_private_data:
             case ProcHook::EXT_swapchain_maintenance1:
             case ProcHook::ANDROID_external_memory_android_hardware_buffer:
             case ProcHook::ANDROID_native_buffer:
@@ -741,6 +742,7 @@ void CreateInfoWrapper::FilterExtension(const char* name) {
                 ext_bit = ProcHook::KHR_external_fence_fd;
                 break;
             case ProcHook::EXT_hdr_metadata:
+            case ProcHook::EXT_private_data:
             case ProcHook::KHR_bind_memory2:
                 hook_extensions_.set(ext_bit);
                 break;
@@ -1474,6 +1476,22 @@ VkResult CreateDevice(VkPhysicalDevice physicalDevice,
         FreeDeviceData(data, data_allocator);
 
         return VK_ERROR_INCOMPATIBLE_DRIVER;
+    }
+
+    if (flags::ext_private_data_swapchain()) {
+        // If loader handling of private data slots is supported,
+        // find how many preallocated private data slots the application wants.
+        //
+        // If this struct is not found, the number of preallocated private data slots is zero,
+        // and so any private data slots later used will be "slow" (map-based) instead.
+        for (auto const *pPrivateData = reinterpret_cast<VkDevicePrivateDataCreateInfo const *>(pCreateInfo->pNext);
+                pPrivateData;
+                pPrivateData = reinterpret_cast<VkDevicePrivateDataCreateInfo const *>(pPrivateData->pNext)) {
+            if (pPrivateData->sType == VK_STRUCTURE_TYPE_DEVICE_PRIVATE_DATA_CREATE_INFO) {
+                std::lock_guard lock(data->private_data_mutex);
+                data->num_preallocated_private_data_slots = pPrivateData->privateDataSlotRequestCount;
+            }
+        }
     }
 
     if (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_CPU) {

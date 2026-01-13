@@ -59,6 +59,7 @@ struct ProcHook {
         KHR_present_id2,
         EXT_present_timing,
         KHR_present_wait2,
+        EXT_private_data,
         ANDROID_external_memory_android_hardware_buffer,
         KHR_bind_memory2,
         KHR_device_group_creation,
@@ -140,6 +141,14 @@ struct DeviceDriverTable {
     PFN_vkGetSwapchainGrallocUsage4ANDROID GetSwapchainGrallocUsage4ANDROID;
     PFN_vkAcquireImageANDROID AcquireImageANDROID;
     PFN_vkQueueSignalReleaseImageANDROID QueueSignalReleaseImageANDROID;
+    PFN_vkCreatePrivateDataSlot CreatePrivateDataSlot;
+    PFN_vkCreatePrivateDataSlotEXT CreatePrivateDataSlotEXT;
+    PFN_vkDestroyPrivateDataSlot DestroyPrivateDataSlot;
+    PFN_vkDestroyPrivateDataSlotEXT DestroyPrivateDataSlotEXT;
+    PFN_vkSetPrivateData SetPrivateData;
+    PFN_vkSetPrivateDataEXT SetPrivateDataEXT;
+    PFN_vkGetPrivateData GetPrivateData;
+    PFN_vkGetPrivateDataEXT GetPrivateDataEXT;
     // clang-format on
 };
 
