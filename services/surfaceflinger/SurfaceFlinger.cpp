@@ -1516,35 +1516,29 @@ bool SurfaceFlinger::finalizeDisplayModeChange(PhysicalDisplayId displayId) {
 
     const auto pendingModeOpt = mDisplayModeController.getPendingMode(displayId);
     if (!pendingModeOpt) {
-        // There is no pending mode change. This can happen if the active
-        // display changed and the mode change happened on a different display.
+        // TODO: b/434757601 - Merge this redundant check with the caller's isModeSetPending.
         return true;
     }
 
-    const auto& activeMode = pendingModeOpt->mode;
-    const bool resolutionMatch = !FlagManager::getInstance().synced_resolution_switch() ||
-            activeMode.matchesResolution(mDisplayModeController.getActiveMode(displayId));
+    const auto& pendingMode = pendingModeOpt->mode;
+    const bool resolutionMatch =
+            pendingMode.matchesResolution(mDisplayModeController.getActiveMode(displayId));
 
-    if (!FlagManager::getInstance().synced_resolution_switch()) {
-        if (const auto oldResolution =
-                    mDisplayModeController.getActiveMode(displayId).modePtr->getResolution();
-            oldResolution != activeMode.modePtr->getResolution()) {
-            auto& state =
-                    mCurrentState.displays.get(getPhysicalDisplayTokenLocked(displayId))->get();
-            // We need to generate new sequenceId in order to recreate the display (and this
-            // way the framebuffer).
-            state.sequenceId = DisplayDeviceState::getNextSequenceId();
-            state.getPhysical().activeMode = activeMode.modePtr.get();
-            processDisplayChangesLocked();
+    if (!FlagManager::getInstance().synced_resolution_switch() && !resolutionMatch) {
+        auto& state = mCurrentState.displays.get(getPhysicalDisplayTokenLocked(displayId))->get();
 
-            if (FlagManager::getInstance().modeset_state_machine()) {
-                mDisplayModeController.finalizeModeChange(displayId);
-            }
+        // We need to generate new sequenceId in order to recreate the display (and this
+        // way the framebuffer).
+        state.sequenceId = DisplayDeviceState::getNextSequenceId();
+        state.getPhysical().activeMode = pendingMode.modePtr.get();
+        processDisplayChangesLocked();
 
-            // The DisplayDevice has been destroyed, so abort the commit for the now dead
-            // FrameTargeter.
-            return false;
+        if (FlagManager::getInstance().modeset_state_machine()) {
+            mDisplayModeController.finalizeModeChange(displayId);
         }
+
+        // The DisplayDevice has been destroyed, so abort the commit for the now dead FrameTargeter.
+        return false;
     }
 
     if (FlagManager::getInstance().modeset_state_machine()) {
@@ -1569,9 +1563,9 @@ bool SurfaceFlinger::finalizeDisplayModeChange(PhysicalDisplayId displayId) {
                     ALOGE("A mode change was initiated but not finalized: %s", noChange.reason);
                 });
     } else {
-        mDisplayModeController.finalizeModeChange(displayId, activeMode.modePtr->getId(),
-                                                  activeMode.modePtr->getVsyncRate(),
-                                                  activeMode.fps);
+        mDisplayModeController.finalizeModeChange(displayId, pendingMode.modePtr->getId(),
+                                                  pendingMode.modePtr->getVsyncRate(),
+                                                  pendingMode.fps);
     }
 
     if (mScheduler->designatePacesetterDisplay()) {
@@ -1579,12 +1573,13 @@ bool SurfaceFlinger::finalizeDisplayModeChange(PhysicalDisplayId displayId) {
     }
 
     if (!FlagManager::getInstance().modeset_state_machine()) {
-        mScheduler->updatePhaseConfiguration(displayId, activeMode.fps);
+        mScheduler->updatePhaseConfiguration(displayId, pendingMode.fps);
 
         // Skip for resolution changes, since the event was already emitted on setting the desired
         // mode.
-        if (resolutionMatch && pendingModeOpt->emitEvent) {
-            mScheduler->onDisplayModeChanged(displayId, activeMode,
+        if ((!FlagManager::getInstance().synced_resolution_switch() || resolutionMatch) &&
+            pendingModeOpt->emitEvent) {
+            mScheduler->onDisplayModeChanged(displayId, pendingMode,
                                              /*clearContentRequirements*/ true);
         }
     }
