@@ -31,6 +31,7 @@
 #include <utils/RefBase.h>
 #include <utils/String8.h>
 
+#include <optional>
 #include <shared_mutex>
 #include <unordered_set>
 
@@ -212,6 +213,9 @@ public:
     // See IGraphicBufferProducer::getNextFrameNumber
     uint64_t getNextFrameNumber() const;
 
+    // get the frame id of the last frame replaced by bufferQueueProducer::queueBuffer
+    std::optional<uint64_t> getLastReplacedFrameId() const;
+
     /* Set the scaling mode to be used with a Surface.
      * See NATIVE_WINDOW_SET_SCALING_MODE and its parameters
      * in <system/window.h>. */
@@ -360,6 +364,7 @@ private:
     int dispatchSetPresentMode(va_list args);
     int dispatchSetAutoRefresh(va_list args);
     int dispatchGetDisplayRefreshCycleDuration(va_list args);
+    int dispatchGetLastReplacedFrameId(va_list args);
     int dispatchGetNextFrameId(va_list args);
     int dispatchEnableFrameTimestamps(va_list args);
     int dispatchGetCompositorTiming(va_list args);
@@ -784,6 +789,9 @@ protected:
     mutable std::mutex mDebugMutex;
     String8 mDebugName GUARDED_BY(mDebugMutex) = String8("not-connected");
     uint64_t mId GUARDED_BY(mDebugMutex) = 0;
+
+    // The frame id of the last frame replaced by bufferQueueProducer::queueBuffer
+    std::optional<uint64_t> mLastReplacedFrameId;
 };
 
 } // namespace android
