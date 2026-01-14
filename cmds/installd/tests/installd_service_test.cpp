@@ -1986,5 +1986,103 @@ TEST_F(MoveCompleteAppTest, Move_Fail_RollsBackPreCreatedPcc) {
     EXPECT_FALSE(ExistsAbsolute(toPccCePath));
 }
 
+class DestroyPccDirectoriesTest : public ServiceTest {
+protected:
+    std::string ce_pcc_path;
+    std::string de_pcc_path;
+    std::string ce_app_path;
+    std::string de_app_path;
+
+    void SetUp() override {
+        ServiceTest::SetUp();
+        ce_pcc_path = create_data_user_ce_package_path("TEST", 0, "com.foo-pcc");
+        de_pcc_path = create_data_user_de_package_path("TEST", 0, "com.foo-pcc");
+        ce_app_path = create_data_user_ce_package_path("TEST", 0, "com.foo");
+        de_app_path = create_data_user_de_package_path("TEST", 0, "com.foo");
+        CreatePccDirectories();
+    }
+
+    void TearDown() override {
+        delete_dir_contents_and_dir(ce_pcc_path, true);
+        delete_dir_contents_and_dir(de_pcc_path, true);
+        delete_dir_contents_and_dir(ce_app_path, true);
+        delete_dir_contents_and_dir(de_app_path, true);
+        ServiceTest::TearDown();
+    }
+
+    void CreatePccDirectories() {
+        ASSERT_TRUE(mkdirs(ce_pcc_path, 0700));
+        ASSERT_TRUE(mkdirs(de_pcc_path, 0700));
+
+        ASSERT_TRUE(android::base::WriteStringToFile("content", ce_pcc_path + "/file.txt", 0600,
+                                                     kTestPccAppUid, kTestPccAppUid, false));
+        ASSERT_TRUE(android::base::WriteStringToFile("content", de_pcc_path + "/file.txt", 0600,
+                                                     kTestPccAppUid, kTestPccAppUid, false));
+    }
+
+    bool PathExists(const std::string& path) { return ::access(path.c_str(), F_OK) == 0; }
+};
+
+TEST_F(DestroyPccDirectoriesTest, DestroyPccDirectories_Success_CeAndDe) {
+    LOG(INFO) << "DestroyPccDirectories_Success_CeAndDe";
+
+    EXPECT_TRUE(PathExists(ce_pcc_path));
+    EXPECT_TRUE(PathExists(de_pcc_path));
+
+    ASSERT_BINDER_SUCCESS(service->destroyPccData(std::make_optional<std::string>("TEST"),
+                                                  "com.foo", 0, FLAG_STORAGE_CE | FLAG_STORAGE_DE,
+                                                  0));
+
+    EXPECT_FALSE(PathExists(ce_pcc_path));
+    EXPECT_FALSE(PathExists(de_pcc_path));
+
+    EXPECT_FALSE(exists_renamed_deleted_dir("/user/0"));
+    EXPECT_FALSE(exists_renamed_deleted_dir("/user_de/0"));
+}
+
+TEST_F(DestroyPccDirectoriesTest, DestroyPccDirectories_Success_CeOnly) {
+    LOG(INFO) << "DestroyPccDirectories_Success_CeOnly";
+
+    ASSERT_BINDER_SUCCESS(service->destroyPccData(std::make_optional<std::string>("TEST"),
+                                                  "com.foo", 0, FLAG_STORAGE_CE, 0));
+
+    EXPECT_FALSE(PathExists(ce_pcc_path)); // CE gone
+    EXPECT_TRUE(PathExists(de_pcc_path));  // DE remains
+}
+
+TEST_F(DestroyPccDirectoriesTest, DestroyPccDirectories_Success_DeOnly) {
+    LOG(INFO) << "DestroyPccDirectories_Success_DeOnly";
+
+    ASSERT_BINDER_SUCCESS(service->destroyPccData(std::make_optional<std::string>("TEST"),
+                                                  "com.foo", 0, FLAG_STORAGE_DE, 0));
+
+    EXPECT_TRUE(PathExists(ce_pcc_path));  // CE remains
+    EXPECT_FALSE(PathExists(de_pcc_path)); // DE gone
+}
+
+TEST_F(DestroyPccDirectoriesTest, DestroyPccDirectories_DirectoriesDoNotExist) {
+    LOG(INFO) << "DestroyPccDirectories_DirectoriesDoNotExist";
+
+    ASSERT_BINDER_SUCCESS(service->destroyPccData(std::make_optional<std::string>("TEST"),
+                                                  "com.foo", 0, FLAG_STORAGE_CE | FLAG_STORAGE_DE,
+                                                  0));
+}
+
+TEST_F(DestroyPccDirectoriesTest, DestroyPccDirectories_DoesNotAffectAppData) {
+    LOG(INFO) << "DestroyPccDirectories_DoesNotAffectAppData";
+
+    ASSERT_TRUE(mkdirs(ce_app_path, 0700));
+    ASSERT_TRUE(mkdirs(de_app_path, 0700));
+
+    ASSERT_BINDER_SUCCESS(service->destroyPccData(std::make_optional<std::string>("TEST"),
+                                                  "com.foo", 0, FLAG_STORAGE_CE | FLAG_STORAGE_DE,
+                                                  0));
+
+    EXPECT_FALSE(PathExists(ce_pcc_path));
+    EXPECT_FALSE(PathExists(de_pcc_path));
+    EXPECT_TRUE(PathExists(ce_app_path));
+    EXPECT_TRUE(PathExists(de_app_path));
+}
+
 }  // namespace installd
 }  // namespace android
