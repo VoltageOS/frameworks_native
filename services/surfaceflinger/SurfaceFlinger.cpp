@@ -220,6 +220,7 @@ using gui::SecureLayerMode;
 using gui::WindowInfo;
 using gui::aidl_utils::binderStatusFromStatusT;
 using scheduler::VsyncModulator;
+using scheduler::VSyncTracker;
 using ui::Dataspace;
 using ui::DisplayPrimaries;
 using ui::RenderIntent;
@@ -2459,7 +2460,8 @@ void SurfaceFlinger::onComposerHalVsync(hal::HWDisplayId hwcDisplayId, int64_t t
 
     Mutex::Autolock lock(mStateLock);
     if (const auto displayIdOpt = getHwComposer().onVsync(hwcDisplayId, timestamp)) {
-        if (mScheduler->addResyncSample(*displayIdOpt, timestamp, vsyncPeriod)) {
+        if (mScheduler->addResyncSample(*displayIdOpt, timestamp, vsyncPeriod,
+                                        VSyncTracker::VsyncTimeSource::HwVsyncCallback)) {
             // period flushed
             mScheduler->modulateVsync(displayIdOpt, &VsyncModulator::onRefreshRateChangeCompleted);
         }
@@ -4795,18 +4797,8 @@ void SurfaceFlinger::requestHardwareVsync(PhysicalDisplayId displayId, bool enab
     // Query HWC for the actual Vsync time and provide it to the scheduler when enabled.
     if (enable && FlagManager::getInstance().get_display_known_vsync_sample_enabled()) {
         if (auto sample = getHwComposer().getDisplayKnownVsyncSample(displayId)) {
-            const nsecs_t actualVsyncTime = sample->timestampNs;
-            const auto vsyncSchedule = mScheduler->getVsyncSchedule(displayId);
-            LOG_ALWAYS_FATAL_IF(!vsyncSchedule);
-
-            const nsecs_t modelErrorNs = vsyncSchedule->getModelAccuracyInNs(actualVsyncTime);
-            SFTRACE_FORMAT("VsyncPredictionError(ms): error= %.2f, actual= %.2f, vsyncPeriod= "
-                           "%.2f",
-                           static_cast<float>(modelErrorNs) / 1.0e6f,
-                           static_cast<float>(actualVsyncTime) / 1.0e6f,
-                           static_cast<float>(sample->vsyncPeriodNs) / 1.0e6f);
-
-            mScheduler->addResyncSample(displayId, sample->timestampNs, sample->vsyncPeriodNs);
+            mScheduler->addResyncSample(displayId, sample->timestampNs, sample->vsyncPeriodNs,
+                                        VSyncTracker::VsyncTimeSource::HwVsyncQuery);
         }
     }
 }
