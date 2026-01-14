@@ -242,6 +242,15 @@ VKAPI_ATTR VkResult checkedWaitForPresent2KHR(VkDevice device, VkSwapchainKHR sw
     }
 }
 
+VKAPI_ATTR VkResult checkedReleaseSwapchainImagesKHR(VkDevice device, const VkReleaseSwapchainImagesInfoKHR* pReleaseInfo) {
+    if (GetData(device).hook_extensions[ProcHook::KHR_swapchain_maintenance1]) {
+        return ReleaseSwapchainImagesKHR(device, pReleaseInfo);
+    } else {
+        Logger(device).Err(device, "VK_KHR_swapchain_maintenance1 not enabled. vkReleaseSwapchainImagesKHR not executed.");
+        return VK_SUCCESS;
+    }
+}
+
 VKAPI_ATTR VkResult checkedReleaseSwapchainImagesEXT(VkDevice device, const VkReleaseSwapchainImagesInfoKHR* pReleaseInfo) {
     if (GetData(device).hook_extensions[ProcHook::EXT_swapchain_maintenance1]) {
         return ReleaseSwapchainImagesEXT(device, pReleaseInfo);
@@ -796,6 +805,13 @@ const ProcHook g_proc_hooks[] = {
         reinterpret_cast<PFN_vkVoidFunction>(checkedReleaseSwapchainImagesEXT),
     },
     {
+        "vkReleaseSwapchainImagesKHR",
+        ProcHook::DEVICE,
+        ProcHook::KHR_swapchain_maintenance1,
+        reinterpret_cast<PFN_vkVoidFunction>(ReleaseSwapchainImagesKHR),
+        reinterpret_cast<PFN_vkVoidFunction>(checkedReleaseSwapchainImagesKHR),
+    },
+    {
         "vkSetHdrMetadataEXT",
         ProcHook::DEVICE,
         ProcHook::EXT_hdr_metadata,
@@ -867,6 +883,8 @@ ProcHook::Extension GetProcHookExtension(const char* name) {
     if (strcmp(name, "VK_EXT_present_timing") == 0) return ProcHook::EXT_present_timing;
     if (strcmp(name, "VK_KHR_present_wait2") == 0) return ProcHook::KHR_present_wait2;
     if (strcmp(name, "VK_EXT_private_data") == 0) return ProcHook::EXT_private_data;
+    if (strcmp(name, "VK_KHR_swapchain_maintenance1") == 0) return ProcHook::KHR_swapchain_maintenance1;
+    if (strcmp(name, "VK_KHR_surface_maintenance1") == 0) return ProcHook::KHR_surface_maintenance1;
     if (strcmp(name, "VK_ANDROID_external_memory_android_hardware_buffer") == 0) return ProcHook::ANDROID_external_memory_android_hardware_buffer;
     if (strcmp(name, "VK_KHR_bind_memory2") == 0) return ProcHook::KHR_bind_memory2;
     if (strcmp(name, "VK_KHR_device_group_creation") == 0) return ProcHook::KHR_device_group_creation;
