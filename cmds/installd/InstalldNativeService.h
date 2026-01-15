@@ -90,7 +90,9 @@ public:
             const std::string& packageName, int32_t userId, int32_t flags, int64_t ceDataInode);
     binder::Status destroyAppData(const std::optional<std::string>& uuid,
             const std::string& packageName, int32_t userId, int32_t flags, int64_t ceDataInode);
-
+    binder::Status destroyPccData(const std::optional<std::string>& uuid,
+                                  const std::string& packageName, int32_t userId, int32_t flags,
+                                  int64_t ceDataInode);
     binder::Status fixupAppData(const std::optional<std::string>& uuid, int32_t flags);
 
     binder::Status snapshotAppData(const std::optional<std::string>& volumeUuid,
