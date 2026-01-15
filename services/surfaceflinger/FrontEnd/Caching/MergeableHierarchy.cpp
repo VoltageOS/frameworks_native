@@ -95,6 +95,10 @@ void MergeableHierarchy::materializeSnapshot(
         compositionengine::CompositionEngine& compositionEngine) {
     auto& firstSnapshot = *snapshots.begin();
     auto bounds = Rect(firstSnapshot->sourceBounds());
+    if (bounds.isEmpty()) {
+        return;
+    }
+
     auto width = std::min(3000u, static_cast<uint32_t>(bounds.getWidth()));
     auto height = std::min(3000u, static_cast<uint32_t>(bounds.getHeight()));
 
@@ -142,6 +146,10 @@ void MergeableHierarchy::materializeSnapshot(
         layerFE->mSnapshot = std::move(snapshot);
         layerFEs.emplace_back(layerFE);
         ceLayerFEs.emplace_back(layerFE);
+    }
+
+    if (layerFEs.empty()) {
+        return;
     }
 
     sp<LayerFE> firstLayer = layerFEs.back();
