@@ -1528,7 +1528,10 @@ bool SurfaceFlinger::finalizeDisplayModeChange(PhysicalDisplayId displayId) {
         processDisplayChangesLocked();
 
         if (FlagManager::getInstance().modeset_state_machine()) {
-            mDisplayModeController.finalizeModeChange(displayId);
+            // processDisplayAdded has set the active mode in DMC, but not cleared the pending mode.
+            // Note that hotplug reconnect does not need to clear, because it registers the display
+            // anew with DMC, which resets the display's state.
+            mDisplayModeController.clearPendingMode(displayId);
         }
 
         // The DisplayDevice has been destroyed, so abort the commit for the now dead FrameTargeter.
@@ -4406,6 +4409,15 @@ void SurfaceFlinger::processDisplayAdded(const wp<IBinder>& displayToken,
 
             mScheduler->registerDisplay(displayId, connectionType,
                                         display->holdRefreshRateSelector());
+
+            if (FlagManager::getInstance().modeset_state_machine()) {
+                auto activeModePtr = physical.activeMode;
+                const auto fps = activeModePtr->getPeakFps();
+
+                applyActiveMode({.mode = scheduler::FrameRateMode{fps,
+                                                                  ftl::as_non_null(std::move(
+                                                                          activeModePtr))}});
+            }
         }
     }
 
@@ -4426,7 +4438,7 @@ void SurfaceFlinger::processDisplayAdded(const wp<IBinder>& displayToken,
     // For an external display, loadDisplayModes already attempted to select the same mode
     // as DM, but SF still needs to be updated to match.
     // TODO (b/318534874): Let DM decide the initial mode.
-    if (mScheduler && state.isPhysical()) {
+    if (!FlagManager::getInstance().modeset_state_machine() && mScheduler && state.isPhysical()) {
         const auto& physical = state.getPhysical();
         const bool isInternalDisplay = mPhysicalDisplays.get(physical.id)
                                                .transform(&PhysicalDisplay::isInternal)
