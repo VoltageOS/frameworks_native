@@ -225,8 +225,12 @@ public:
         return refreshRate.getPeriodNsecs() - sfVsyncOffset.ns() + 1000000;
     }
 
-    // Sets the render rate for the scheduler to run at.
-    void setRenderRate(PhysicalDisplayId, Fps, bool applyImmediately);
+    // Combines resyncToHardwareVsync, setRenderRate, and updatePhaseConfiguration.
+    enum class ResyncToModeOpts { None, PeakRenderRate };
+    void resyncToMode(const FrameRateMode&, ResyncToModeOpts = ResyncToModeOpts::None);
+
+    // TODO: b/434757601 - Merge with DMC::setActiveMode.
+    void setRenderRate(PhysicalDisplayId, Fps renderRate, bool applyImmediately);
 
     void enableHardwareVsync(PhysicalDisplayId) REQUIRES(kMainThreadContext);
     void disableHardwareVsync(PhysicalDisplayId, bool disallow) REQUIRES(kMainThreadContext);
@@ -635,6 +639,18 @@ private:
         return pacesetterDisplayLocked()
                 .transform([](const Display& display) { return display.selectorPtr; })
                 .or_else([] { return std::optional<RefreshRateSelectorPtr>(nullptr); })
+                .value();
+    }
+
+    RefreshRateSelectorPtr selectorPtrLocked(PhysicalDisplayId displayId) const
+            REQUIRES(mDisplayLock) {
+        ftl::FakeGuard guard(kMainThreadContext);
+        return mDisplays.get(displayId)
+                .transform([](const Display& display) { return display.selectorPtr; })
+                .or_else([this] {
+                    ftl::FakeGuard guard(mDisplayLock);
+                    return std::make_optional(pacesetterSelectorPtrLocked());
+                })
                 .value();
     }
 
