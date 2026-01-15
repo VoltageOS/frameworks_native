@@ -1003,9 +1003,9 @@ void SurfaceFlinger::init() FTL_FAKE_GUARD(kMainThreadContext) {
     LOG_ALWAYS_FATAL_IF(!getHwComposer().isConnected(display->getPhysicalId()),
                         "Primary display is disconnected");
 
-    // TODO(b/241285876): The Scheduler needlessly depends on creating the CompositionEngine part of
-    // the DisplayDevice, hence the above commit of the primary display. Remove that special case by
-    // initializing the Scheduler after configureLocked, once decoupled from DisplayDevice.
+    // TODO: b/355424160 - The Scheduler needlessly depends on creating the CompositionEngine part
+    // of the DisplayDevice, hence the above commit of the primary display. Remove that special case
+    // by initializing the Scheduler after configureLocked, once decoupled from DisplayDevice.
     initScheduler(display);
 
     // Start listening after creating the Scheduler, since the listener calls into it.
@@ -4285,13 +4285,6 @@ sp<DisplayDevice> SurfaceFlinger::setupNewDisplayDeviceInternal(
             compositionengine::Output::ColorProfile{defaultColorMode, defaultDataSpace,
                                                     RenderIntent::COLORIMETRIC});
 
-    if (state.isPhysical()) {
-        const auto& physical = state.getPhysical();
-        const auto& mode = *physical.activeMode;
-        mDisplayModeController.setActiveMode(physical.id, mode.getId(), mode.getVsyncRate(),
-                                             mode.getPeakFps());
-    }
-
     display->setLayerFilter(
             makeLayerFilterForDisplay(display->getDisplayIdVariant(), state.layerStack));
     display->setProjection(state.orientation, state.layerStackSpaceRect,
@@ -4414,14 +4407,27 @@ void SurfaceFlinger::processDisplayAdded(const wp<IBinder>& displayToken,
     auto display = setupNewDisplayDeviceInternal(displayToken, std::move(compositionDisplay), state,
                                                  displaySurface, compositionSurface);
 
-    if (mScheduler && !display->isVirtual()) {
-        // For hotplug reconnect, renew the registration since display modes have been reloaded.
-        const auto displayId = display->getPhysicalId();
-        const auto connectionType = mPhysicalDisplays.get(displayId)
-                                            .transform(&PhysicalDisplay::snapshotRef)
-                                            .transform(&display::DisplaySnapshot::connectionType)
-                                            .value_or(ui::DisplayConnectionType::External);
-        mScheduler->registerDisplay(displayId, connectionType, display->holdRefreshRateSelector());
+    if (state.isPhysical()) {
+        const auto& physical = state.getPhysical();
+        const auto& mode = *physical.activeMode;
+        mDisplayModeController.setActiveMode(physical.id, mode.getId(), mode.getVsyncRate(),
+                                             mode.getPeakFps());
+
+        // When the primary display is added during boot, the Scheduler does not exist yet.
+        // TODO: b/355424160 - Dedupe with initScheduler. See TODO for that function call.
+        if (mScheduler) {
+            // If the display is being re-added through hotplug reconnect, renew the registration
+            // since the display modes have been reloaded.
+            const auto displayId = display->getPhysicalId();
+            const auto connectionType =
+                    mPhysicalDisplays.get(displayId)
+                            .transform(&PhysicalDisplay::snapshotRef)
+                            .transform(&display::DisplaySnapshot::connectionType)
+                            .value_or(ui::DisplayConnectionType::External);
+
+            mScheduler->registerDisplay(displayId, connectionType,
+                                        display->holdRefreshRateSelector());
+        }
     }
 
     if (display->isVirtual()) {
