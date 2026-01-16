@@ -2979,13 +2979,15 @@ bool SurfaceFlinger::commit(PhysicalDisplayId pacesetterId,
     // Composite if transactions were committed, or if requested by HWC.
     bool mustComposite = mMustComposite.exchange(false);
     {
-        const bool pacesetterPoweredOn =
-                FTL_FAKE_GUARD(mStateLock, getDisplayDeviceLocked(pacesetterId))->getPowerMode()
-                    == hal::PowerMode::ON;
+        scheduler::FrameTimelineDisplayState displayState = {
+                .poweredOn = FTL_FAKE_GUARD(mStateLock, getDisplayDeviceLocked(pacesetterId))
+                                     ->getPowerMode() == hal::PowerMode::ON,
+                .modeChangeInProgress = mScheduler->getVsyncSchedule()->isModeChangeInProgress(),
+        };
         mFrameTimeline->setSfWakeUp(ftl::to_underlying(vsyncId),
                                     pacesetterFrameTargetPtr->frameBeginTime().ns(),
                                     Fps::fromPeriodNsecs(vsyncPeriod.ns()),
-                                    mScheduler->getPacesetterRefreshRate(), pacesetterPoweredOn);
+                                    mScheduler->getPacesetterRefreshRate(), displayState);
 
         const bool flushTransactions = clearTransactionFlags(eTransactionFlushNeeded);
         bool transactionsAreEmpty = false;
