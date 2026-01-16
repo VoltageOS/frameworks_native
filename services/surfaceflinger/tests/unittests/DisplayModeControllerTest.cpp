@@ -230,8 +230,8 @@ TEST_F(DisplayModeControllerTest, setDesiredMode) {
               mDmc.setDesiredMode(mDisplayId, DisplayModeRequest(kDesiredMode90)));
     EXPECT_DISPLAY_MODE_REQUEST_OPT(kDesiredMode90, mDmc.getDesiredMode(mDisplayId));
 
-    // No action since a mode switch has already been initiated.
-    EXPECT_EQ(Action::None, mDmc.setDesiredMode(mDisplayId, DisplayModeRequest(kDesiredMode120)));
+    EXPECT_EQ(Action::MergeDisplayModeSwitch,
+              mDmc.setDesiredMode(mDisplayId, DisplayModeRequest(kDesiredMode120)));
     EXPECT_DISPLAY_MODE_REQUEST_OPT(kDesiredMode120, mDmc.getDesiredMode(mDisplayId));
 }
 
@@ -572,8 +572,8 @@ FTL_FAKE_GUARD(kMainThreadContext) {
               mDmc.initiateModeChange(mDisplayId, std::move(modeRequest), constraints, timeline));
     EXPECT_DISPLAY_MODE_REQUEST_OPT(kDesiredMode90, mDmc.getPendingMode(mDisplayId));
 
-    // No action since a mode switch has already been initiated.
-    EXPECT_EQ(Action::None, mDmc.setDesiredMode(mDisplayId, DisplayModeRequest(kDesiredMode120)));
+    EXPECT_EQ(Action::MergeDisplayModeSwitch,
+              mDmc.setDesiredMode(mDisplayId, DisplayModeRequest(kDesiredMode120)));
 
     EXPECT_DISPLAY_MODE_REQUEST_OPT(kDesiredMode90, mDmc.getPendingMode(mDisplayId));
     EXPECT_DISPLAY_MODE_REQUEST_OPT(kDesiredMode120, mDmc.getDesiredMode(mDisplayId));
@@ -624,7 +624,8 @@ TEST_F(DisplayModeControllerTest, initiateDisplayModeSwitch) FTL_FAKE_GUARD(kMai
     // The latest request should override the desired mode.
     EXPECT_EQ(Action::InitiateDisplayModeSwitch,
               mDmc.setDesiredMode(mDisplayId, DisplayModeRequest(kDesiredMode60)));
-    EXPECT_EQ(Action::None, mDmc.setDesiredMode(mDisplayId, DisplayModeRequest(kDesiredMode120)));
+    EXPECT_EQ(Action::MergeDisplayModeSwitch,
+              mDmc.setDesiredMode(mDisplayId, DisplayModeRequest(kDesiredMode120)));
 
     EXPECT_DISPLAY_MODE_REQUEST_OPT(kDesiredMode120, mDmc.getDesiredMode(mDisplayId));
 
