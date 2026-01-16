@@ -363,6 +363,8 @@ public:
                                      composer3::VsyncSample* outVsyncSample) override;
 
     Error setDisplayMode(Display display, Config modeId, bool seamless) override;
+    Error setDisplayModes(const std::vector<std::pair<Display, Config>>& requests,
+                          bool seamless) override;
 
 private:
     class CommandWriter : public CommandWriterBase {
