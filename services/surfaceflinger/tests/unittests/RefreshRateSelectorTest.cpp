@@ -1529,6 +1529,7 @@ TEST_P(RefreshRateSelectorTest, powerOnImminentConsidered) {
 
 TEST_P(RefreshRateSelectorTest, pacesetterConsidered) {
     SET_FLAG_FOR_TEST(flags::follower_arbitrary_refresh_rate_selection, false);
+    SET_FLAG_FOR_TEST(flags::follower_arbitrary_refresh_rate_selection_platform, false);
     SET_FLAG_FOR_TEST(flags::modeset_state_machine, false);
 
     auto selector = createSelector(kModes_60_90, kModeId60);
@@ -1560,6 +1561,7 @@ TEST_P(RefreshRateSelectorTest, followerRefreshRateSelections) {
         return;
     }
     SET_FLAG_FOR_TEST(flags::follower_arbitrary_refresh_rate_selection, true);
+    SET_FLAG_FOR_TEST(flags::follower_arbitrary_refresh_rate_selection_platform, true);
     SET_FLAG_FOR_TEST(flags::modeset_state_machine, true);
 
     auto selector = createSelector(kModes_60_90, kModeId60);
@@ -1597,6 +1599,7 @@ TEST_P(RefreshRateSelectorTest, followerRefreshRateSelections) {
 
 TEST_P(RefreshRateSelectorTest, layerStackFiltered) {
     SET_FLAG_FOR_TEST(flags::follower_arbitrary_refresh_rate_selection, true);
+    SET_FLAG_FOR_TEST(flags::follower_arbitrary_refresh_rate_selection_platform, true);
     SET_FLAG_FOR_TEST(flags::modeset_state_machine, true);
 
     auto selector = createSelector(kModes_60_90, kModeId90);

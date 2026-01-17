@@ -454,6 +454,7 @@ TEST_F(SchedulerTest, chooseRefreshRateForContentSelectsMaxRefreshRate) {
 
 TEST_F(SchedulerTest, chooseRefreshRateForContentFollowerModeChangeRequest) {
     SET_FLAG_FOR_TEST(flags::follower_arbitrary_refresh_rate_selection, true);
+    SET_FLAG_FOR_TEST(flags::follower_arbitrary_refresh_rate_selection_platform, true);
     SET_FLAG_FOR_TEST(flags::modeset_state_machine, true);
 
     // Configure pacesetter display to 120Hz.
@@ -503,6 +504,7 @@ TEST_F(SchedulerTest, chooseRefreshRateForContentFollowerModeChangeRequest) {
 
 TEST_F(SchedulerTest, chooseRefreshRateForContentFollowerModeChangeRequestPacesetterCantSwitch) {
     SET_FLAG_FOR_TEST(flags::follower_arbitrary_refresh_rate_selection, true);
+    SET_FLAG_FOR_TEST(flags::follower_arbitrary_refresh_rate_selection_platform, true);
     SET_FLAG_FOR_TEST(flags::modeset_state_machine, true);
 
     // Configure pacesetter display to 120Hz.
@@ -785,6 +787,7 @@ TEST_F(SchedulerTest, chooseDisplayModesMultipleDisplays) {
 
 TEST_F(SchedulerTest, chooseDisplayModesMultipleDisplaysArbitraryFollowersIdle) {
     SET_FLAG_FOR_TEST(flags::follower_arbitrary_refresh_rate_selection, true);
+    SET_FLAG_FOR_TEST(flags::follower_arbitrary_refresh_rate_selection_platform, true);
     SET_FLAG_FOR_TEST(flags::modeset_state_machine, true);
 
     mScheduler->registerDisplay(kDisplayId1, ui::DisplayConnectionType::Internal,
@@ -870,6 +873,7 @@ TEST_F(SchedulerTest, chooseDisplayModesMultipleDisplaysArbitraryFollowersIdle) 
 
 TEST_F(SchedulerTest, chooseDisplayModesMultipleDisplaysArbitraryFollowersPowerMode) {
     SET_FLAG_FOR_TEST(flags::follower_arbitrary_refresh_rate_selection, true);
+    SET_FLAG_FOR_TEST(flags::follower_arbitrary_refresh_rate_selection_platform, true);
     SET_FLAG_FOR_TEST(flags::modeset_state_machine, true);
     mScheduler->registerDisplay(kDisplayId1, ui::DisplayConnectionType::Internal,
                                 std::make_shared<RefreshRateSelector>(kDisplay1Modes,
@@ -974,6 +978,7 @@ TEST_F(SchedulerTest, resetForcedPacesetterDisplay) FTL_FAKE_GUARD(kMainThreadCo
 
 TEST_F(SchedulerTest, onFrameSignalMultipleDisplays) {
     SET_FLAG_FOR_TEST(flags::follower_display_backpressure, false);
+    SET_FLAG_FOR_TEST(flags::follower_display_backpressure_platform, false);
 
     mScheduler->registerDisplay(kDisplayId1, ui::DisplayConnectionType::Internal,
                                 std::make_shared<RefreshRateSelector>(kDisplay1Modes,
@@ -1021,6 +1026,7 @@ TEST_F(SchedulerTest, onFrameSignalMultipleDisplays) {
 
 TEST_F(SchedulerTest, onFrameSignalMultipleDisplaysIgnoreBackpressureForLockstepFollower) {
     SET_FLAG_FOR_TEST(flags::follower_display_backpressure, true);
+    SET_FLAG_FOR_TEST(flags::follower_display_backpressure_platform, true);
 
     auto mockVsyncTracker1 = std::make_shared<android::mock::VSyncTracker>();
     ON_CALL(*mockVsyncTracker1, currentPeriod).WillByDefault(Return((60_Hz).getPeriodNsecs()));
@@ -1096,6 +1102,7 @@ TEST_F(SchedulerTest, onFrameSignalMultipleDisplaysIgnoreBackpressureForLockstep
 
 TEST_F(SchedulerTest, onFrameSignalMultipleDisplaysSkipFollowerCompositionOnBackpressure) {
     SET_FLAG_FOR_TEST(flags::follower_display_backpressure, true);
+    SET_FLAG_FOR_TEST(flags::follower_display_backpressure_platform, true);
 
     auto mockVsyncTracker1 = std::make_shared<android::mock::VSyncTracker>();
     ON_CALL(*mockVsyncTracker1, currentPeriod).WillByDefault(Return((120_Hz).getPeriodNsecs()));
@@ -1197,6 +1204,7 @@ TEST_F(SchedulerTest, onFrameSignalMultipleDisplaysSkipFollowerCompositionOnBack
 
 TEST_F(SchedulerTest, onFrameSignalMultipleDisplaysSkipFollowerCompositionOnMissedPresentation) {
     SET_FLAG_FOR_TEST(flags::follower_display_backpressure, true);
+    SET_FLAG_FOR_TEST(flags::follower_display_backpressure_platform, true);
 
     auto mockVsyncTracker1 = std::make_shared<android::mock::VSyncTracker>();
     ON_CALL(*mockVsyncTracker1, currentPeriod).WillByDefault(Return((120_Hz).getPeriodNsecs()));
@@ -1972,6 +1980,7 @@ FTL_FAKE_GUARD(kMainThreadContext) {
 
 TEST_F(SchedulerTest, selectorPtrForLayerStack) FTL_FAKE_GUARD(kMainThreadContext) {
     SET_FLAG_FOR_TEST(flags::follower_arbitrary_refresh_rate_selection, true);
+    SET_FLAG_FOR_TEST(flags::follower_arbitrary_refresh_rate_selection_platform, true);
     SET_FLAG_FOR_TEST(flags::modeset_state_machine, true);
 
     auto selector1 =
