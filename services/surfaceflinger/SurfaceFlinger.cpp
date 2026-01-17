@@ -1006,9 +1006,9 @@ void SurfaceFlinger::init() FTL_FAKE_GUARD(kMainThreadContext) {
     LOG_ALWAYS_FATAL_IF(!getHwComposer().isConnected(display->getPhysicalId()),
                         "Primary display is disconnected");
 
-    // TODO(b/241285876): The Scheduler needlessly depends on creating the CompositionEngine part of
-    // the DisplayDevice, hence the above commit of the primary display. Remove that special case by
-    // initializing the Scheduler after configureLocked, once decoupled from DisplayDevice.
+    // TODO: b/355424160 - The Scheduler needlessly depends on creating the CompositionEngine part
+    // of the DisplayDevice, hence the above commit of the primary display. Remove that special case
+    // by initializing the Scheduler after configureLocked, once decoupled from DisplayDevice.
     initScheduler(display);
 
     // Start listening after creating the Scheduler, since the listener calls into it.
@@ -1410,43 +1410,41 @@ void SurfaceFlinger::setDesiredMode(display::DisplayModeRequest desiredMode) {
     const bool emitEvent = desiredMode.emitEvent;
 
     using DesiredModeAction = display::DisplayModeController::DesiredModeAction;
+    using ResyncToModeOpts = scheduler::Scheduler::ResyncToModeOpts;
 
     switch (mDisplayModeController.setDesiredMode(displayId, std::move(desiredMode))) {
         case DesiredModeAction::InitiateDisplayModeSwitch: {
-            const auto selectorPtr = mDisplayModeController.selectorPtrFor(displayId);
-            if (!selectorPtr) break;
-
-            const auto activeMode = selectorPtr->getActiveMode();
-            const Fps renderRate = activeMode.fps;
-
-            // DisplayModeController::setDesiredMode updated the render rate, so inform Scheduler.
-            mScheduler->setRenderRate(displayId, renderRate, true /* applyImmediately */);
-
             // Schedule a new frame to initiate the display mode switch.
             scheduleComposite(FrameHint::kNone);
 
-            // Start receiving vsync samples now, so that we can detect a period
-            // switch.
-            mScheduler->resyncToHardwareVsync(displayId, true /* allowToEnable */,
-                                              mode.modePtr.get());
+            // Resync to hardware VSYNC now to detect a period switch, and restore render
+            // rate to schedule the next frame as soon as possible.
+            mScheduler->resyncToMode(mode, ResyncToModeOpts::PeakRenderRate);
 
             // As we called to set period, we will call to onRefreshRateChangeCompleted once
             // VsyncController model is locked.
             mScheduler->modulateVsync(displayId, &VsyncModulator::onRefreshRateChangeInitiated);
-
-            mScheduler->updatePhaseConfiguration(displayId, mode.fps);
             mScheduler->setModeChangePending(displayId, true);
 
             // The mode set to switch resolution is not initiated until the display transaction that
             // resizes the display. DM sends this transaction in response to a mode change event, so
             // emit the event now, not when finalizing the mode change as for a refresh rate switch.
-            if (FlagManager::getInstance().synced_resolution_switch() &&
-                !mode.matchesResolution(activeMode)) {
-                mScheduler->onDisplayModeChanged(displayId, mode,
-                                                 /*clearContentRequirements*/ true);
+            if (FlagManager::getInstance().synced_resolution_switch()) {
+                if (const auto selectorPtr = mDisplayModeController.selectorPtrFor(displayId)) {
+                    const auto activeMode = selectorPtr->getActiveMode();
+                    if (!mode.matchesResolution(activeMode)) {
+                        mScheduler->onDisplayModeChanged(displayId, mode,
+                                                         /*clearContentRequirements*/ true);
+                    }
+                }
             }
             break;
         }
+        case DesiredModeAction::MergeDisplayModeSwitch:
+            if (FlagManager::getInstance().modeset_state_machine()) {
+                mScheduler->resyncToMode(mode, ResyncToModeOpts::PeakRenderRate);
+            }
+            break;
         case DesiredModeAction::InitiateRenderRateSwitch:
             mScheduler->setRenderRate(displayId, mode.fps, /*applyImmediately*/ false);
             mScheduler->updatePhaseConfiguration(displayId, mode.fps);
@@ -1599,31 +1597,13 @@ void SurfaceFlinger::dropModeRequest(display::DisplayModeRequest&& request) {
 }
 
 void SurfaceFlinger::applyActiveMode(PhysicalDisplayId displayId) {
-    const auto activeModeOpt = mDisplayModeController.getDesiredMode(displayId);
-    auto activeModePtr = activeModeOpt->mode.modePtr;
-    const auto renderFps = activeModeOpt->mode.fps;
-
+    mScheduler->resyncToMode(mDisplayModeController.getDesiredMode(displayId)->mode);
     dropModeRequest(displayId);
-
-    constexpr bool kAllowToEnable = true;
-    mScheduler->resyncToHardwareVsync(displayId, kAllowToEnable, std::move(activeModePtr).take());
-
-    mScheduler->setRenderRate(displayId, renderFps, /*applyImmediately*/ true);
-    mScheduler->updatePhaseConfiguration(displayId, renderFps);
 }
 
 void SurfaceFlinger::applyActiveMode(display::DisplayModeRequest&& activeMode) {
-    auto activeModePtr = activeMode.mode.modePtr;
-    const auto displayId = activeModePtr->getPhysicalDisplayId();
-    const auto renderFps = activeMode.mode.fps;
-
+    mScheduler->resyncToMode(activeMode.mode);
     dropModeRequest(std::move(activeMode));
-
-    constexpr bool kAllowToEnable = true;
-    mScheduler->resyncToHardwareVsync(displayId, kAllowToEnable, std::move(activeModePtr).take());
-
-    mScheduler->setRenderRate(displayId, renderFps, /*applyImmediately*/ true);
-    mScheduler->updatePhaseConfiguration(displayId, renderFps);
 }
 
 void SurfaceFlinger::initiateDisplayModeChanges() {
@@ -4289,13 +4269,6 @@ sp<DisplayDevice> SurfaceFlinger::setupNewDisplayDeviceInternal(
             compositionengine::Output::ColorProfile{defaultColorMode, defaultDataSpace,
                                                     RenderIntent::COLORIMETRIC});
 
-    if (state.isPhysical()) {
-        const auto& physical = state.getPhysical();
-        const auto& mode = *physical.activeMode;
-        mDisplayModeController.setActiveMode(physical.id, mode.getId(), mode.getVsyncRate(),
-                                             mode.getPeakFps());
-    }
-
     display->setLayerFilter(
             makeLayerFilterForDisplay(display->getDisplayIdVariant(), state.layerStack));
     display->setProjection(state.orientation, state.layerStackSpaceRect,
@@ -4418,14 +4391,27 @@ void SurfaceFlinger::processDisplayAdded(const wp<IBinder>& displayToken,
     auto display = setupNewDisplayDeviceInternal(displayToken, std::move(compositionDisplay), state,
                                                  displaySurface, compositionSurface);
 
-    if (mScheduler && !display->isVirtual()) {
-        // For hotplug reconnect, renew the registration since display modes have been reloaded.
-        const auto displayId = display->getPhysicalId();
-        const auto connectionType = mPhysicalDisplays.get(displayId)
-                                            .transform(&PhysicalDisplay::snapshotRef)
-                                            .transform(&display::DisplaySnapshot::connectionType)
-                                            .value_or(ui::DisplayConnectionType::External);
-        mScheduler->registerDisplay(displayId, connectionType, display->holdRefreshRateSelector());
+    if (state.isPhysical()) {
+        const auto& physical = state.getPhysical();
+        const auto& mode = *physical.activeMode;
+        mDisplayModeController.setActiveMode(physical.id, mode.getId(), mode.getVsyncRate(),
+                                             mode.getPeakFps());
+
+        // When the primary display is added during boot, the Scheduler does not exist yet.
+        // TODO: b/355424160 - Dedupe with initScheduler. See TODO for that function call.
+        if (mScheduler) {
+            // If the display is being re-added through hotplug reconnect, renew the registration
+            // since the display modes have been reloaded.
+            const auto displayId = display->getPhysicalId();
+            const auto connectionType =
+                    mPhysicalDisplays.get(displayId)
+                            .transform(&PhysicalDisplay::snapshotRef)
+                            .transform(&display::DisplaySnapshot::connectionType)
+                            .value_or(ui::DisplayConnectionType::External);
+
+            mScheduler->registerDisplay(displayId, connectionType,
+                                        display->holdRefreshRateSelector());
+        }
     }
 
     if (display->isVirtual()) {

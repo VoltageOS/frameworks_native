@@ -339,12 +339,15 @@ private:
             ANativeWindowBuffer* buffer);
 
     int dispatchConnect(va_list args);
+    int dispatchConnectWithListener(va_list args);
     int dispatchDisconnect(va_list args);
     int dispatchSetBufferCount(va_list args);
     int dispatchSetBuffersGeometry(va_list args);
     int dispatchSetBuffersDimensions(va_list args);
     int dispatchSetBuffersUserDimensions(va_list args);
     int dispatchSetBuffersFormat(va_list args);
+    int dispatchSetOnDroppedCallback(va_list args);
+    int dispatchSetOnAcquiredCallback(va_list args);
     int dispatchSetScalingMode(va_list args);
     int dispatchSetBuffersTransform(va_list args);
     int dispatchSetBuffersStickyTransform(va_list args);
@@ -427,7 +430,8 @@ public:
     // attachBuffer call. This allows clients with their own buffer caches to free up buffers no
     // longer in use by this surface.
     virtual int connect(int api, const sp<SurfaceListener>& listener,
-                        bool reportBufferRemoval = false);
+                        bool reportBufferRemoval = false, bool needsAcquiredNotify = false,
+                        bool needsDroppedNotify = false);
     virtual int detachNextBuffer(sp<GraphicBuffer>* outBuffer, sp<Fence>* outFence);
     virtual int attachBuffer(ANativeWindowBuffer*);
 
@@ -485,8 +489,13 @@ protected:
 
     class ProducerListenerProxy : public BnProducerListener {
     public:
-        ProducerListenerProxy(const wp<Surface>& parent, const sp<SurfaceListener>& listener)
-              : mParent(parent), mSurfaceListener(listener) {}
+        ProducerListenerProxy(const wp<Surface>& parent, const sp<SurfaceListener>& listener,
+                              bool needsAcquiredNotify = false, bool needsDroppedNotify = false)
+              : mParent(parent),
+                mSurfaceListener(listener),
+                mNeedsAcquiredNotify(needsAcquiredNotify),
+                mNeedsDroppedNotify(needsDroppedNotify) {}
+
         virtual ~ProducerListenerProxy() {}
 
         virtual void onBufferReleased() override { mSurfaceListener->onBufferReleased(); }
@@ -500,6 +509,19 @@ protected:
         }
 
         virtual void onBuffersDiscarded(const std::vector<int32_t>& slots) override;
+
+        virtual void onBufferAcquired(uint64_t bufferId, uint64_t frameNumber) override;
+
+        virtual void onBufferDropped(uint64_t bufferId, uint64_t frameNumber) override;
+
+        virtual bool needsAcquiredNotify() override { return mNeedsAcquiredNotify; }
+
+        virtual bool needsDroppedNotify() override { return mNeedsDroppedNotify; }
+
+        void setOnDroppedCallback(ANativeWindow_OnDroppedCallback onDroppedCallback, void* data);
+
+        void setOnAcquiredCallback(ANativeWindow_OnAcquiredCallback onAcquiredCallback, void* data);
+
 #if COM_ANDROID_GRAPHICS_LIBGUI_FLAGS(BQ_CONSUMER_ATTACH_CALLBACK)
         virtual void onBufferAttached() override { mSurfaceListener->onBufferAttached(); }
 
@@ -508,6 +530,15 @@ protected:
     private:
         wp<Surface> mParent;
         sp<SurfaceListener> mSurfaceListener;
+
+        bool mNeedsAcquiredNotify;
+        bool mNeedsDroppedNotify;
+
+        std::mutex mMutex;
+        ANativeWindow_OnAcquiredCallback mOnAcquiredCallback GUARDED_BY(mMutex);
+        void* mOnAcquiredCallbackData GUARDED_BY(mMutex);
+        ANativeWindow_OnDroppedCallback mOnDroppedCallback GUARDED_BY(mMutex);
+        void* mOnDroppedCallbackData GUARDED_BY(mMutex);
     };
 
     class ProducerDeathListenerProxy : public IBinder::DeathRecipient {
@@ -766,7 +797,7 @@ protected:
     bool mIsSlotExpansionAllowed;
 #endif
 
-    sp<IProducerListener> mListenerProxy;
+    sp<ProducerListenerProxy> mListenerProxy;
 
     // Get and flush the buffers of given slots, if the buffer in the slot
     // is currently dequeued then it won't be flushed and won't be returned
