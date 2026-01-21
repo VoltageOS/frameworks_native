@@ -53,6 +53,7 @@
 #include <android/ipcrenderbuffer/RenderBufferHelpers.h>
 #include <common/FlagManager.h>
 #include <common/Panopticon.h>
+#include <common/ThreadStateCrashLogger.h>
 #include <common/trace.h>
 #include <gui/FenceMonitor.h>
 #include <include/gpu/ganesh/GrBackendSemaphore.h>
@@ -797,7 +798,7 @@ static SkRRect getBlurRRect(const BlurRegion& region) {
 // Arbitrary default margin which should be close enough to zero.
 constexpr float kDefaultMargin = 0.0001f;
 static bool equalsWithinMargin(float expected, float value, float margin = kDefaultMargin) {
-    LOG_ALWAYS_FATAL_IF(margin < 0.f, "Margin is negative!");
+    LOG_THREAD_STATE_AND_CRASH_IF(margin < 0.f, "Margin is negative!");
     return std::abs(expected - value) < margin;
 }
 
@@ -864,6 +865,20 @@ void SkiaRenderEngine::drawLayersInternal(
     auto context = getActiveContext();
     LOG_ALWAYS_FATAL_IF(context->isAbandonedOrDeviceLost(),
                         "Context is abandoned/device lost at start of %s", __func__);
+
+    // Only dump settings on crashes that occur after the more specific validations above, which
+    // aren't affected by the settings logged here.
+    ThreadStateCrashLogger settingsLogger(
+            [inProtectedContext = this->mInProtectedContext, &buffer, &display, &layers] {
+                ALOGD(" --- drawLayersInternal debugging context --- ");
+                ALOGD("Context: %s", inProtectedContext ? "protected" : "unprotected");
+                ALOGD("Output buffer: %s", toString(*buffer).c_str());
+                logSettings(display);
+                ALOGD("%zu layers:", layers.size());
+                for (auto layer : layers) {
+                    logSettings(layer);
+                }
+            });
 
     // any AutoBackendTexture deletions will now be deferred until cleanupPostRender is called
     DeferTextureCleanup dtc(mTextureCleanupMgr);
@@ -968,8 +983,8 @@ void SkiaRenderEngine::drawLayersInternal(
 
         sk_sp<SkImage> blurInput;
         if (blurCompositionLayer == &layer) {
-            LOG_ALWAYS_FATAL_IF(activeSurface == dstSurface);
-            LOG_ALWAYS_FATAL_IF(canvas == dstCanvas);
+            LOG_THREAD_STATE_AND_CRASH_IF(activeSurface == dstSurface);
+            LOG_THREAD_STATE_AND_CRASH_IF(canvas == dstCanvas);
 
             blurInput = activeSurface->makeTemporaryImage();
 
@@ -993,10 +1008,10 @@ void SkiaRenderEngine::drawLayersInternal(
             surfaceAutoSaveRestore.replace(canvas);
             initCanvas(canvas, display);
 
-            LOG_ALWAYS_FATAL_IF(activeSurface->getCanvas()->getSaveCount() !=
-                                dstSurface->getCanvas()->getSaveCount());
-            LOG_ALWAYS_FATAL_IF(activeSurface->getCanvas()->getTotalMatrix() !=
-                                dstSurface->getCanvas()->getTotalMatrix());
+            LOG_THREAD_STATE_AND_CRASH_IF(activeSurface->getCanvas()->getSaveCount() !=
+                                          dstSurface->getCanvas()->getSaveCount());
+            LOG_THREAD_STATE_AND_CRASH_IF(activeSurface->getCanvas()->getTotalMatrix() !=
+                                          dstSurface->getCanvas()->getTotalMatrix());
 
             // assign dstSurface to activeSurface
             activeSurface = dstSurface;
@@ -1117,7 +1132,8 @@ void SkiaRenderEngine::drawLayersInternal(
 
             if (layer.shadow.length > 0) {
                 // This would require a new parameter/flag to SkShadowUtils::DrawShadow
-                LOG_ALWAYS_FATAL_IF(layer.disableBlending, "Cannot disableBlending with a shadow");
+                LOG_THREAD_STATE_AND_CRASH_IF(layer.disableBlending,
+                                              "Cannot disableBlending with a shadow");
 
                 SkRRect shadowBounds, shadowClip;
                 if (layer.geometry.boundaries == layer.shadow.boundaries) {
@@ -1154,8 +1170,8 @@ void SkiaRenderEngine::drawLayersInternal(
                                                                        : originalBounds;
 
             if (!layer.boxShadowSettings.boxShadows.empty()) {
-                LOG_ALWAYS_FATAL_IF(layer.disableBlending,
-                                    "Cannot disableBlending with a box shadow");
+                LOG_THREAD_STATE_AND_CRASH_IF(layer.disableBlending,
+                                              "Cannot disableBlending with a box shadow");
 
                 float cornerRadius =
                         roundf(preferredOriginalBounds.radii(SkRRect::kUpperLeft_Corner).fX);
@@ -1171,8 +1187,8 @@ void SkiaRenderEngine::drawLayersInternal(
             // layer is occluded it should have an outline.
             if (layer.borderSettings.strokeWidth > 0) {
                 SFTRACE_NAME("LayerBorder");
-                LOG_ALWAYS_FATAL_IF(layer.disableBlending,
-                                    "Cannot disableBlending with an outline");
+                LOG_THREAD_STATE_AND_CRASH_IF(layer.disableBlending,
+                                              "Cannot disableBlending with an outline");
                 SkRRect outlineRect = preferredOriginalBounds;
                 outlineRect.outset(layer.borderSettings.strokeWidth,
                                    layer.borderSettings.strokeWidth);
@@ -1331,7 +1347,8 @@ void SkiaRenderEngine::drawLayersInternal(
             paint.setAlphaf(layer.alpha);
 
             if (imageTextureRef->colorType() == kAlpha_8_SkColorType) {
-                LOG_ALWAYS_FATAL_IF(layer.disableBlending, "Cannot disableBlending with A8");
+                LOG_THREAD_STATE_AND_CRASH_IF(layer.disableBlending,
+                                              "Cannot disableBlending with A8");
 
                 // SysUI creates the alpha layer as a coverage layer, which is
                 // appropriate for the DPU. Use a color matrix to convert it to
@@ -1455,7 +1472,7 @@ void SkiaRenderEngine::drawLayersInternal(
     surfaceAutoSaveRestore.restore();
     mCapture->endCapture();
 
-    LOG_ALWAYS_FATAL_IF(activeSurface != dstSurface);
+    LOG_THREAD_STATE_AND_CRASH_IF(activeSurface != dstSurface);
 
     auto drawFence = sp<Fence>::make(flushAndSubmit(context, dstSurface));
     trace(drawFence);
@@ -1483,6 +1500,19 @@ void SkiaRenderEngine::tonemapAndDrawGainmapInternal(
         float hdrSdrRatio, ui::Dataspace dataspace, const std::shared_ptr<ExternalTexture>& sdr,
         const std::shared_ptr<ExternalTexture>& gainmap) {
     std::lock_guard<std::mutex> lock(mRenderingMutex);
+
+    ThreadStateCrashLogger parametersLogger([inProtectedContext = this->mInProtectedContext, &hdr,
+                                             hdrSdrRatio, dataspace, &sdr, &gainmap] {
+        ALOGD(" --- tonemapAndDrawGainmapInternal debugging context --- ");
+        ALOGD("Context: %s", inProtectedContext ? "protected" : "unprotected");
+        ALOGD("Input HDR buffer: %s", toString(*hdr).c_str());
+        ALOGD("hdrSdrRatio: %f", hdrSdrRatio);
+        ALOGD("dataspace: %s (%s)", toString(dataspace).c_str(),
+              dataspaceDetails(static_cast<android_dataspace>(dataspace)).c_str());
+        ALOGD("Output SDR buffer: %s", toString(*sdr).c_str());
+        ALOGD("Output gainmap buffer: %s", toString(*gainmap).c_str());
+    });
+
     auto context = getActiveContext();
     auto gainmapTextureRef = getOrCreateBackendTexture(gainmap->getBuffer(), true);
 
