@@ -3112,8 +3112,10 @@ SurfaceFlinger::RefreshArgsPartition SurfaceFlinger::addOutputsToRefreshArgs(
         }
 
         const Fps refreshRate = display->getAdjustedRefreshRate();
-        if (refreshRate.isValid() &&
-            !mScheduler->isVsyncInPhase(pacesetterTarget.frameBeginTime(), refreshRate)) {
+        const auto vsyncTime = FlagManager::getInstance().bugfix_virtual_display_refresh_rate()
+                ? pacesetterTarget.expectedPresentTime()
+                : pacesetterTarget.frameBeginTime();
+        if (refreshRate.isValid() && !mScheduler->isVsyncInPhase(vsyncTime, refreshRate)) {
             continue;
         }
 
