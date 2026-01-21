@@ -177,6 +177,7 @@ void FlagManager::dump(std::string& result) const {
     DUMP_ACONFIG_FLAG(renderable_buffer_usage);
     DUMP_ACONFIG_FLAG(restore_blur_step);
     DUMP_ACONFIG_FLAG(shader_disk_cache);
+    DUMP_ACONFIG_FLAG(small_blur_region_improvements);
     DUMP_ACONFIG_FLAG(skip_invisible_windows_in_input);
     DUMP_ACONFIG_FLAG(stable_edid_ids);
     DUMP_ACONFIG_FLAG(synced_resolution_switch);
@@ -292,6 +293,7 @@ FLAG_MANAGER_ACONFIG_FLAG(protected_if_client, "")
 FLAG_MANAGER_ACONFIG_FLAG(renderable_buffer_usage, "")
 FLAG_MANAGER_ACONFIG_FLAG(restore_blur_step, "debug.renderengine.restore_blur_step")
 FLAG_MANAGER_ACONFIG_FLAG(shader_disk_cache, "");
+FLAG_MANAGER_ACONFIG_FLAG(small_blur_region_improvements, "");
 FLAG_MANAGER_ACONFIG_FLAG(skip_invisible_windows_in_input, "");
 FLAG_MANAGER_ACONFIG_FLAG(stable_edid_ids, "debug.sf.stable_edid_ids")
 FLAG_MANAGER_ACONFIG_FLAG(synced_resolution_switch, "");
