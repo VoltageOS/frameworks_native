@@ -6918,24 +6918,15 @@ void SurfaceFlinger::dumpRenderCommandBuffers(std::string& result) {
 
     int numDumps = 0;
     mLayerSnapshotBuilder.forEachSnapshot([&](const frontend::LayerSnapshot& snapshot) {
-        if (snapshot.renderCommandBufferConsumer != nullptr) {
+        if (snapshot.renderCommandBuffer != nullptr) {
             std::string filename_prefix = dump_output_path + std::to_string(numDumps) + "_";
             std::string rcb_filename = filename_prefix + "rcb.dump";
 
-            auto buffer = snapshot.renderCommandBufferConsumer->getCurrentBuffer();
+            snapshot.renderCommandBuffer->dumpToFile(rcb_filename.c_str());
 
-            if (buffer != nullptr) {
-                buffer->dumpToFile(
-                        rcb_filename.c_str());
-
-                dump_output_string << "  Layer: " << snapshot.name << " (sequence: "
-                                   << snapshot.sequence << ")\n";
-                dump_output_string << "    RenderCommandBuffer dumped to: " << rcb_filename << "\n";
-            } else {
-                dump_output_string << "  Layer: " << snapshot.name << " (sequence: "
-                                   << snapshot.sequence << ")\n";
-                dump_output_string << "    ERROR: RenderCommandBuffer is null.\n";
-            }
+            dump_output_string << "  Layer: " << snapshot.name
+                               << " (sequence: " << snapshot.sequence << ")\n";
+            dump_output_string << "    RenderCommandBuffer dumped to: " << rcb_filename << "\n";
             numDumps++;
         }
     });

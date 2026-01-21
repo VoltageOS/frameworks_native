@@ -191,9 +191,9 @@ std::optional<compositionengine::LayerFE::LayerSettings> LayerFE::prepareClientC
     layerSettings.name = mSnapshot->name;
     layerSettings.luts = mSnapshot->luts ? mSnapshot->luts : targetSettings.luts;
 
-    layerSettings.renderCommandBufferConsumer = mSnapshot->renderCommandBufferConsumer;
-    layerSettings.renderCommandBufferFrameId = mSnapshot->renderCommandBufferFrameId;
+    layerSettings.renderCommandBuffer = mSnapshot->renderCommandBuffer;
     layerSettings.renderResourceCache = mSnapshot->renderResourceCache;
+    layerSettings.renderCommandBufferFrameId = mSnapshot->renderCommandBufferFrameId;
 
     if (hasEffect() && !hasBufferOrSidebandStream()) {
         prepareEffectsClientComposition(layerSettings, targetSettings);
