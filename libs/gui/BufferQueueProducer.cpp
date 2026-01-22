@@ -126,7 +126,6 @@ status_t BufferQueueProducer::requestBuffer(int slot, sp<GraphicBuffer>* buf) {
     return NO_ERROR;
 }
 
-#if COM_ANDROID_GRAPHICS_LIBGUI_FLAGS(WB_UNLIMITED_SLOTS)
 status_t BufferQueueProducer::extendSlotCount(int size) {
     ATRACE_CALL();
 
@@ -167,7 +166,6 @@ status_t BufferQueueProducer::extendSlotCount(int size) {
 
     return NO_ERROR;
 }
-#endif
 
 status_t BufferQueueProducer::setMaxDequeuedBufferCount(
         int maxDequeuedBuffers) {
@@ -1463,9 +1461,7 @@ status_t BufferQueueProducer::connect(const sp<IProducerListener>& listener,
             output->nextFrameNumber = mCore->mFrameCounter + 1;
             output->bufferReplaced = false;
             output->maxBufferCount = mCore->mMaxBufferCount;
-#if COM_ANDROID_GRAPHICS_LIBGUI_FLAGS(WB_UNLIMITED_SLOTS)
             output->isSlotExpansionAllowed = mCore->mAllowExtendedSlotCount;
-#endif
 
             if (listener != nullptr) {
                 // Set up a death notification so that we can disconnect
