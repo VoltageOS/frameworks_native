@@ -188,6 +188,18 @@
 #define NO_THREAD_SAFETY_ANALYSIS \
     _Pragma("GCC error \"Prefer <ftl/fake_guard.h> or MutexUtils.h helpers.\"")
 
+#define MODE_TRANSITION_LOCK_IF(cond)                                                             \
+    ConditionalLock lock(mStateLock,                                                              \
+                         !FlagManager::getInstance()                                              \
+                                         .follower_arbitrary_refresh_rate_selection_combined() && \
+                                 cond);                                                           \
+    ConditionalLock                                                                               \
+    modeLock(mModeTransitionMutex,                                                                \
+             FlagManager::getInstance().follower_arbitrary_refresh_rate_selection_combined() &&   \
+                     cond)
+
+#define MODE_TRANSITION_LOCK() MODE_TRANSITION_LOCK_IF(true)
+
 namespace android {
 using namespace std::chrono_literals;
 using namespace std::string_literals;
@@ -1019,6 +1031,10 @@ void SurfaceFlinger::init() FTL_FAKE_GUARD(kMainThreadContext) {
     LOG_ALWAYS_FATAL_IF(!display, "Failed to configure the primary display");
     LOG_ALWAYS_FATAL_IF(!getHwComposer().isConnected(display->getPhysicalId()),
                         "Primary display is disconnected");
+
+    ConditionalLock modeLock(mModeTransitionMutex,
+                             FlagManager::getInstance()
+                                     .follower_arbitrary_refresh_rate_selection_combined());
 
     // TODO: b/355424160 - The Scheduler needlessly depends on creating the CompositionEngine part
     // of the DisplayDevice, hence the above commit of the primary display. Remove that special case
@@ -2894,7 +2910,8 @@ bool SurfaceFlinger::commit(PhysicalDisplayId pacesetterId,
         const bool hasPacesetterDisplay =
                 FTL_FAKE_GUARD(mStateLock, mPhysicalDisplays.contains(pacesetterId));
         if (!hasPacesetterDisplay) {
-            FTL_FAKE_GUARD(mStateLock, processDisplayChangesLocked());
+            MODE_TRANSITION_LOCK();
+            processDisplayChangesLocked();
             mScheduler->scheduleFrame();
             return false;
         }
@@ -2912,7 +2929,8 @@ bool SurfaceFlinger::commit(PhysicalDisplayId pacesetterId,
     }
 
     {
-        Mutex::Autolock lock(mStateLock);
+        MODE_TRANSITION_LOCK();
+
         for (const auto [displayId, _] : frameTargets) {
             if (mDisplayModeController.isModeSetPending(displayId)) {
                 if (!finalizeDisplayModeChange(displayId)) {
@@ -3035,7 +3053,7 @@ bool SurfaceFlinger::commit(PhysicalDisplayId pacesetterId,
         bool updateAttachedChoreographer = mUpdateAttachedChoreographer;
         mUpdateAttachedChoreographer = false;
 
-        Mutex::Autolock lock(mStateLock);
+        MODE_TRANSITION_LOCK();
         mScheduler->chooseRefreshRateForContent(&mLayerHierarchyBuilder.getHierarchy(),
                                                 updateAttachedChoreographer);
 
@@ -4835,11 +4853,9 @@ void SurfaceFlinger::requestDisplayModes(std::vector<display::DisplayModeRequest
 
     SFTRACE_CALL();
 
-    // If this is called from the main thread mStateLock must be locked before
-    // Currently the only way to call this function from the main thread is from
-    // Scheduler::chooseRefreshRateForContent
-
-    ConditionalLock lock(mStateLock, std::this_thread::get_id() != mMainThreadId);
+    // The caller context may be the main thread (via Scheduler::chooseRefreshRateForContent) or a
+    // OneShotTimer thread. The main thread already locks, so only lock when off the main thread.
+    MODE_TRANSITION_LOCK_IF(std::this_thread::get_id() != mMainThreadId);
 
     for (auto& request : modeRequests) {
         const auto& modePtr = request.mode.modePtr;
@@ -5677,6 +5693,9 @@ bool SurfaceFlinger::applyAndCommitDisplayTransactionStatesLocked(
 
     mFrontEndDisplayInfosChanged = mTransactionFlags & eDisplayTransactionNeeded;
     if (mFrontEndDisplayInfosChanged) {
+        ConditionalLock lock(mModeTransitionMutex,
+                             FlagManager::getInstance()
+                                     .follower_arbitrary_refresh_rate_selection_combined());
         processDisplayChangesLocked();
         mFrontEndDisplayInfos.clear();
         for (const auto& [_, display] : mDisplays) {
@@ -6216,6 +6235,9 @@ SurfaceFlinger::setPhysicalDisplayPowerModeAsync(const sp<DisplayDevice>& displa
     }
 
     if (mScheduler->setDisplayPowerMode(displayId, mode)) {
+        ConditionalLock lock(mModeTransitionMutex,
+                             FlagManager::getInstance()
+                                     .follower_arbitrary_refresh_rate_selection_combined());
         onNewPacesetterDisplay();
     }
 
@@ -8827,7 +8849,7 @@ status_t SurfaceFlinger::setDesiredDisplayModeSpecsInternal(
     const auto displayId = display->getPhysicalId();
     SFTRACE_NAME(ftl::Concat(__func__, ' ', displayId.value).c_str());
 
-    Mutex::Autolock lock(mStateLock);
+    MODE_TRANSITION_LOCK();
 
     if (mDebugDisplayModeSetByBackdoor) {
         // ignore this request as mode is overridden by backdoor
@@ -9643,6 +9665,10 @@ status_t SurfaceFlinger::sfdo_forcePacesetter(PhysicalDisplayId displayId) {
                                        return NAME_NOT_FOUND;
                                    }
                                    if (mScheduler->forcePacesetterDisplay(displayId)) {
+                                       ConditionalLock lock(
+                                               mModeTransitionMutex,
+                                               FlagManager::getInstance()
+                                                       .follower_arbitrary_refresh_rate_selection_combined());
                                        onNewPacesetterDisplay();
                                    }
                                    return OK;
@@ -9654,6 +9680,10 @@ void SurfaceFlinger::sfdo_resetForcedPacesetter() {
     mScheduler
             ->schedule([=, this]() FTL_FAKE_GUARD(kMainThreadContext) FTL_FAKE_GUARD(mStateLock) {
                 if (mScheduler->resetForcedPacesetterDisplay()) {
+                    ConditionalLock
+                            lock(mModeTransitionMutex,
+                                 FlagManager::getInstance()
+                                         .follower_arbitrary_refresh_rate_selection_combined());
                     onNewPacesetterDisplay();
                 }
             })
