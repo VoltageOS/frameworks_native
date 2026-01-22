@@ -104,6 +104,7 @@ public:
     bool renderable_buffer_usage() const;
     bool restore_blur_step() const;
     bool shader_disk_cache() const;
+    bool small_blur_region_improvements() const;
     bool skip_invisible_windows_in_input() const;
     bool stable_edid_ids() const;
     bool synced_resolution_switch() const;
