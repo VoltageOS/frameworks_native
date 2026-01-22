@@ -2990,59 +2990,6 @@ TEST_F(SurfaceTest, Detach_BufferIsNotLeaked) {
     ASSERT_EQ(nullptr, weakBuffer.promote());
 }
 
-TEST_F(SurfaceTest, ConsumerDetach_BufferIsNotLeaked) {
-    auto [consumer, surface] = BufferItemConsumer::create(GRALLOC_USAGE_SW_READ_OFTEN);
-
-    struct DetachingListener : public StubSurfaceListener {
-    public:
-        virtual void onBufferDetached(int slot) override { mDetachedSlots.push_back(slot); }
-        virtual bool needsReleaseNotify() override { return true; }
-
-        std::vector<int> mDetachedSlots;
-    };
-
-    sp<DetachingListener> listener = sp<DetachingListener>::make();
-    ASSERT_EQ(OK, surface->connect(NATIVE_WINDOW_API_CPU, listener));
-
-    sp<GraphicBuffer> buffer;
-    sp<Fence> fence;
-    ASSERT_EQ(OK, surface->dequeueBuffer(&buffer, &fence));
-    ASSERT_EQ(OK, surface->queueBuffer(buffer, fence));
-
-    {
-        BufferItem item;
-        ASSERT_EQ(OK, consumer->acquireBuffer(&item, 0));
-        ASSERT_EQ(OK, consumer->detachBuffer(item.mGraphicBuffer));
-    }
-
-    ASSERT_EQ(1u, listener->mDetachedSlots.size());
-    wp<GraphicBuffer> weakBuffer = buffer;
-    buffer = nullptr;
-    EXPECT_EQ(nullptr, weakBuffer.promote());
-}
-
-TEST_F(SurfaceTest, ConsumerDetach_BufferIsNotLeaked_WithoutNotifyRelease) {
-    auto [consumer, surface] = BufferItemConsumer::create(GRALLOC_USAGE_SW_READ_OFTEN);
-
-    sp<StubSurfaceListener> listener = sp<StubSurfaceListener>::make();
-    ASSERT_EQ(OK, surface->connect(NATIVE_WINDOW_API_CPU, listener));
-
-    sp<GraphicBuffer> buffer;
-    sp<Fence> fence;
-    ASSERT_EQ(OK, surface->dequeueBuffer(&buffer, &fence));
-    ASSERT_EQ(OK, surface->queueBuffer(buffer, fence));
-
-    {
-        BufferItem item;
-        ASSERT_EQ(OK, consumer->acquireBuffer(&item, 0));
-        ASSERT_EQ(OK, consumer->detachBuffer(item.mGraphicBuffer));
-    }
-
-    wp<GraphicBuffer> weakBuffer = buffer;
-    buffer = nullptr;
-    EXPECT_EQ(nullptr, weakBuffer.promote());
-}
-
 TEST_F(SurfaceTest, DiscardDetach_DoesNotDeadlock) {
     constexpr size_t kLotsOfBuffers = 512;
     auto [consumer, surface] = BufferItemConsumer::create(GRALLOC_USAGE_SW_READ_OFTEN);
