@@ -83,7 +83,7 @@ class DisplayDevice : public RefBase {
 public:
     constexpr static float sDefaultMinLumiance = 0.0;
     constexpr static float sDefaultMaxLumiance = 500.0;
-    enum { eReceivesInput = 0x01 };
+    enum { eReceivesInput = 0x01, eOptimizationPolicyPower = 0x02 };
 
     explicit DisplayDevice(DisplayDeviceCreationArgs& args);
 
@@ -108,7 +108,7 @@ public:
     // The optimization policy influences whether this display is optimized for power or
     // performance.
     gui::ISurfaceComposer::OptimizationPolicy getOptimizationPolicy() const;
-    void setOptimizationPolicy(gui::ISurfaceComposer::OptimizationPolicy optimizationPolicy);
+    void enableForceOptimizationPolicyForPower();
 
     int getWidth() const;
     int getHeight() const;
@@ -267,8 +267,7 @@ private:
     // TODO(b/182939859): Remove special cases for primary display.
     const bool mIsPrimary;
 
-    gui::ISurfaceComposer::OptimizationPolicy mOptimizationPolicy =
-            gui::ISurfaceComposer::OptimizationPolicy::optimizeForPerformance;
+    bool mForceOptimizationPolicyForPower = false;
 
     uint32_t mFlags = 0;
 

@@ -694,6 +694,9 @@ private:
             REQUIRES(kMainThreadContext);
 
     // ICEPowerCallback overrides:
+    // If the performance hint session is enabled, and SurfaceFlinger is in performance policy
+    // mode, this will provide a performance hint that SurfaceFlinger's CPU workload is
+    // increasing.
     void notifyCpuLoadUp() override;
 
     using KernelIdleTimerController = scheduler::RefreshRateSelector::KernelIdleTimerController;
@@ -1413,6 +1416,7 @@ private:
 
     std::atomic_bool mMustComposite = false;
     std::atomic_bool mGeometryDirty = false;
+    std::atomic_bool mOptimizeForPerformance = false;
 
     // constant members (no synchronization needed for access)
     const nsecs_t mBootTime = systemTime();
@@ -1642,7 +1646,7 @@ private:
         return mScheduler->getLayerFramerate(now, id);
     }
 
-    bool mPowerHintSessionEnabled;
+    std::atomic_bool mPowerHintSessionEnabled;
     // Whether a display should be turned on when initialized
     bool mSkipPowerOnForQuiescent;
 
