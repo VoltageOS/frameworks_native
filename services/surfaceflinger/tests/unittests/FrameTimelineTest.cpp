@@ -193,7 +193,8 @@ public:
     }
 
     NO_THREAD_SAFETY_ANALYSIS
-    const std::map<int64_t, TimelineItem>& getPredictions() const {
+    const ftl::StaticVector<std::pair<int64_t, TimelineItem>, impl::TokenManager::kMaxTokens>&
+    getPredictions() const {
         return mTokenManager->mPredictions;
     }
 
