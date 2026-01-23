@@ -709,10 +709,10 @@ status_t RpcState::transactInternal(const sp<RpcSession::RpcConnection>& connect
     };
     std::optional<SmallFunction<status_t()>> altPoll = std::nullopt;
     struct {
-        const sp<RpcSession::RpcConnection> connection;
-        const sp<RpcSession> session;
+        const sp<RpcSession::RpcConnection>* connection;
+        const sp<RpcSession>* session;
         size_t waitUs;
-    } tmpHeap = {connection, session, 0};
+    } tmpHeap = {&connection, &session, 0};
     if (session->getMaxIncomingThreads() == 0) {
         altPoll = [this, &tmpHeap] {
             // Oneway calls have no sync point, so if many are sent before, whether this
@@ -752,7 +752,7 @@ status_t RpcState::transactInternal(const sp<RpcSession::RpcConnection>& connect
             // This is restricted to "CONTROL_ONLY" because we should not receive any
             // nested transactions until the entire transaction is sent and starts
             // executing.
-            return drainCommands(tmpHeap.connection, tmpHeap.session, CommandType::CONTROL_ONLY);
+            return drainCommands(*tmpHeap.connection, *tmpHeap.session, CommandType::CONTROL_ONLY);
         };
     }
     if (status_t status = rpcSend(connection, session, "transaction", iovs, countof(iovs), altPoll,
