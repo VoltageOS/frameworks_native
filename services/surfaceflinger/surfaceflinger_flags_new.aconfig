@@ -209,6 +209,16 @@ flag {
 } # frame_rate_category_mrr
 
 flag {
+  name: "frametimeline_boottime_in_lambda"
+  namespace: "core_graphics"
+  description: "Converts monotonic boottime timestamps to wallclock time in FrameTimeline"
+  bug: "477947066"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+} # frametimeline_boottime_in_lambda
+
+flag {
   name: "frontend_caching_v0"
   namespace: "core_graphics"
   description: "Enables caching of frontend layer states"
