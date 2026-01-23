@@ -2851,6 +2851,9 @@ bool SurfaceFlinger::updateLayerSnapshots(VsyncId vsyncId, nsecs_t frameTimeNs,
 
 bool SurfaceFlinger::commit(PhysicalDisplayId pacesetterId,
                             const scheduler::FrameTargets& frameTargets) EXCLUDES(mStateLock) {
+    const scheduler::FrameTarget* pacesetterFrameTargetPtr = frameTargets.get(pacesetterId)->get();
+    const VsyncId vsyncId = pacesetterFrameTargetPtr->vsyncId();
+
     panopticon::Ids ids;
     {
         Mutex::Autolock lock(mStateLock);
@@ -2860,12 +2863,8 @@ bool SurfaceFlinger::commit(PhysicalDisplayId pacesetterId,
         }
     }
 
-    panopticon::make(ids, panopticon::Source::CG_FrameSignal);
+    panopticon::make(ids, panopticon::Source::CG_FrameSignal, ftl::to_underlying(vsyncId));
     auto commitTokens = panopticon::slice(panopticon::SliceType::CG_Sf_Commit);
-
-    const scheduler::FrameTarget* pacesetterFrameTargetPtr = frameTargets.get(pacesetterId)->get();
-
-    const VsyncId vsyncId = pacesetterFrameTargetPtr->vsyncId();
     SFTRACE_NAME(ftl::Concat(__func__, ' ', ftl::to_underlying(vsyncId)).c_str());
 
     if (pacesetterFrameTargetPtr->didMissFrame()) {
