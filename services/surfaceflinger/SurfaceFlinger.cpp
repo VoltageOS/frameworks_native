@@ -622,17 +622,29 @@ void SurfaceFlinger::run() {
 
 sp<IBinder> SurfaceFlinger::createVirtualDisplay(
         const std::string& displayName, bool isSecure,
-        gui::ISurfaceComposer::OptimizationPolicy optimizationPolicy, const std::string& uniqueId,
-        uid_t ownerUid, float requestedRefreshRate) {
-    (void)ownerUid;
-
+        gui::ISurfaceComposer::OptimizationPolicy optimizationPolicy,
+        gui::ISurfaceComposer::EmbeddedContentPolicy embeddedContentPolicy,
+        const std::string& uniqueId, uid_t ownerUid, float requestedRefreshRate) {
     // SurfaceComposerAIDL checks for some permissions, but adding an additional check here.
     // This is to ensure that only root, system, and graphics can request to create a secure
     // display. Secure displays can show secure content so we add an additional restriction on it.
     const uid_t uid = IPCThreadState::self()->getCallingUid();
-    if (isSecure && uid != AID_ROOT && uid != AID_GRAPHICS && uid != AID_SYSTEM) {
-        ALOGE("Only privileged processes can create a secure display");
-        return nullptr;
+    const bool isPrivileged = uid == AID_ROOT || uid == AID_GRAPHICS || uid == AID_SYSTEM;
+
+    if (!isPrivileged) {
+        if (isSecure) {
+            ALOGE("Only privileged processes can create a secure display");
+            return nullptr;
+        }
+        if (embeddedContentPolicy == gui::ISurfaceComposer::EmbeddedContentPolicy::Include) {
+            ALOGE("Only privileged processes can create a virtual display that includes embedded "
+                  "content.");
+            return nullptr;
+        }
+        if (ownerUid != uid) {
+            ALOGW("Only privileged processes can create a virtual display for another UID.");
+            ownerUid = uid;
+        }
     }
 
     ALOGD("Creating virtual display: %s", displayName.c_str());
@@ -665,6 +677,8 @@ sp<IBinder> SurfaceFlinger::createVirtualDisplay(
     state.displayName = displayName;
     state.uniqueId = uniqueId;
     state.requestedRefreshRate = Fps::fromValue(requestedRefreshRate);
+    state.ownerUid = gui::Uid{static_cast<unsigned int>(ownerUid)};
+    state.embeddedContentPolicy = embeddedContentPolicy;
     mCurrentState.displays.emplace_or_replace(token, state);
     return token;
 }
@@ -1533,7 +1547,10 @@ bool SurfaceFlinger::finalizeDisplayModeChange(PhysicalDisplayId displayId) {
         processDisplayChangesLocked();
 
         if (FlagManager::getInstance().modeset_state_machine()) {
-            mDisplayModeController.finalizeModeChange(displayId);
+            // processDisplayAdded has set the active mode in DMC, but not cleared the pending mode.
+            // Note that hotplug reconnect does not need to clear, because it registers the display
+            // anew with DMC, which resets the display's state.
+            mDisplayModeController.clearPendingMode(displayId);
         }
 
         // The DisplayDevice has been destroyed, so abort the commit for the now dead FrameTargeter.
@@ -4272,7 +4289,12 @@ sp<DisplayDevice> SurfaceFlinger::setupNewDisplayDeviceInternal(
                                                     RenderIntent::COLORIMETRIC});
 
     display->setLayerFilter(
-            makeLayerFilterForDisplay(display->getDisplayIdVariant(), state.layerStack));
+            makeLayerFilterForDisplay(display->getDisplayIdVariant(), state.layerStack,
+                                      state.embeddedContentPolicy ==
+                                                      gui::ISurfaceComposer::EmbeddedContentPolicy::
+                                                              Exclude
+                                              ? state.ownerUid
+                                              : gui::Uid::INVALID));
     display->setProjection(state.orientation, state.layerStackSpaceRect,
                            state.orientedDisplaySpaceRect);
     display->setDisplayName(state.displayName);
@@ -4413,6 +4435,15 @@ void SurfaceFlinger::processDisplayAdded(const wp<IBinder>& displayToken,
 
             mScheduler->registerDisplay(displayId, connectionType,
                                         display->holdRefreshRateSelector());
+
+            if (FlagManager::getInstance().modeset_state_machine()) {
+                auto activeModePtr = physical.activeMode;
+                const auto fps = activeModePtr->getPeakFps();
+
+                applyActiveMode({.mode = scheduler::FrameRateMode{fps,
+                                                                  ftl::as_non_null(std::move(
+                                                                          activeModePtr))}});
+            }
         }
     }
 
@@ -4433,7 +4464,7 @@ void SurfaceFlinger::processDisplayAdded(const wp<IBinder>& displayToken,
     // For an external display, loadDisplayModes already attempted to select the same mode
     // as DM, but SF still needs to be updated to match.
     // TODO (b/318534874): Let DM decide the initial mode.
-    if (mScheduler && state.isPhysical()) {
+    if (!FlagManager::getInstance().modeset_state_machine() && mScheduler && state.isPhysical()) {
         const auto& physical = state.getPhysical();
         const bool isInternalDisplay = mPhysicalDisplays.get(physical.id)
                                                .transform(&PhysicalDisplay::isInternal)
@@ -4542,8 +4573,14 @@ void SurfaceFlinger::processDisplayChanged(const wp<IBinder>& displayToken,
 
     if (const auto display = getDisplayDeviceLocked(displayToken)) {
         if (currentState.layerStack != drawingState.layerStack) {
-            display->setLayerFilter(makeLayerFilterForDisplay(display->getDisplayIdVariant(),
-                                                              currentState.layerStack));
+            display->setLayerFilter(
+                    makeLayerFilterForDisplay(display->getDisplayIdVariant(),
+                                              currentState.layerStack,
+                                              currentState.embeddedContentPolicy ==
+                                                              gui::ISurfaceComposer::
+                                                                      EmbeddedContentPolicy::Exclude
+                                                      ? currentState.ownerUid
+                                                      : gui::Uid::INVALID));
         }
         if (currentState.flags != drawingState.flags) {
             display->setFlags(currentState.flags);
@@ -9663,14 +9700,17 @@ binder::Status SurfaceComposerAIDL::createConnection(sp<gui::ISurfaceComposerCli
 
 binder::Status SurfaceComposerAIDL::createVirtualDisplay(
         const std::string& displayName, bool isSecure,
-        gui::ISurfaceComposer::OptimizationPolicy optimizationPolicy, const std::string& uniqueId,
-        int32_t ownerUid, float requestedRefreshRate, sp<IBinder>* outDisplay) {
+        gui::ISurfaceComposer::OptimizationPolicy optimizationPolicy,
+        gui::ISurfaceComposer::EmbeddedContentPolicy embeddedContentPolicy,
+        const std::string& uniqueId, int32_t ownerUid, float requestedRefreshRate,
+        sp<IBinder>* outDisplay) {
     status_t status = checkAccessPermission();
     if (status != OK) {
         return binderStatusFromStatusT(status);
     }
     *outDisplay = mFlinger->createVirtualDisplay(displayName, isSecure, optimizationPolicy,
-                                                 uniqueId, ownerUid, requestedRefreshRate);
+                                                 embeddedContentPolicy, uniqueId, ownerUid,
+                                                 requestedRefreshRate);
     return binder::Status::ok();
 }
 

@@ -529,10 +529,11 @@ private:
     status_t dump(int fd, const Vector<String16>& args) override { return priorityDump(fd, args); }
 
     // ISurfaceComposer implementation:
-    sp<IBinder> createVirtualDisplay(const std::string& displayName, bool isSecure,
-                                     gui::ISurfaceComposer::OptimizationPolicy optimizationPolicy,
-                                     const std::string& uniqueId, uid_t ownerUid,
-                                     float requestedRefreshRate = 0.0f);
+    sp<IBinder> createVirtualDisplay(
+            const std::string& displayName, bool isSecure,
+            gui::ISurfaceComposer::OptimizationPolicy optimizationPolicy,
+            gui::ISurfaceComposer::EmbeddedContentPolicy embeddedContentPolicy,
+            const std::string& uniqueId, uid_t ownerUid, float requestedRefreshRate = 0.0f);
     status_t destroyVirtualDisplay(const sp<IBinder>& displayToken);
     std::vector<PhysicalDisplayId> getPhysicalDisplayIds() const EXCLUDES(mStateLock) {
         Mutex::Autolock lock(mStateLock);
@@ -1138,7 +1139,8 @@ private:
     // region of all screens presenting this layer stack.
     void invalidateLayerStack(const LayerFilter& layerFilter, const Region& dirty);
 
-    LayerFilter makeLayerFilterForDisplay(DisplayIdVariant displayId, ui::LayerStack layerStack)
+    LayerFilter makeLayerFilterForDisplay(DisplayIdVariant displayId, ui::LayerStack layerStack,
+                                          gui::Uid ownerUid = gui::Uid::INVALID)
             REQUIRES(mStateLock) {
         return {.layerStack = layerStack,
                 .toInternalDisplay =
@@ -1146,7 +1148,8 @@ private:
                                 .and_then(display::getPhysicalDisplay(mPhysicalDisplays))
                                 .transform(&display::PhysicalDisplay::isInternal)
                                 .value_or(false),
-                .skipScreenshot = false};
+                .skipScreenshot = false,
+                ownerUid};
     }
 
     ui::Size findLargestFramebufferSizeLocked() const REQUIRES(mStateLock);
@@ -1756,6 +1759,7 @@ public:
     binder::Status createVirtualDisplay(
             const std::string& displayName, bool isSecure,
             gui::ISurfaceComposer::OptimizationPolicy optimizationPolicy,
+            gui::ISurfaceComposer::EmbeddedContentPolicy embeddedContentPolicy,
             const std::string& uniqueId, int32_t ownerUid, float requestedRefreshRate,
             sp<IBinder>* outDisplay) override;
     binder::Status destroyVirtualDisplay(const sp<IBinder>& displayToken) override;
