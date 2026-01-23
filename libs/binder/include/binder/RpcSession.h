@@ -353,8 +353,8 @@ private:
         const sp<RpcConnection>& get() { return mConnection; }
 
     private:
-        static void findConnection(uint64_t tid, sp<RpcConnection>* exclusive,
-                                   sp<RpcConnection>* available,
+        static void findConnection(uint64_t tid, RpcConnection** exclusive,
+                                   RpcConnection** available,
                                    std::vector<sp<RpcConnection>>& sockets,
                                    size_t socketsIndexHint);
 

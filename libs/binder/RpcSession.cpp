@@ -897,8 +897,8 @@ status_t RpcSession::ExclusiveConnection::find(RpcSession* session, ConnectionUs
 
     session->mConnections.mWaitingThreads++;
     while (true) {
-        sp<RpcConnection> exclusive;
-        sp<RpcConnection> available;
+        RpcConnection* exclusive = nullptr;
+        RpcConnection* available = nullptr;
 
         // CHECK FOR DEDICATED CLIENT SOCKET
         //
@@ -923,7 +923,7 @@ status_t RpcSession::ExclusiveConnection::find(RpcSession* session, ConnectionUs
 
         // USE SERVING SOCKET (e.g. nested transaction)
         if (use != ConnectionUse::CLIENT_ASYNC) {
-            sp<RpcConnection> exclusiveIncoming;
+            RpcConnection* exclusiveIncoming = nullptr;
             // server connections are always assigned to a thread
             findConnection(tid, &exclusiveIncoming, nullptr /*available*/,
                            session->mConnections.mIncoming, 0 /* index hint */);
@@ -946,11 +946,11 @@ status_t RpcSession::ExclusiveConnection::find(RpcSession* session, ConnectionUs
 
         // if our thread is already using a connection, prioritize using that
         if (exclusive != nullptr) {
-            connection->mConnection = exclusive;
+            connection->mConnection = sp<RpcConnection>::fromExisting(exclusive);
             connection->mReentrant = true;
             break;
         } else if (available != nullptr) {
-            connection->mConnection = available;
+            connection->mConnection = sp<RpcConnection>::fromExisting(available);
             connection->mConnection->exclusiveTid = tid;
             break;
         }
@@ -980,8 +980,8 @@ status_t RpcSession::ExclusiveConnection::find(RpcSession* session, ConnectionUs
     return OK;
 }
 
-void RpcSession::ExclusiveConnection::findConnection(uint64_t tid, sp<RpcConnection>* exclusive,
-                                                     sp<RpcConnection>* available,
+void RpcSession::ExclusiveConnection::findConnection(uint64_t tid, RpcConnection** exclusive,
+                                                     RpcConnection** available,
                                                      std::vector<sp<RpcConnection>>& sockets,
                                                      size_t socketsIndexHint) {
     LOG_ALWAYS_FATAL_IF(sockets.size() > 0 && socketsIndexHint >= sockets.size(),
@@ -994,14 +994,14 @@ void RpcSession::ExclusiveConnection::findConnection(uint64_t tid, sp<RpcConnect
 
         // take first available connection (intuition = caching)
         if (available && *available == nullptr && socket->exclusiveTid == std::nullopt) {
-            *available = socket;
+            *available = socket.get();
             continue;
         }
 
         // though, prefer to take connection which is already inuse by this thread
         // (nested transactions)
         if (exclusive && socket->exclusiveTid == tid) {
-            *exclusive = socket;
+            *exclusive = socket.get();
             break; // consistent with return above
         }
     }
