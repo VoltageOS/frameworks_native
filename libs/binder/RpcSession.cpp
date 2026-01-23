@@ -239,7 +239,7 @@ sp<IBinder> RpcSession::getRootObject() {
     status_t status = ExclusiveConnection::find(sp<RpcSession>::fromExisting(this),
                                                 ConnectionUse::CLIENT, &connection);
     if (status != OK) return nullptr;
-    return state()->getRootObject(connection.get(), sp<RpcSession>::fromExisting(this));
+    return state()->getRootObject(*connection.get(), *this);
 }
 
 status_t RpcSession::getRemoteMaxThreads(size_t* maxThreads) {
@@ -247,7 +247,7 @@ status_t RpcSession::getRemoteMaxThreads(size_t* maxThreads) {
     status_t status = ExclusiveConnection::find(sp<RpcSession>::fromExisting(this),
                                                 ConnectionUse::CLIENT, &connection);
     if (status != OK) return status;
-    return state()->getMaxThreads(connection.get(), sp<RpcSession>::fromExisting(this), maxThreads);
+    return state()->getMaxThreads(*connection.get(), *this, maxThreads);
 }
 
 bool RpcSession::shutdownAndWait(bool wait) {
@@ -265,7 +265,7 @@ bool RpcSession::shutdownAndWait(bool wait) {
 
     _l.unlock();
 
-    if (status_t res = state()->sendObituaries(sp<RpcSession>::fromExisting(this)); res != OK) {
+    if (status_t res = state()->sendObituaries(*this); res != OK) {
         ALOGE("Failed to send obituaries as the RpcSession is shutting down: %s",
               statusToString(res).c_str());
     }
@@ -284,8 +284,7 @@ status_t RpcSession::transact(const sp<IBinder>& binder, uint32_t code, const Pa
                                                                      : ConnectionUse::CLIENT,
                                       &connection);
     if (status != OK) return status;
-    return state()->transact(connection.get(), binder, code, data,
-                             sp<RpcSession>::fromExisting(this), reply, flags);
+    return state()->transact(*connection.get(), binder, code, data, *this, reply, flags);
 }
 
 status_t RpcSession::sendDecStrong(const BpBinder* binder) {
@@ -298,8 +297,7 @@ status_t RpcSession::sendDecStrongToTarget(uint64_t address, size_t target) {
     status_t status = ExclusiveConnection::find(sp<RpcSession>::fromExisting(this),
                                                 ConnectionUse::CLIENT_REFCOUNT, &connection);
     if (status != OK) return status;
-    return state()->sendDecStrongToTarget(connection.get(), sp<RpcSession>::fromExisting(this),
-                                          address, target);
+    return state()->sendDecStrongToTarget(*connection.get(), *this, address, target);
 }
 
 status_t RpcSession::readId() {
@@ -313,7 +311,7 @@ status_t RpcSession::readId() {
                                                 ConnectionUse::CLIENT, &connection);
     if (status != OK) return status;
 
-    status = state()->getSessionId(connection.get(), sp<RpcSession>::fromExisting(this), &mId);
+    status = state()->getSessionId(*connection.get(), *this, &mId);
     if (status != OK) return status;
 
     LOG_RPC_DETAIL("RpcSession %p has id %s", this, HexString(mId.data(), mId.size()).c_str());
@@ -362,8 +360,7 @@ RpcSession::PreJoinSetupResult RpcSession::preJoinSetup(
     if (connection == nullptr) {
         status = DEAD_OBJECT;
     } else {
-        status =
-                mRpcBinderState->readConnectionInit(connection, sp<RpcSession>::fromExisting(this));
+        status = mRpcBinderState->readConnectionInit(*connection, *this);
     }
 
     return PreJoinSetupResult{
@@ -434,7 +431,7 @@ void RpcSession::join(sp<RpcSession>&& session, PreJoinSetupResult&& setupResult
         LOG_ALWAYS_FATAL_IF(!connection, "must have connection if setup succeeded");
         [[maybe_unused]] JavaThreadAttacher javaThreadAttacher;
         while (true) {
-            status_t status = session->state()->getAndExecuteCommand(connection, session,
+            status_t status = session->state()->getAndExecuteCommand(*connection, *session,
                                                                      RpcState::CommandType::ANY);
             if (status != OK) {
                 LOG_RPC_DETAIL("Binder connection thread closing w/ status %s",
@@ -541,9 +538,7 @@ status_t RpcSession::setupClient(Fn&& connectAndInit) {
             return status;
 
         uint32_t version;
-        if (status_t status =
-                    state()->readNewSessionResponse(connection.get(),
-                                                    sp<RpcSession>::fromExisting(this), &version);
+        if (status_t status = state()->readNewSessionResponse(*connection.get(), *this, &version);
             status != OK)
             return status;
         if (!setProtocolVersionInternal(version, false)) return BAD_VALUE;
@@ -801,8 +796,7 @@ status_t RpcSession::addOutgoingConnection(std::unique_ptr<RpcTransport> rpcTran
 
     status_t status = OK;
     if (init) {
-        status =
-                mRpcBinderState->sendConnectionInit(connection, sp<RpcSession>::fromExisting(this));
+        status = mRpcBinderState->sendConnectionInit(*connection, *this);
     }
 
     clearConnectionTid(connection);

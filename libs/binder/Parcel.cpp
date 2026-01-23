@@ -260,7 +260,7 @@ status_t Parcel::flattenBinder(const sp<IBinder>& binder) {
             status_t status = writeInt32(RpcFields::TYPE_BINDER); // non-null
             if (status != OK) return status;
             uint64_t address;
-            status = rpcFields->mSession->state()->onBinderLeaving(rpcFields->mSession, binder,
+            status = rpcFields->mSession->state()->onBinderLeaving(*rpcFields->mSession, binder,
                                                                    &address);
             if (status != OK) return status;
             status = writeUint64(address);
@@ -420,7 +420,7 @@ status_t Parcel::unflattenBinder(sp<IBinder>* out) const
             if (binder == nullptr) {
                 if (rpcFields->mSendState == RpcFields::RpcSendState::RECEIVED) {
                     if (status_t status =
-                                rpcFields->mSession->state()->onBinderEntering(rpcFields->mSession,
+                                rpcFields->mSession->state()->onBinderEntering(*rpcFields->mSession,
                                                                                addr, &binder);
                         status != OK)
                         return status;
@@ -429,7 +429,7 @@ status_t Parcel::unflattenBinder(sp<IBinder>* out) const
 
                     if (status_t status =
                                 rpcFields->mSession->state()
-                                        ->flushExcessBinderRefs(rpcFields->mSession, addr, binder);
+                                        ->flushExcessBinderRefs(*rpcFields->mSession, addr, binder);
                         status != OK) {
                         return status;
                     }
@@ -787,7 +787,7 @@ status_t Parcel::appendFrom(const Parcel* parcel, size_t offset, size_t len) {
 
                     uint64_t leavingAddress;
                     if (status_t status =
-                                rpcFields->mSession->state()->onBinderLeaving(rpcFields->mSession,
+                                rpcFields->mSession->state()->onBinderLeaving(*rpcFields->mSession,
                                                                               binder,
                                                                               &leavingAddress);
                         status != OK) {
@@ -3634,7 +3634,7 @@ status_t Parcel::truncateRpcObjects(size_t newObjectsSize) {
                 LOG_ALWAYS_FATAL_IF(readRpcBinderAddress(&addr) != OK,
                                     "Inconsistent acquisition state.");
                 if (status_t status =
-                            rpcFields->mSession->state()->cancelBinderLeaving(rpcFields->mSession,
+                            rpcFields->mSession->state()->cancelBinderLeaving(*rpcFields->mSession,
                                                                               addr);
                     status != OK) {
                     ALOGE("Unexpected failure releasing resources: %s",
