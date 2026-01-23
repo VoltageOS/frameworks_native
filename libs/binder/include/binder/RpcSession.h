@@ -404,6 +404,7 @@ private:
     bool mStartedSetup = false;
     size_t mMaxIncomingThreads = 0;
     size_t mMaxOutgoingConnections = kDefaultMaxOutgoingConnections;
+    // If mStartedSetup=true, OK to access without a lock + always has a value.
     std::optional<uint32_t> mProtocolVersion;
     FileDescriptorTransportMode mFileDescriptorTransportMode = FileDescriptorTransportMode::NONE;
 

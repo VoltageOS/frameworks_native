@@ -802,7 +802,7 @@ status_t RpcState::waitForReply(RpcSession::RpcConnection& connection, RpcSessio
         ancillaryFds = decltype(ancillaryFds)();
     }
 
-    const size_t rpcReplyWireSize = RpcWireReply::wireSize(session.getProtocolVersion().value());
+    const size_t rpcReplyWireSize = RpcWireReply::wireSize(*session.mProtocolVersion);
 
     if (command.bodySize < rpcReplyWireSize) {
         ALOGE("Expecting %zu but got %" PRId32 " bytes for RpcWireReply. Terminating!",
@@ -839,7 +839,7 @@ status_t RpcState::waitForReply(RpcSession::RpcConnection& connection, RpcSessio
 
     Span<const uint8_t> parcelSpan = {data.data(), data.size()};
     Span<const uint32_t> objectTableSpan;
-    if (session.getProtocolVersion().value() >=
+    if (*session.mProtocolVersion >=
         RPC_WIRE_PROTOCOL_VERSION_RPC_HEADER_FEATURE_EXPLICIT_PARCEL_SIZE) {
         std::optional<Span<const uint8_t>> objectTableBytes =
                 parcelSpan.splitOff(rpcReply.parcelDataSize);
@@ -1143,7 +1143,7 @@ processTransactInternalTailCall:
                                           transactionData.size() -
                                                   offsetof(RpcWireTransaction, data)};
         Span<const uint32_t> objectTableSpan;
-        if (session.getProtocolVersion().value() >=
+        if (*session.mProtocolVersion >=
             RPC_WIRE_PROTOCOL_VERSION_RPC_HEADER_FEATURE_EXPLICIT_PARCEL_SIZE) {
             std::optional<Span<const uint8_t>> objectTableBytes =
                     parcelSpan.splitOff(transaction->parcelDataSize);
@@ -1330,7 +1330,7 @@ processTransactInternalTailCall:
     auto* rpcFields = reply.maybeRpcFields();
     LOG_ALWAYS_FATAL_IF(rpcFields == nullptr);
 
-    const size_t rpcReplyWireSize = RpcWireReply::wireSize(session.getProtocolVersion().value());
+    const size_t rpcReplyWireSize = RpcWireReply::wireSize(*session.mProtocolVersion);
 
     Span<const uint32_t> objectTableSpan = Span<const uint32_t>{rpcFields->mObjectPositions.data(),
                                                                 rpcFields->mObjectPositions.size()};
@@ -1470,7 +1470,7 @@ status_t RpcState::validateParcel(RpcSession& session, const Parcel& parcel,
         return BAD_TYPE;
     }
 
-    uint32_t protocolVersion = session.getProtocolVersion().value();
+    uint32_t protocolVersion = *session.mProtocolVersion;
     if (protocolVersion < RPC_WIRE_PROTOCOL_VERSION_RPC_HEADER_FEATURE_EXPLICIT_PARCEL_SIZE &&
         !rpcFields->mObjectPositions.empty()) {
         *errorMsg = "Parcel has attached objects but the session's protocol version ";
