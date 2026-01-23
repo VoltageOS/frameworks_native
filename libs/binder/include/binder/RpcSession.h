@@ -345,7 +345,8 @@ private:
     // Object representing exclusive access to a connection.
     class ExclusiveConnection {
     public:
-        [[nodiscard]] static status_t find(const sp<RpcSession>& session, ConnectionUse use,
+        // `session` must be valid for the lifetime of `connection`.
+        [[nodiscard]] static status_t find(RpcSession* session, ConnectionUse use,
                                            ExclusiveConnection* connection);
 
         ~ExclusiveConnection();
@@ -357,7 +358,7 @@ private:
                                    std::vector<sp<RpcConnection>>& sockets,
                                    size_t socketsIndexHint);
 
-        sp<RpcSession> mSession; // avoid deallocation
+        RpcSession* mSession = nullptr;
         sp<RpcConnection> mConnection;
 
         // whether this is being used for a nested transaction (being on the same

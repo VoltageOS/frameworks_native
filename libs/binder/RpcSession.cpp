@@ -236,16 +236,14 @@ status_t RpcSession::addNullDebuggingClient() {
 
 sp<IBinder> RpcSession::getRootObject() {
     ExclusiveConnection connection;
-    status_t status = ExclusiveConnection::find(sp<RpcSession>::fromExisting(this),
-                                                ConnectionUse::CLIENT, &connection);
+    status_t status = ExclusiveConnection::find(this, ConnectionUse::CLIENT, &connection);
     if (status != OK) return nullptr;
     return state()->getRootObject(*connection.get(), *this);
 }
 
 status_t RpcSession::getRemoteMaxThreads(size_t* maxThreads) {
     ExclusiveConnection connection;
-    status_t status = ExclusiveConnection::find(sp<RpcSession>::fromExisting(this),
-                                                ConnectionUse::CLIENT, &connection);
+    status_t status = ExclusiveConnection::find(this, ConnectionUse::CLIENT, &connection);
     if (status != OK) return status;
     return state()->getMaxThreads(*connection.get(), *this, maxThreads);
 }
@@ -279,7 +277,7 @@ status_t RpcSession::transact(const sp<IBinder>& binder, uint32_t code, const Pa
                               Parcel* reply, uint32_t flags) {
     ExclusiveConnection connection;
     status_t status =
-            ExclusiveConnection::find(sp<RpcSession>::fromExisting(this),
+            ExclusiveConnection::find(this,
                                       (flags & IBinder::FLAG_ONEWAY) ? ConnectionUse::CLIENT_ASYNC
                                                                      : ConnectionUse::CLIENT,
                                       &connection);
@@ -294,8 +292,7 @@ status_t RpcSession::sendDecStrong(const BpBinder* binder) {
 
 status_t RpcSession::sendDecStrongToTarget(uint64_t address, size_t target) {
     ExclusiveConnection connection;
-    status_t status = ExclusiveConnection::find(sp<RpcSession>::fromExisting(this),
-                                                ConnectionUse::CLIENT_REFCOUNT, &connection);
+    status_t status = ExclusiveConnection::find(this, ConnectionUse::CLIENT_REFCOUNT, &connection);
     if (status != OK) return status;
     return state()->sendDecStrongToTarget(*connection.get(), *this, address, target);
 }
@@ -307,8 +304,7 @@ status_t RpcSession::readId() {
     }
 
     ExclusiveConnection connection;
-    status_t status = ExclusiveConnection::find(sp<RpcSession>::fromExisting(this),
-                                                ConnectionUse::CLIENT, &connection);
+    status_t status = ExclusiveConnection::find(this, ConnectionUse::CLIENT, &connection);
     if (status != OK) return status;
 
     status = state()->getSessionId(*connection.get(), *this, &mId);
@@ -532,8 +528,7 @@ status_t RpcSession::setupClient(Fn&& connectAndInit) {
 
     {
         ExclusiveConnection connection;
-        if (status_t status = ExclusiveConnection::find(sp<RpcSession>::fromExisting(this),
-                                                        ConnectionUse::CLIENT, &connection);
+        if (status_t status = ExclusiveConnection::find(this, ConnectionUse::CLIENT, &connection);
             status != OK)
             return status;
 
@@ -891,7 +886,7 @@ std::vector<uint8_t> RpcSession::getCertificate(RpcCertificateFormat format) {
     return mCtx->getCertificate(format);
 }
 
-status_t RpcSession::ExclusiveConnection::find(const sp<RpcSession>& session, ConnectionUse use,
+status_t RpcSession::ExclusiveConnection::find(RpcSession* session, ConnectionUse use,
                                                ExclusiveConnection* connection) {
     connection->mSession = session;
     connection->mConnection = nullptr;
