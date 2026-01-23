@@ -3428,7 +3428,7 @@ CompositeResultsPerDisplay SurfaceFlinger::composite(
 
     TimeStats::ClientCompositionRecord clientCompositionRecord;
 
-    for (const auto& [_, display] : FTL_FAKE_GUARD(mStateLock, mDisplays)) {
+    for (const auto& [_, display] : displays) {
         const auto& state = display->getCompositionDisplay()->getState();
         CompositionCoverageFlags& flags =
                 mCompositionCoverage.try_emplace(display->getDisplayIdVariant()).first->second;
@@ -4735,7 +4735,8 @@ void SurfaceFlinger::persistDisplayBrightness(bool needsComposite) {
         return;
     }
 
-    for (const auto& [_, display] : FTL_FAKE_GUARD(mStateLock, mDisplays)) {
+    const auto& displays = FTL_FAKE_GUARD(mStateLock, mDisplays);
+    for (const auto& [_, display] : displays) {
         if (const auto brightness = display->getStagedBrightness(); brightness) {
             if (!needsComposite) {
                 const status_t error =
@@ -4778,7 +4779,8 @@ void SurfaceFlinger::buildWindowInfos(std::vector<WindowInfo>& outWindowInfos,
 
 void SurfaceFlinger::updateCursorAsync() {
     compositionengine::CompositionRefreshArgs refreshArgs;
-    for (const auto& [_, display] : FTL_FAKE_GUARD(mStateLock, mDisplays)) {
+    const auto& displays = FTL_FAKE_GUARD(mStateLock, mDisplays);
+    for (const auto& [_, display] : displays) {
         if (asHalDisplayId(display->getDisplayIdVariant())) {
             refreshArgs.outputs.push_back(display->getCompositionDisplay());
         }
@@ -5071,7 +5073,8 @@ void SurfaceFlinger::doCommitTransactions() {
 }
 
 void SurfaceFlinger::invalidateLayerStack(const LayerFilter& layerFilter, const Region& dirty) {
-    for (const auto& [token, displayDevice] : FTL_FAKE_GUARD(mStateLock, mDisplays)) {
+    const auto& displays = FTL_FAKE_GUARD(mStateLock, mDisplays);
+    for (const auto& [token, displayDevice] : displays) {
         auto display = displayDevice->getCompositionDisplay();
         if (display->includesLayer(layerFilter)) {
             display->editState().dirtyRegion.orSelf(dirty);
@@ -6098,7 +6101,8 @@ void SurfaceFlinger::initializeDisplays() {
     state.id = transactionId;
 
     auto layerStack = ui::DEFAULT_LAYER_STACK.id;
-    for (const auto& [id, display] : FTL_FAKE_GUARD(mStateLock, mPhysicalDisplays)) {
+    const auto& displays = FTL_FAKE_GUARD(mStateLock, mPhysicalDisplays);
+    for (const auto& [id, display] : displays) {
         state.displays.emplace_back(
                 DisplayState(display.token(), ui::LayerStack::fromValue(layerStack++)));
     }
@@ -6817,7 +6821,8 @@ perfetto::protos::LayersProto SurfaceFlinger::dumpDrawingStateProto(uint32_t tra
 
     // Determine if virtual layers display should be skipped
     if ((traceFlags & LayerTracing::TRACE_VIRTUAL_DISPLAYS) == 0) {
-        for (const auto& [_, display] : FTL_FAKE_GUARD(mStateLock, mDisplays)) {
+        const auto& displays = FTL_FAKE_GUARD(mStateLock, mDisplays);
+        for (const auto& [_, display] : displays) {
             if (display->isVirtual()) {
                 stackIdsToSkip.insert(display->getLayerStack().id);
             }
@@ -6838,9 +6843,10 @@ perfetto::protos::LayersProto SurfaceFlinger::dumpDrawingStateProto(uint32_t tra
 
 google::protobuf::RepeatedPtrField<perfetto::protos::DisplayProto>
 SurfaceFlinger::dumpDisplayProto() const {
-    google::protobuf::RepeatedPtrField<perfetto::protos::DisplayProto> displays;
-    for (const auto& [_, display] : FTL_FAKE_GUARD(mStateLock, mDisplays)) {
-        perfetto::protos::DisplayProto* displayProto = displays.Add();
+    google::protobuf::RepeatedPtrField<perfetto::protos::DisplayProto> displayProtos;
+    const auto& displays = FTL_FAKE_GUARD(mStateLock, mDisplays);
+    for (const auto& [_, display] : displays) {
+        perfetto::protos::DisplayProto* displayProto = displayProtos.Add();
         displayProto->set_id(display->getId().value);
         displayProto->set_name(display->getDisplayName());
         displayProto->set_layer_stack(display->getLayerStack().id);
@@ -6860,7 +6866,7 @@ SurfaceFlinger::dumpDisplayProto() const {
                                                 displayProto->mutable_transform());
         displayProto->set_is_virtual(display->isVirtual());
     }
-    return displays;
+    return displayProtos;
 }
 
 void SurfaceFlinger::dumpHwc(std::string& result) const {

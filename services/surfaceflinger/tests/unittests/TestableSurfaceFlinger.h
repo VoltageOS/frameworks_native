@@ -329,9 +329,8 @@ public:
 
         scheduler::FrameTargets targets;
         scheduler::FrameTargeters targeters;
-
-        for (const auto& [id, display] :
-             FTL_FAKE_GUARD(mFlinger->mStateLock, mFlinger->mPhysicalDisplays)) {
+        const auto& displays = FTL_FAKE_GUARD(mFlinger->mStateLock, mFlinger->mPhysicalDisplays);
+        for (const auto& [id, display] : displays) {
             targets.try_emplace(id, &frameTargeter.target());
             targeters.try_emplace(id, &frameTargeter);
         }
