@@ -457,6 +457,7 @@ void LayerSnapshotBuilder::updateSnapshots(const Args& args) {
         auto mergedSnapshot =
                 args.mergeableHierarchyManager->findLayerSnapshotCopy(UNASSIGNED_LAYER_ID);
         if (mergedSnapshot) {
+            updateVisibility(*mergedSnapshot, mergedSnapshot->getIsVisible());
             mMergedSnapshots.emplace_back(std::move(mergedSnapshot));
         }
     }
@@ -531,7 +532,7 @@ void LayerSnapshotBuilder::update(const Args& args) {
         clearChanges(*snapshot);
     }
 
-    if (tryFastUpdate(args)) {
+    if (tryFastUpdate(args) && args.mergeableHierarchyManager == nullptr) {
         return;
     }
     updateSnapshots(args);
@@ -569,11 +570,11 @@ const LayerSnapshot& LayerSnapshotBuilder::updateSnapshotsInHierarchy(
     if (args.mergeableHierarchyManager) {
         auto mergedSnapshot = args.mergeableHierarchyManager->findLayerSnapshotCopy(layer->id);
         if (mergedSnapshot) {
-            updateSnapshot(*mergedSnapshot, args, *layer, parentSnapshot, traversalPath);
+            updateSnapshot(*mergedSnapshot, args, *layer, parentSnapshot, traversalPath, true);
+            updateVisibility(*mergedSnapshot, mergedSnapshot->getIsVisible());
             mMergedSnapshots.emplace_back(std::move(mergedSnapshot));
-        }
-
-        if (!args.mergeableHierarchyManager->isMemberOfAnyHierarchy(layer->id)) {
+        } else if (!args.mergeableHierarchyManager->isMemberOfAnyHierarchy(layer->id)) {
+            updateVisibility(*snapshot, snapshot->getIsVisible());
             mMergedSnapshots.emplace_back(std::make_unique<LayerSnapshot>(*snapshot));
         }
     }
@@ -753,7 +754,8 @@ int multiplyAlpha(int color, float alpha) {
 void LayerSnapshotBuilder::updateSnapshot(LayerSnapshot& snapshot, const Args& args,
                                           const RequestedLayerState& requested,
                                           const LayerSnapshot& parentSnapshot,
-                                          const LayerHierarchy::TraversalPath& path) {
+                                          const LayerHierarchy::TraversalPath& path,
+                                          bool forMergedSnapshot) {
     // Always update flags and visibility
     ftl::Flags<RequestedLayerState::Changes> parentChanges = parentSnapshot.changes &
             (RequestedLayerState::Changes::Hierarchy | RequestedLayerState::Changes::Geometry |
@@ -804,7 +806,7 @@ void LayerSnapshotBuilder::updateSnapshot(LayerSnapshot& snapshot, const Args& a
             snapshot.changes.any(RequestedLayerState::Changes::Geometry |
                                  RequestedLayerState::Changes::BufferSize |
                                  RequestedLayerState::Changes::Input)) {
-            updateInput(snapshot, requested, parentSnapshot, path, args);
+            updateInput(snapshot, requested, parentSnapshot, path, args, forMergedSnapshot);
         }
         if (forceUpdate ||
             (args.includeMetadata &&
@@ -1016,7 +1018,7 @@ void LayerSnapshotBuilder::updateSnapshot(LayerSnapshot& snapshot, const Args& a
     if (forceUpdate ||
         snapshot.changes.any(RequestedLayerState::Changes::Geometry |
                              RequestedLayerState::Changes::Input)) {
-        updateInput(snapshot, requested, parentSnapshot, path, args);
+        updateInput(snapshot, requested, parentSnapshot, path, args, forMergedSnapshot);
     }
 
     if (forceUpdate || snapshot.clientChanges & layer_state_t::eSystemContentPriorityChanged) {
@@ -1334,7 +1336,11 @@ void LayerSnapshotBuilder::updateLayerBounds(LayerSnapshot& snapshot,
     if (!requested.crop.isEmpty()) {
         snapshot.geomLayerCrop = snapshot.geomLayerCrop.intersect(requested.crop);
     }
-    snapshot.geomLayerBounds = snapshot.geomLayerBounds.intersect(snapshot.geomLayerCrop);
+
+    if (!snapshot.geomLayerCrop.isEmpty()) {
+        snapshot.geomLayerBounds = snapshot.geomLayerBounds.intersect(snapshot.geomLayerCrop);
+    }
+
     snapshot.transformedBounds = snapshot.geomLayerTransform.transform(snapshot.geomLayerBounds);
     const Rect geomLayerBoundsWithoutTransparentRegion =
             RequestedLayerState::reduce(Rect(snapshot.geomLayerBounds),
@@ -1378,8 +1384,8 @@ void LayerSnapshotBuilder::updateShadows(LayerSnapshot& snapshot, const Requeste
 void LayerSnapshotBuilder::updateInput(LayerSnapshot& snapshot,
                                        const RequestedLayerState& requested,
                                        const LayerSnapshot& parentSnapshot,
-                                       const LayerHierarchy::TraversalPath& path,
-                                       const Args& args) {
+                                       const LayerHierarchy::TraversalPath& path, const Args& args,
+                                       bool forMergedSnapshot) {
     using InputConfig = gui::WindowInfo::InputConfig;
 
     snapshot.inputInfo = requested.getWindowInfo();
@@ -1441,7 +1447,9 @@ void LayerSnapshotBuilder::updateInput(LayerSnapshot& snapshot,
     }
 
     if (requested.touchCropId != UNASSIGNED_LAYER_ID || path.isClone()) {
-        mNeedsTouchableRegionCrop.insert(path);
+        if (!forMergedSnapshot) {
+            mNeedsTouchableRegionCrop.insert(path);
+        }
     }
     auto cropLayerSnapshot = getSnapshot(requested.touchCropId);
     if (!cropLayerSnapshot && snapshot.inputInfo.replaceTouchableRegionWithCrop) {
