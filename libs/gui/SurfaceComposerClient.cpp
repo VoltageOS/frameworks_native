@@ -1404,6 +1404,16 @@ SurfaceComposerClient::Transaction& SurfaceComposerClient::Transaction::setFlags
     return *this;
 }
 
+SurfaceComposerClient::Transaction& SurfaceComposerClient::Transaction::setRoundedCornerOpt(
+        const sp<SurfaceControl>& sc, bool enable) {
+    if (enable) {
+        return setFlags(sc, 0, layer_state_t::eRoundedCornerOptDisabled);
+    } else {
+        return setFlags(sc, layer_state_t::eRoundedCornerOptDisabled,
+                        layer_state_t::eRoundedCornerOptDisabled);
+    }
+}
+
 SurfaceComposerClient::Transaction& SurfaceComposerClient::Transaction::setTransparentRegionHint(
         const sp<SurfaceControl>& sc, const Region& transparentRegion) {
     layer_state_t* s = getLayerState(sc);

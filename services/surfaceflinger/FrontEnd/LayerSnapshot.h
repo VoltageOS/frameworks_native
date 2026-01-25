@@ -46,6 +46,8 @@ struct RoundedCornerState {
     // The radius used as the source for children to inherit from.
     gui::CornerRadii effectiveRadii;
 
+    bool disableClientDrawnRadii = false;
+
     bool hasClientDrawnRadius() const { return !clientDrawnRadii.isEmpty(); }
     bool hasRequestedRadius() const { return !requestedRadii.isEmpty(); }
     bool hasSfDrawnRadius() const { return !sfDrawnRadii.isEmpty(); }
