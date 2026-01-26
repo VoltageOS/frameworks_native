@@ -70,7 +70,7 @@ fn is_device_usb(device: &Device) -> bool {
 }
 
 /// Main function of the usb_auth crate.
-#[tokio::main]
+#[tokio::main(flavor = "multi_thread", worker_threads = 2)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     logger::init(
         logger::Config::default()
