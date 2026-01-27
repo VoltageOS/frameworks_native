@@ -1828,6 +1828,20 @@ SurfaceComposerClient::Transaction& SurfaceComposerClient::Transaction::setDesir
     return *this;
 }
 
+SurfaceComposerClient::Transaction& SurfaceComposerClient::Transaction::setDesiredMaxHdrHeadroom(
+        const sp<SurfaceControl>& sc, float maxDesiredHdrSdrRatio) {
+    layer_state_t* s = getLayerState(sc);
+    if (!s) {
+        mStatus = BAD_INDEX;
+        return *this;
+    }
+    s->what |= layer_state_t::eDesiredMaxHdrHeadroomChanged;
+    s->maxDesiredHdrSdrRatio = maxDesiredHdrSdrRatio;
+
+    registerSurfaceControlForCallback(sc);
+    return *this;
+}
+
 SurfaceComposerClient::Transaction& SurfaceComposerClient::Transaction::setLuts(
         const sp<SurfaceControl>& sc, base::unique_fd&& lutFd, const std::vector<int32_t>& offsets,
         const std::vector<int32_t>& dimensions, const std::vector<int32_t>& sizes,

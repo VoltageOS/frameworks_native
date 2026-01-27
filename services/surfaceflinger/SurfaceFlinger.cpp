@@ -5832,6 +5832,11 @@ uint32_t SurfaceFlinger::updateLayerCallbacksAndStats(const FrameTimelineInfo& f
             flags |= eTraversalNeeded;
         }
     }
+    if (what & layer_state_t::eDesiredMaxHdrHeadroomChanged) {
+        if (layer->setDesiredMaxHdrHeadroom(s.maxDesiredHdrSdrRatio)) {
+            flags |= eTraversalNeeded;
+        }
+    }
     if (what & layer_state_t::eBufferChanged) {
         std::optional<ui::Transform::RotationFlags> transformHint = std::nullopt;
         if (snapshot) {
