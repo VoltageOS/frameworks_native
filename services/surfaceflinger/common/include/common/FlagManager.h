@@ -88,7 +88,6 @@ public:
     bool connected_display_hdr_v3() const;
     bool correct_dpi_with_display_size() const;
     bool deprecate_frame_tracker() const;
-    bool disable_synthetic_vsync_for_performance() const;
     bool display_command_modeset() const;
     bool frame_rate_category_mrr() const;
     bool graphite_renderengine() const;
