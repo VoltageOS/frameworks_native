@@ -125,7 +125,6 @@ void FlagManager::dump(std::string& result) const {
     DUMP_ACONFIG_FLAG(adpf_gpu_sf);
     DUMP_ACONFIG_FLAG(color_transform_translation);
     DUMP_ACONFIG_FLAG(configure_work_duration);
-    DUMP_ACONFIG_FLAG(correct_virtual_display_power_state);
     DUMP_ACONFIG_FLAG(deprecate_vsync_sf_v2);
     DUMP_ACONFIG_FLAG(disable_transparent_region_hint);
     DUMP_ACONFIG_FLAG(enable_color_correction_bugfix);
@@ -333,8 +332,6 @@ FLAG_MANAGER_ACONFIG_FLAG(use_experimental_jank_classification, "");
 
 /// Trunk stable server (R/W) flags from outside SurfaceFlinger ///
 
-FLAG_MANAGER_ACONFIG_FLAG_IMPORTED(correct_virtual_display_power_state, "",
-                                   android::companion::virtualdevice::flags)
 FLAG_MANAGER_ACONFIG_FLAG_IMPORTED(luts_api, "", android::hardware::flags);
 
 bool FlagManager::follower_arbitrary_refresh_rate_selection_combined() const {
