@@ -23,8 +23,8 @@ package {
 
 cc_library_static {
     name: "libprocpartition",
-    whole_static_libs: [
-        "libtinyxml2",
+    static_libs: [
+        "apex_aidl_interface-cpp",
     ],
     shared_libs: [
         "libbase",
