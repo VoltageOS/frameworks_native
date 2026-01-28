@@ -1438,11 +1438,17 @@ void SkiaRenderEngine::drawLayersInternal(
             SFTRACE_NAME("RenderCommandBuffer");
             if (layer.renderResourceCache) {
                 for (auto& [id, bitmap] : layer.renderResourceCache->bitmaps) {
-                    auto imageTextureRef = getOrCreateBackendTexture(bitmap.buffer, false);
+                    bool isRenderTarget =
+                            bitmap.buffer->getUsage() & GraphicBuffer::USAGE_HW_RENDER;
+                    auto imageTextureRef = getOrCreateBackendTexture(bitmap.buffer, isRenderTarget);
 
                     if (!bitmap.image) {
                         bitmap.image =
                                 imageTextureRef->makeImage(layerDataspace, kUnpremul_SkAlphaType);
+                    }
+
+                    if (isRenderTarget && !bitmap.surface) {
+                        bitmap.surface = imageTextureRef->getOrCreateSurface(layerDataspace);
                     }
                 }
             }
