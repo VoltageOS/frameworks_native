@@ -105,7 +105,8 @@ RequestedLayerState::RequestedLayerState(const LayerCreationArgs& args)
     z = 0;
     layerStack = ui::DEFAULT_LAYER_STACK;
     transformToDisplayInverse = false;
-    desiredHdrSdrRatio = -1.f;
+    desiredHdrSdrRatio = 0.f;
+    maxDesiredHdrSdrRatio = 0.f;
     currentHdrSdrRatio = 1.f;
     dataspaceRequested = false;
     hdrMetadata.validTypes = 0;
@@ -376,6 +377,14 @@ void RequestedLayerState::merge(const ResolvedComposerState& resolvedComposerSta
         changes |= RequestedLayerState::Changes::Visibility;
     }
 
+    if (clientState.what & layer_state_t::eDesiredMaxHdrHeadroomChanged) {
+        maxDesiredHdrSdrRatio = clientState.maxDesiredHdrSdrRatio;
+    }
+
+    if (clientState.what & layer_state_t::eDesiredHdrHeadroomChanged) {
+        desiredHdrSdrRatio = clientState.desiredHdrSdrRatio;
+    }
+
     // We can't just check requestedTransform here because LayerSnapshotBuilder uses
     // getTransform which reads destinationFrame or buffer dimensions.
     // Display rotation does not affect validity so just use ROT_0.
@@ -479,6 +488,13 @@ std::ostream& operator<<(std::ostream& out, const RequestedLayerState& obj) {
     if (!obj.handleAlive) out << " handleNotAlive";
     if (obj.requestedFrameRate.isValid())
         out << " requestedFrameRate: {" << obj.requestedFrameRate << "}";
+    if (obj.desiredHdrSdrRatio >= 1.f) {
+        out << " desiredHdrSdrRatio=" << obj.desiredHdrSdrRatio;
+    }
+    if (obj.maxDesiredHdrSdrRatio >= 1.f) {
+        out << " maxDesiredHdrSdrRatio=" << obj.maxDesiredHdrSdrRatio;
+    }
+
     if (obj.dropInputMode != gui::DropInputMode::NONE)
         out << " dropInputMode=" << static_cast<uint32_t>(obj.dropInputMode);
     return out;

@@ -47,6 +47,18 @@ using namespace ftl::flag_operators;
 
 namespace {
 
+float getMaxHdrSdrRatio(float left, float right) {
+    if (left >= 1.f && right >= 1.f) {
+        return std::min(left, right);
+    } else if (left >= 1.f) {
+        return left;
+    } else if (right >= 1.f) {
+        return right;
+    }
+
+    return 0.f;
+}
+
 FloatRect getMaxDisplayBounds(const DisplayInfos& displays) {
     const ui::Size maxSize = [&displays] {
         if (displays.empty()) return ui::Size{5000, 5000};
@@ -356,6 +368,8 @@ LayerSnapshot LayerSnapshotBuilder::getRootSnapshot() {
     snapshot.trustedOverlay = gui::TrustedOverlay::UNSET;
     snapshot.gameMode = gui::GameMode::Unsupported;
     snapshot.frameRate = {};
+    snapshot.desiredHdrSdrRatio = 0.f;
+    snapshot.maxDesiredHdrSdrRatio = 0.f;
     snapshot.fixedTransformHint = ui::Transform::ROT_INVALID;
     snapshot.ignoreLocalTransform = false;
     return snapshot;
@@ -1014,6 +1028,16 @@ void LayerSnapshotBuilder::updateSnapshot(LayerSnapshot& snapshot, const Args& a
         } else {
             snapshot.renderResourceCache = nullptr;
         }
+    }
+
+    if (forceUpdate ||
+        snapshot.clientChanges &
+                (layer_state_t::eDesiredHdrHeadroomChanged |
+                 layer_state_t::eDesiredMaxHdrHeadroomChanged)) {
+        snapshot.maxDesiredHdrSdrRatio = getMaxHdrSdrRatio(requested.maxDesiredHdrSdrRatio,
+                                                           parentSnapshot.maxDesiredHdrSdrRatio);
+        snapshot.desiredHdrSdrRatio =
+                getMaxHdrSdrRatio(snapshot.maxDesiredHdrSdrRatio, requested.desiredHdrSdrRatio);
     }
 
     bool hasSmpte2094_50 = false;
