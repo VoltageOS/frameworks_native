@@ -35,6 +35,7 @@
 #include <gui/AidlUtil.h>
 #include <gui/ISurfaceComposer.h>
 #include <gui/LayerState.h>
+#include <gui/bufferqueue/2.0/H2BGraphicBufferProducer.h>
 #include <private/gui/ComposerService.h>
 #include <private/gui/ComposerServiceAIDL.h>
 #endif
@@ -192,6 +193,22 @@ Surface::~Surface() {
 sp<Surface> Surface::from(ANativeWindow* anw) {
     return sp<Surface>::fromExisting(static_cast<Surface*>(anw));
 }
+
+#ifndef NO_BINDER
+sp<Surface> Surface::fromHidl(
+        const sp<hardware::graphics::bufferqueue::V2_0::IGraphicBufferProducer>& token) {
+    if (token == nullptr) {
+        return nullptr;
+    }
+    using H2BGraphicBufferProducer =
+            hardware::graphics::bufferqueue::V2_0::utils::H2BGraphicBufferProducer;
+    sp<IGraphicBufferProducer> bufferProducer = sp<H2BGraphicBufferProducer>::make(token);
+    if (bufferProducer == nullptr) {
+        return nullptr;
+    }
+    return sp<Surface>::make(bufferProducer);
+}
+#endif
 
 bool Surface::areSurfacesEquivalent(const sp<Surface>& a, const sp<Surface>& b) {
     if (a == b) {
