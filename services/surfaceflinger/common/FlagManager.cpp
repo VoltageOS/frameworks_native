@@ -34,6 +34,7 @@
 #include <com_android_graphics_libgui_flags.h>
 #include <com_android_graphics_surfaceflinger_flags.h>
 #include <com_android_server_display_feature_flags.h>
+#include <com_android_window_flags.h>
 
 namespace android {
 using namespace com::android::graphics::surfaceflinger;
@@ -158,6 +159,7 @@ void FlagManager::dump(std::string& result) const {
     DUMP_ACONFIG_FLAG(correct_dpi_with_display_size);
     DUMP_ACONFIG_FLAG(deprecate_frame_tracker);
     DUMP_ACONFIG_FLAG(display_command_modeset);
+    DUMP_ACONFIG_FLAG(enable_user_preferred_hdr_mode);
     DUMP_ACONFIG_FLAG(fence_handling);
     DUMP_ACONFIG_FLAG(follower_arbitrary_refresh_rate_selection);
     DUMP_ACONFIG_FLAG(follower_arbitrary_refresh_rate_selection_platform);
@@ -337,6 +339,7 @@ FLAG_MANAGER_ACONFIG_FLAG(use_experimental_jank_classification, "");
 /// Trunk stable server (R/W) flags from outside SurfaceFlinger ///
 
 FLAG_MANAGER_ACONFIG_FLAG_IMPORTED(luts_api, "", android::hardware::flags);
+FLAG_MANAGER_ACONFIG_FLAG_IMPORTED(enable_user_preferred_hdr_mode, "", com::android::window::flags);
 
 bool FlagManager::follower_arbitrary_refresh_rate_selection_combined() const {
     return (follower_arbitrary_refresh_rate_selection() ||

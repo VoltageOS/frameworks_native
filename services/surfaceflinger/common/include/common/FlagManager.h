@@ -90,6 +90,7 @@ public:
     bool correct_dpi_with_display_size() const;
     bool deprecate_frame_tracker() const;
     bool display_command_modeset() const;
+    bool enable_user_preferred_hdr_mode() const;
     bool frame_rate_category_mrr() const;
     bool graphite_renderengine() const;
     bool hdcp_level_hal() const;
