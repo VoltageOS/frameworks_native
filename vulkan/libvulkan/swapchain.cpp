@@ -770,7 +770,7 @@ VkResult CreateAndroidSurfaceKHR(
         return VK_ERROR_SURFACE_LOST_KHR;
     }
 
-    if (flags::vk_khr_present_wait2()) {
+    if (flags::vk_khr_present_wait2_gpu()) {
         err = native_window_api_connect_with_listener(
             surface->window.get(), NATIVE_WINDOW_API_EGL, false, true, true);
     } else {
@@ -784,7 +784,7 @@ VkResult CreateAndroidSurfaceKHR(
         allocator->pfnFree(allocator->pUserData, surface);
         return VK_ERROR_NATIVE_WINDOW_IN_USE_KHR;
     }
-    if (flags::vk_khr_present_wait2()) {
+    if (flags::vk_khr_present_wait2_gpu()) {
         err = native_window_set_on_acquired_callback(
             surface->window.get(), &nativeWindowOnAcquiredCallback, surface);
         ALOGW_IF(err != android::OK,
@@ -1246,7 +1246,7 @@ VkResult GetPhysicalDeviceSurfaceCapabilities2KHR(
             }
 
             case VK_STRUCTURE_TYPE_SURFACE_CAPABILITIES_PRESENT_WAIT_2_KHR: {
-                if (!flags::vk_khr_present_wait2())
+                if (!flags::vk_khr_present_wait2_gpu())
                     break;
 
                 VkSurfaceCapabilitiesPresentWait2KHR* present_wait2 =
@@ -1947,7 +1947,7 @@ VkResult CreateSwapchainKHR(VkDevice device,
         ALOGW_IF(err != android::OK,
                  "native_window_api_disconnect failed: %s (%d)", strerror(-err),
                  err);
-        if (flags::vk_khr_present_wait2()) {
+        if (flags::vk_khr_present_wait2_gpu()) {
             err = native_window_api_connect_with_listener(
                 window, NATIVE_WINDOW_API_EGL, false, true, true);
         } else {
@@ -1956,7 +1956,7 @@ VkResult CreateSwapchainKHR(VkDevice device,
         ALOGW_IF(err != android::OK,
                  "native_window_api_connect_with_listener failed: %s (%d)",
                  strerror(-err), err);
-        if (flags::vk_khr_present_wait2()) {
+        if (flags::vk_khr_present_wait2_gpu()) {
             err = native_window_set_on_acquired_callback(
                 window, &nativeWindowOnAcquiredCallback, &surface);
             ALOGW_IF(err != android::OK,
@@ -2797,11 +2797,11 @@ static VkResult PresentOneSwapchain(VkQueue queue,
                     swapchain, pGoogleTime->presentID, nativeFrameId,
                     pGoogleTime->desiredPresentTime, 0, false);
             }
-            if (flags::vk_khr_present_wait2() && presentId != 0) {
+            if (flags::vk_khr_present_wait2_gpu() && presentId != 0) {
                 swapchain.surface.listener.associatePresentId(nativeFrameId,
                                                               presentId);
             }
-            if (flags::vk_khr_present_wait2()) {
+            if (flags::vk_khr_present_wait2_gpu()) {
                 uint64_t frameId;
                 native_window_get_last_replaced_frame_id(window, &frameId);
                 if (frameId != 0) {
