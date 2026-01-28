@@ -46,6 +46,8 @@
 
 #include <com_android_graphics_libgui_flags.h>
 
+#include "AsyncWorker.h"
+
 using namespace com::android::graphics::libgui;
 using namespace std::chrono_literals;
 
@@ -1087,56 +1089,10 @@ SurfaceComposerClient::Transaction* BLASTBufferQueue::gatherPendingTransactions(
     return t;
 }
 
-// Maintains a single worker thread per process that services a list of runnables.
-class AsyncWorker : public Singleton<AsyncWorker> {
-private:
-    std::thread mThread;
-    bool mDone = false;
-    std::deque<std::function<void()>> mRunnables;
-    std::mutex mMutex;
-    std::condition_variable mCv;
-    void run() {
-        std::unique_lock<std::mutex> lock(mMutex);
-        while (!mDone) {
-            while (!mRunnables.empty()) {
-                std::deque<std::function<void()>> runnables = std::move(mRunnables);
-                mRunnables.clear();
-                lock.unlock();
-                // Run outside the lock since the runnable might trigger another
-                // post to the async worker.
-                execute(runnables);
-                lock.lock();
-            }
-            mCv.wait(lock);
-        }
-    }
-
-    void execute(std::deque<std::function<void()>>& runnables) {
-        while (!runnables.empty()) {
-            std::function<void()> runnable = runnables.front();
-            runnables.pop_front();
-            runnable();
-        }
-    }
-
-public:
-    AsyncWorker() : Singleton<AsyncWorker>() { mThread = std::thread(&AsyncWorker::run, this); }
-
-    ~AsyncWorker() {
-        mDone = true;
-        mCv.notify_all();
-        if (mThread.joinable()) {
-            mThread.join();
-        }
-    }
-
-    void post(std::function<void()> runnable) {
-        std::unique_lock<std::mutex> lock(mMutex);
-        mRunnables.emplace_back(std::move(runnable));
-        mCv.notify_one();
-    }
-};
-ANDROID_SINGLETON_STATIC_INSTANCE(AsyncWorker);
+// Per-process AsyncWorker that emulates a single 'binder thread'.
+class AsyncProducerListenerWorker : public AsyncWorker,
+                                    public Singleton<AsyncProducerListenerWorker> {};
+ANDROID_SINGLETON_STATIC_INSTANCE(AsyncProducerListenerWorker);
 
 // Asynchronously calls ProducerListener functions so we can emulate one way binder calls.
 class AsyncProducerListener : public BnProducerListener {
@@ -1151,28 +1107,29 @@ public:
     bool needsDroppedNotify() override { return mListener->needsDroppedNotify(); }
 
     void onBufferReleased() override {
-        AsyncWorker::getInstance().post([listener = mListener]() { listener->onBufferReleased(); });
+        AsyncProducerListenerWorker::getInstance().post(
+                [listener = mListener]() { listener->onBufferReleased(); });
     }
 
     void onBuffersDiscarded(const std::vector<int32_t>& slots) override {
-        AsyncWorker::getInstance().post(
+        AsyncProducerListenerWorker::getInstance().post(
                 [listener = mListener, slots = slots]() { listener->onBuffersDiscarded(slots); });
     }
 
     void onBufferDetached(int slot) override {
-        AsyncWorker::getInstance().post(
+        AsyncProducerListenerWorker::getInstance().post(
                 [listener = mListener, slot = slot]() { listener->onBufferDetached(slot); });
     }
 
     void onBufferAcquired(uint64_t bufferId, uint64_t frameNumber) override {
-        AsyncWorker::getInstance().post(
+        AsyncProducerListenerWorker::getInstance().post(
                 [listener = mListener, bufferId = bufferId, frameNumber = frameNumber]() {
                     listener->onBufferAcquired(bufferId, frameNumber);
                 });
     };
 
     void onBufferDropped(uint64_t bufferId, uint64_t frameNumber) override {
-        AsyncWorker::getInstance().post(
+        AsyncProducerListenerWorker::getInstance().post(
                 [listener = mListener, bufferId = bufferId, frameNumber = frameNumber]() {
                     listener->onBufferDropped(bufferId, frameNumber);
                 });
@@ -1180,7 +1137,8 @@ public:
 
 #if COM_ANDROID_GRAPHICS_LIBGUI_FLAGS(BQ_CONSUMER_ATTACH_CALLBACK)
     void onBufferAttached() override {
-        AsyncWorker::getInstance().post([listener = mListener]() { listener->onBufferAttached(); });
+        AsyncProducerListenerWorker::getInstance().post(
+                [listener = mListener]() { listener->onBufferAttached(); });
     }
 #endif
 };
