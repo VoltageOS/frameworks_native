@@ -16,9 +16,7 @@
 
 #include "AsyncWorker.h"
 
-AsyncWorker::AsyncWorker() {
-    mThread = std::thread(&AsyncWorker::run, this);
-}
+AsyncWorker::AsyncWorker() {}
 
 AsyncWorker::~AsyncWorker() {
     mDone = true;
@@ -30,6 +28,11 @@ AsyncWorker::~AsyncWorker() {
 
 void AsyncWorker::post(std::function<void()> runnable) {
     std::unique_lock<std::mutex> lock(mMutex);
+    // Not joinable means mThread is still default constructed
+    // and needs initialization now.
+    if (!mThread.joinable()) {
+        mThread = std::thread(&AsyncWorker::run, this);
+    }
     mRunnables.emplace_back(std::move(runnable));
     mCv.notify_one();
 }

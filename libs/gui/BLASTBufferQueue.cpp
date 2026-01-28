@@ -20,6 +20,8 @@
 #define ATRACE_TAG ATRACE_TAG_GRAPHICS
 //#define LOG_NDEBUG 0
 
+#include <atomic>
+
 #include <com_android_graphics_libgui_flags.h>
 #include <cutils/atomic.h>
 #include <ftl/fake_guard.h>
@@ -964,27 +966,89 @@ private:
     std::mutex mMutex;
     sp<BLASTBufferQueue> mBbq GUARDED_BY(mMutex);
     bool mDestroyed GUARDED_BY(mMutex) = false;
+    AsyncWorker mAllocWorker;
+    std::atomic<pid_t> mAllocWorkerTid{-1};
 
 public:
     BBQSurface(const sp<IGraphicBufferProducer>& igbp, bool controlledByApp,
                const sp<IBinder>& scHandle, const sp<BLASTBufferQueue>& bbq)
-          : Surface(igbp, controlledByApp, scHandle), mBbq(bbq) {}
+          : Surface(igbp, controlledByApp, scHandle), mBbq(bbq) {
+        if (com_android_graphics_libgui_flags_allocate_buffer_priority_inheritance()) {
+            mAllocWorker.post([this] {
+                androidSetThreadName("allocateBuffers");
+                mAllocWorkerTid.store(gettid(), std::memory_order_relaxed);
+            });
+        }
+    }
 
     void allocateBuffers() override {
         ATRACE_CALL();
         uint32_t reqWidth = mReqWidth ? mReqWidth : mUserWidth;
         uint32_t reqHeight = mReqHeight ? mReqHeight : mUserHeight;
+        if (com_android_graphics_libgui_flags_allocate_buffer_priority_inheritance()) {
+            allocateBuffersCallerPriority(reqWidth, reqHeight);
+        } else {
+            allocateBuffersStaticPriority(reqWidth, reqHeight);
+        }
+    }
+
+    void allocateBuffersStaticPriority(uint32_t reqWidth, uint32_t reqHeight) {
         auto gbp = getIGraphicBufferProducer();
         std::thread allocateThread([reqWidth, reqHeight, gbp = getIGraphicBufferProducer(),
                                     reqFormat = mReqFormat, reqUsage = mReqUsage]() {
             androidSetThreadName("allocateBuffers");
             pid_t tid = gettid();
             androidSetThreadPriority(tid, ANDROID_PRIORITY_DISPLAY);
+            gbp->allocateBuffers(reqWidth, reqHeight, reqFormat, reqUsage);
+        });
+        allocateThread.detach();
+    }
 
+    void allocateBuffersCallerPriority(uint32_t reqWidth, uint32_t reqHeight) {
+        std::optional<int> callerPriority;
+        pid_t workerTid = mAllocWorkerTid.load(std::memory_order_relaxed);
+        int callerScheduler = sched_getscheduler(0);
+        switch (callerScheduler) {
+            // For fair policies, we can set worker thread's priority
+            // to the caller thread's priority.
+            case SCHED_OTHER: // i.e. SCHED_NORMAL
+            case SCHED_BATCH:
+            case SCHED_EXT:
+                callerPriority = androidGetThreadPriority(gettid());
+                break;
+            // For realtime policies, this process doesn't necessarily have
+            // the capability to switch the worker thread to a realtime
+            // policy. As such, just use the highest generic priority.
+            case SCHED_FIFO:
+            case SCHED_RR:
+            case SCHED_DEADLINE:
+                callerPriority = -10; // Process.THREAD_PRIORITY_TOP_APP_BOOST
+                break;
+            // Priority doesn't matter for SCHED_IDLE.
+            case SCHED_IDLE:
+                break;
+            default:
+                ALOGW("Unknown scheduling class %d", callerScheduler);
+        }
+
+        // If the allocation thread is already running, set its priority here so that the
+        // scheduler has the right priority when we wake it up. On the rare chance we're
+        // here before the allocation thread has started, the best we can do is have the
+        // allocation thread update its own priority.
+        if (callerPriority.has_value() && workerTid != -1) {
+            androidSetThreadPriority(workerTid, *callerPriority);
+        }
+
+        auto gbp = getIGraphicBufferProducer();
+        mAllocWorker.post([reqWidth, reqHeight, gbp = getIGraphicBufferProducer(),
+                           reqFormat = mReqFormat, reqUsage = mReqUsage, workerTid,
+                           callerPriority]() {
+            if (callerPriority.has_value() && workerTid == -1) {
+                androidSetThreadPriority(gettid(), *callerPriority);
+            }
             gbp->allocateBuffers(reqWidth, reqHeight,
                                  reqFormat, reqUsage);
         });
-        allocateThread.detach();
     }
 
     status_t setFrameTimelineInfo(uint64_t frameNumber,
