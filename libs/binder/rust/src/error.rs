@@ -17,15 +17,11 @@
 use crate::binder::AsNative;
 use crate::sys;
 
-use alloc::ffi::CString;
-use alloc::string::{String, ToString};
-use core::ffi::CStr;
-use core::fmt::{Debug, Display, Formatter, Result as FmtResult};
-use core::ptr;
-use core::result;
-
-#[cfg(feature = "std")]
 use std::error;
+use std::ffi::{CStr, CString};
+use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
+use std::ptr;
+use std::result;
 
 pub use sys::binder_status_t as status_t;
 
@@ -265,7 +261,6 @@ impl Status {
     }
 }
 
-#[cfg(feature = "std")]
 impl error::Error for Status {}
 
 impl Display for Status {
@@ -437,9 +432,9 @@ pub trait IntoBinderResult<T, E> {
     ) -> result::Result<T, Status>;
 }
 
-impl<T, E: core::fmt::Debug> IntoBinderResult<T, E> for result::Result<T, E> {
+impl<T, E: std::fmt::Debug> IntoBinderResult<T, E> for result::Result<T, E> {
     fn or_binder_exception(self, exception: ExceptionCode) -> result::Result<T, Status> {
-        self.or_binder_exception_with(exception, |e| alloc::format!("{:?}", e))
+        self.or_binder_exception_with(exception, |e| format!("{:?}", e))
     }
 
     fn or_binder_exception_with<M: AsRef<str>, O: FnOnce(E) -> M>(
@@ -451,7 +446,7 @@ impl<T, E: core::fmt::Debug> IntoBinderResult<T, E> for result::Result<T, E> {
     }
 
     fn or_service_specific_exception(self, error_code: i32) -> result::Result<T, Status> {
-        self.or_service_specific_exception_with(error_code, |e| alloc::format!("{:?}", e))
+        self.or_service_specific_exception_with(error_code, |e| format!("{:?}", e))
     }
 
     fn or_service_specific_exception_with<M: AsRef<str>, O: FnOnce(E) -> M>(

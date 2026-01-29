@@ -14,9 +14,8 @@
  * limitations under the License.
  */
 
-use alloc::boxed::Box;
-use core::future::Future;
-use core::pin::Pin;
+use std::future::Future;
+use std::pin::Pin;
 
 /// A type alias for a pinned, boxed future that lets you write shorter code without littering it
 /// with Pin and Send bounds.

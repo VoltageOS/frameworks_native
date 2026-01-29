@@ -17,8 +17,6 @@
 #![allow(missing_docs)]
 #![no_main]
 
-extern crate alloc;
-
 mod read_utils;
 
 use crate::read_utils::READ_FUNCS;
