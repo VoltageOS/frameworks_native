@@ -213,6 +213,7 @@ public:
     // Used by both SF and FrameTimeline.
     std::optional<int32_t> getJankType() const;
     std::optional<JankSeverityType> getJankSeverityType() const;
+    std::optional<float> getJankSeverityScore() const;
 
     // Functions called by SF
     int64_t getToken() const { return mToken; };
@@ -291,13 +292,15 @@ public:
         Status status;
         TimelineItem predictions;
         TimelineItem actuals;
+        nsecs_t vsyncResyncedJitter;
 
-        static PreviousFrameData unknown() { return PreviousFrameData{Status::Unknown, {}, {}}; }
+        static PreviousFrameData unknown() { return PreviousFrameData{Status::Unknown, {}, {}, 0}; }
         static PreviousFrameData outOfOrder() {
-            return PreviousFrameData{Status::OutOfOrder, {}, {}};
+            return PreviousFrameData{Status::OutOfOrder, {}, {}, 0};
         }
-        static PreviousFrameData create(TimelineItem predictions, TimelineItem actuals) {
-            return PreviousFrameData{Status::Valid, predictions, actuals};
+        static PreviousFrameData create(TimelineItem predictions, TimelineItem actuals,
+                                        nsecs_t vsyncResyncedJitter) {
+            return PreviousFrameData{Status::Valid, predictions, actuals, vsyncResyncedJitter};
         }
     };
     PreviousFrameData previousFrameDataLocked() const REQUIRES(mMutex);

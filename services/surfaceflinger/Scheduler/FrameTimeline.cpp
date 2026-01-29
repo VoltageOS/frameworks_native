@@ -528,7 +528,8 @@ SurfaceFrame::PreviousFrameData SurfaceFrame::previousFrameDataLocked() const {
     }
 
     std::scoped_lock lock(prev->mMutex);
-    return PreviousFrameData::create(prev->mPredictions, prev->mActuals);
+    return PreviousFrameData::create(prev->mPredictions, prev->mActuals,
+                                     prev->mVsyncResyncedJitter);
 }
 
 // TODO(b/316171339): migrate from perfetto side
@@ -567,6 +568,16 @@ std::optional<JankSeverityType> SurfaceFrame::getJankSeverityType() const {
         return std::nullopt;
     }
     return mJankSeverityTypeLegacy;
+}
+
+std::optional<float> SurfaceFrame::getJankSeverityScore() const {
+    std::scoped_lock lock(mMutex);
+    if (mActuals.presentTime == 0) {
+        // Frame hasn't been presented yet.
+        return std::nullopt;
+    }
+    return calculateJankSeverity(mJankType.value(), mExpectedPresentDelta, mActualPresentDelta)
+            .first;
 }
 
 nsecs_t SurfaceFrame::getBaseTime() const {
@@ -905,10 +916,14 @@ void SurfaceFrame::classifyJankLocked(int32_t displayFrameJankTypeLegacy,
                     mFramePresentMetadata.experimental() = FramePresentMetadata::LatePresent;
                     break;
                 case PreviousFrameData::Status::Valid: {
+                    const auto thisExpectedPresentTime =
+                            mPredictions.presentTime + mVsyncResyncedJitter;
+                    const auto prevExpectedPresentTime = previousFrameData.predictions.presentTime +
+                            previousFrameData.vsyncResyncedJitter;
+
                     mActualPresentDelta =
                             mActuals.presentTime - previousFrameData.actuals.presentTime;
-                    mExpectedPresentDelta =
-                            mPredictions.presentTime - previousFrameData.predictions.presentTime;
+                    mExpectedPresentDelta = thisExpectedPresentTime - prevExpectedPresentTime;
                     const nsecs_t presentationConsistencyDelay =
                             mActualPresentDelta - mExpectedPresentDelta;
                     const float deltaFrameRatio = mExpectedPresentDelta == 0
@@ -1018,7 +1033,7 @@ void SurfaceFrame::classifyJankLocked(int32_t displayFrameJankTypeLegacy,
 
     if (mVsyncResyncedJitter > 0) {
         // the app adjusted the vsync time due to a delay on the main thread - mark is as
-        // AppDeadlineMissed
+        // AppResyncedJitter
         mJankType.experimental() |= JankType::AppResyncedJitter;
     }
 }
