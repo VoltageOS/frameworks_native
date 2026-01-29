@@ -22,17 +22,15 @@ use crate::parcel::{BorrowedParcel, Serialize};
 use crate::proxy::SpIBinder;
 use crate::sys;
 
-use alloc::boxed::Box;
-use core::convert::TryFrom;
-use core::ffi::{c_char, c_void};
-use core::mem::ManuallyDrop;
-use core::ops::Deref;
-use core::str;
-
+use std::convert::TryFrom;
+use std::ffi::c_void;
 #[cfg(feature = "std")]
 use std::ffi::CStr;
 #[cfg(feature = "std")]
 use std::io::{Read, Write};
+use std::mem::ManuallyDrop;
+use std::ops::Deref;
+use std::os::raw::c_char;
 
 /// Rust wrapper around Binder remotable objects.
 ///
