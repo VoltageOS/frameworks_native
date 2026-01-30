@@ -9492,7 +9492,8 @@ SurfaceFlinger::getLayerSnapshotsForScreenshots(const SnapshotRequestArgs& args)
                                     getHwComposer().getSupportedLayerGenericMetadata(),
                             .genericLayerMetadataKeyMap = getGenericLayerMetadataKeyMap(),
                             .skipRoundCornersWhenProtected =
-                                    !getRenderEngine().supportsProtectedContent()};
+                                    !getRenderEngine().supportsProtectedContent(),
+                            .renderResourceCache = mIpcCache.get()};
         if (args.rootLayerId) {
             if (builderArgs.root.hasLayerCycle()) {
                 return base::unexpected(BAD_VALUE);
