@@ -28,6 +28,9 @@ cc_library_static {
     ],
     shared_libs: [
         "libbase",
+        "libbinder",
+        "libutils",
+        "packagemanager_aidl-cpp",
     ],
     srcs: [
         "procpartition.cpp",
