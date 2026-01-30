@@ -344,9 +344,8 @@ FLAG_MANAGER_ACONFIG_FLAG_IMPORTED(luts_api, "", android::hardware::flags);
 FLAG_MANAGER_ACONFIG_FLAG_IMPORTED(enable_user_preferred_hdr_mode, "", com::android::window::flags);
 
 bool FlagManager::follower_arbitrary_refresh_rate_selection_combined() const {
-    return (follower_arbitrary_refresh_rate_selection() ||
-            follower_arbitrary_refresh_rate_selection_platform()) &&
-            modeset_state_machine();
+    return follower_arbitrary_refresh_rate_selection() ||
+            follower_arbitrary_refresh_rate_selection_platform();
 }
 
 bool FlagManager::follower_display_backpressure_combined() const {
