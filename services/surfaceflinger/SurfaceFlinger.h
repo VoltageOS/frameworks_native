@@ -717,13 +717,14 @@ private:
     status_t setActiveModeFromBackdoor(const sp<display::DisplayToken>&, DisplayModeId, Fps minFps,
                                        Fps maxFps);
 
-    void initiateDisplayModeChanges() REQUIRES(kMainThreadContext) REQUIRES(mStateLock);
+    void initiateDisplayModeChanges() REQUIRES(kMainThreadContext)
+            REQUIRES(mStateLock, mModeTransitionMutex);
 
     // Returns whether the commit stage should proceed. The return value is ignored when finalizing
     // immediate mode changes, which happen toward the end of the commit stage.
     // TODO: b/355427258 - Remove the return value once the `synced_resolution_switch` flag is live.
     bool finalizeDisplayModeChange(PhysicalDisplayId) REQUIRES(kMainThreadContext)
-            REQUIRES(mStateLock);
+            REQUIRES(mStateLock, mModeTransitionMutex);
 
     // TODO: Remove once `modeset_state_machine` flag is cleaned up.
     void dropModeRequest(PhysicalDisplayId) REQUIRES(kMainThreadContext);
@@ -762,12 +763,12 @@ private:
 
     status_t setDesiredDisplayModeSpecsInternal(
             const sp<DisplayDevice>&, const scheduler::RefreshRateSelector::PolicyVariant&)
-            EXCLUDES(mStateLock) REQUIRES(kMainThreadContext);
+            EXCLUDES(mStateLock, mModeTransitionMutex) REQUIRES(kMainThreadContext);
 
     // TODO(b/241285191): Look up RefreshRateSelector on Scheduler to remove redundant parameter.
     status_t applyRefreshRateSelectorPolicy(PhysicalDisplayId,
                                             const scheduler::RefreshRateSelector&)
-            REQUIRES(mStateLock, kMainThreadContext);
+            REQUIRES(mStateLock, mModeTransitionMutex, kMainThreadContext);
 
     void updateWorkDuration(const sp<DisplayDevice>&, const gui::DisplayModeSpecs&);
 
@@ -799,7 +800,8 @@ private:
     void commitInputWindowCommands() REQUIRES(mStateLock);
     void updateCursorAsync() REQUIRES(kMainThreadContext);
 
-    void initScheduler(const sp<const DisplayDevice>&) REQUIRES(kMainThreadContext, mStateLock);
+    void initScheduler(const sp<const DisplayDevice>&)
+            REQUIRES(kMainThreadContext, mStateLock, mModeTransitionMutex);
 
     /*
      * Transactions
@@ -1196,7 +1198,8 @@ private:
             const DisplayDeviceState& state,
             const sp<compositionengine::DisplaySurface>& displaySurface,
             const sp<Surface>& compositionSurface) REQUIRES(mStateLock);
-    void processDisplayChangesLocked() REQUIRES(mStateLock, kMainThreadContext);
+    void processDisplayChangesLocked()
+            REQUIRES(mStateLock, mModeTransitionMutex, kMainThreadContext);
     void processDisplayAdded(const wp<IBinder>& displayToken, const DisplayDeviceState&)
             REQUIRES(mStateLock, kMainThreadContext);
     void processDisplayRemoved(const wp<IBinder>& displayToken)
@@ -1204,7 +1207,7 @@ private:
     void processDisplayChanged(const wp<IBinder>& displayToken,
                                const DisplayDeviceState& currentState,
                                const DisplayDeviceState& drawingState)
-            REQUIRES(mStateLock, kMainThreadContext);
+            REQUIRES(mStateLock, mModeTransitionMutex, kMainThreadContext);
 
     /*
      * Display identification
@@ -1288,7 +1291,7 @@ private:
                                    const DisplayDevice& newFrontInternalDisplay)
             REQUIRES(mStateLock, kMainThreadContext);
 
-    void onNewPacesetterDisplay() REQUIRES(mStateLock, kMainThreadContext);
+    void onNewPacesetterDisplay() REQUIRES(mStateLock, mModeTransitionMutex, kMainThreadContext);
 
     /*
      * Debugging & dumpsys
@@ -1503,6 +1506,7 @@ private:
     std::atomic<PhysicalDisplayId> mFrontInternalDisplayId;
 
     display::DisplayModeController mDisplayModeController;
+    std::mutex mModeTransitionMutex;
 
     struct {
         std::unique_ptr<DisplayIdGenerator<GpuVirtualDisplayId>> gpu =
