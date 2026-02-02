@@ -326,6 +326,14 @@ Surface* SurfaceFromHandle(VkSurfaceKHR handle) {
     return reinterpret_cast<Surface*>(handle);
 }
 
+// Tracking for live surfaces, used by nativeWindowOnAcquiredCallback below.
+// Note that callbacks can be delivered as late as _during static deinitialization_
+// so this structure needs to live forever.
+struct {
+    std::unordered_set<Surface *> mSurfaces;
+    std::mutex mMutex;
+} live_surfaces [[clang::no_destroy]];
+
 bool IsSharedPresentMode(VkPresentModeKHR mode) {
     return mode == VK_PRESENT_MODE_SHARED_DEMAND_REFRESH_KHR ||
         mode == VK_PRESENT_MODE_SHARED_CONTINUOUS_REFRESH_KHR;
@@ -335,6 +343,16 @@ static void nativeWindowOnAcquiredCallback(uint64_t /*bufferId*/,
                                            uint64_t frameId,
                                            void* data) {
     Surface* surface = static_cast<Surface*>(data);
+
+    // It is possible for callbacks to be delivered after the destruction
+    // of the associated surface. Ensure that the surface still lives
+    // before using it.
+    std::lock_guard lock(live_surfaces.mMutex);
+    if (!live_surfaces.mSurfaces.count(surface)) {
+        ALOGW("Dropping present callback for surface %p as the surface has been destroyed.", data);
+        return;
+    }
+
     surface->listener.onFramePresented(frameId);
 }
 
@@ -795,6 +813,9 @@ VkResult CreateAndroidSurfaceKHR(
         ALOGW_IF(err != android::OK,
                  "native_window_set_on_dropped_callback failed: %s (%d)",
                  strerror(-err), err);
+
+        std::lock_guard lock(live_surfaces.mMutex);
+        live_surfaces.mSurfaces.insert(surface);
     }
 
     *out_surface = HandleFromSurface(surface);
@@ -810,6 +831,15 @@ void DestroySurfaceKHR(VkInstance instance,
     Surface* surface = SurfaceFromHandle(surface_handle);
     if (!surface)
         return;
+
+    {
+        // Remove the surface from the set of live surfaces.
+        // After this point, no async present callbacks will be
+        // delivered to this surface so we can safely clean it up.
+        std::lock_guard lock(live_surfaces.mMutex);
+        live_surfaces.mSurfaces.erase(surface);
+    }
+
     native_window_api_disconnect(surface->window.get(), NATIVE_WINDOW_API_EGL);
     ALOGV_IF(surface->swapchain_handle != VK_NULL_HANDLE,
              "destroyed VkSurfaceKHR 0x%" PRIx64
