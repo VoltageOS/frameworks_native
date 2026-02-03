@@ -879,6 +879,9 @@ bool VirtualTouchscreen::writeTouchEvent(int32_t pointerId, int32_t toolType, in
             return false;
         }
     }
+    if (uinputAction == UinputAction::CANCEL) {
+        mActivePointers.reset(pointerId);
+    }
     return writeInputEvent(EV_SYN, SYN_REPORT, 0, eventTime);
 }
 
