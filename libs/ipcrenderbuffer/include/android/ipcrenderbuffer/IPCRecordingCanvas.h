@@ -52,6 +52,7 @@ class IPCRecordingCanvas : public SkCanvasVirtualEnforcer<SkNoDrawCanvas> {
 public:
     explicit IPCRecordingCanvas(IPCClientResourceCache& resourceCache);
 
+    bool canRecord();
     void startRecording();
     void endRecording();
 

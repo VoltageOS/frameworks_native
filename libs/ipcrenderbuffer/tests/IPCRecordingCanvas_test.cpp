@@ -184,7 +184,7 @@ public:
         mIPCRecordingCanvas.startRecording();
         doDraw(&mIPCRecordingCanvas);
         mIPCRecordingCanvas.endRecording();
-        renderCommandBufferToCanvas(&mServerCache, &mRenderCommandBufferConsumer,
+        renderCommandBufferToCanvas(&mServerCache, mRenderCommandBufferConsumer.getCurrentBuffer(),
                                     mIPCCanvasBackend.canvas, [&](int) {});
     }
 

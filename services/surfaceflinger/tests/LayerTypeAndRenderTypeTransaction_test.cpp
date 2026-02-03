@@ -1139,6 +1139,7 @@ TEST_P(LayerTypeAndRenderTypeTransactionTest, SetRenderBuffer) {
 
     IPCClientResourceCache clientCache;
     auto canvas = IPCRecordingCanvas(clientCache);
+    canvas.storeSize(layerSize, layerSize);
     canvas.startRecording();
     canvas.drawColor(0xFFB0E0E6, SkBlendMode::kSrc);
 
@@ -1232,6 +1233,7 @@ TEST_P(LayerTypeAndRenderTypeTransactionTest, RegisterGraphicBuffer) {
 
     // Command recording
     auto canvas = IPCRecordingCanvas(clientCache);
+    canvas.storeSize(width, height);
     canvas.startRecording();
     canvas.drawImage(image.get(), 0, 0, SkSamplingOptions());
     canvas.endRecording();

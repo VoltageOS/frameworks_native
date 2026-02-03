@@ -41,7 +41,7 @@ SkImageInfo fromShmemImageInfo(const ShmemImageInfo& info) {
     return SkImageInfo::Make(info.width, info.height, info.colorType, info.alphaType);
 }
 
-void renderOpToCanvas(IPCServerResourceCache* cache, RenderCommandBufferConsumer* consumer,
+void renderOpToCanvas(IPCServerResourceCache* cache, RenderCommandBuffer* buffer,
                       IPCRenderBufferOp* op, SkCanvas* canvas,
                       const std::function<void(int)>& renderProxyCallback) {
     switch (op->type) {
@@ -285,15 +285,9 @@ bool isDrawingOp(uint32_t type) {
     }
 }
 
-bool renderCommandBufferToCanvas(IPCServerResourceCache* cache, RenderCommandBufferConsumer* consumer,
+bool renderCommandBufferToCanvas(IPCServerResourceCache* cache, RenderCommandBuffer* buffer,
                                  SkCanvas* canvas,
                                  const std::function<void(int)>& renderProxyCallback) {
-    auto buffer = consumer->getCurrentBuffer();
-    if (buffer == nullptr) {
-        ALOGE("Failed to acquire RenderCommandBuffer for replay");
-        return false;
-    }
-
     bool foundFirstDrawingOp = false;
 
     if constexpr (DUMP_OPS) {
@@ -319,25 +313,12 @@ bool renderCommandBufferToCanvas(IPCServerResourceCache* cache, RenderCommandBuf
             ALOGE("Rendering op %s", opTypeToString(op->type).c_str());
             ALOGE("Details %s", opToString(op).c_str());
         }
-        renderOpToCanvas(cache, consumer, op, canvas, renderProxyCallback);
+        renderOpToCanvas(cache, buffer, op, canvas, renderProxyCallback);
     }
     if constexpr (DUMP_OPS) {
         ALOGE("Done rendering command buffer");
     }
     return true;
-}
-
-void resetRenderCommandBufferForReplay(IPCServerResourceCache* cache,
-                                       RenderCommandBufferConsumer* consumer) {
-    auto buffer = consumer->consumerAcquire();
-    if (buffer == nullptr) {
-        ALOGE("Failed to acquire RenderCommandBuffer for replay");
-        return;
-    }
-
-    for (IPCRenderBufferOp* op = buffer->getOps(); op; op = op->next) {
-        //  TODO:
-    }
 }
 
 std::string shmemPaintToString(const ShmemPaint& paint) {
@@ -850,7 +831,12 @@ DrawImageRectOp* DrawImageRectOp::Create(RenderCommandBuffer* commandBuffer, uin
 
 void DrawImageRectOp::draw(SkCanvas* c, const SkMatrix&, IPCServerResourceCache& resourceCache) {
     auto it = resourceCache.bitmaps.find(bitmapId);
-    LOG_ALWAYS_FATAL_IF(it == resourceCache.bitmaps.end(), "Bitmap not found in cache");
+    if (it == resourceCache.bitmaps.end()) {
+        // This currently only happens when a process shuts down.
+        // There may be a frame remaining that references bitmaps which were destroyed.
+        ALOGE("Bitmap not found in cache");
+        return;
+    }
     SkPaint p;
     const SkPaint* paintPtr = hasPaint ? &(p = fromShmemPaint(paint)) : nullptr;
     c->drawImageRect(it->second.image, src, dst, sampling, paintPtr, constraint);

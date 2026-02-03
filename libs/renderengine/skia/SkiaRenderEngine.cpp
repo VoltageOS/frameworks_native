@@ -1436,7 +1436,8 @@ void SkiaRenderEngine::drawLayersInternal(
             canvas->clipRRect(roundRectClip, enableAntiAlias);
         }
 
-        if (layer.renderCommandBufferConsumer) {
+        if (layer.renderCommandBuffer) {
+            SFTRACE_NAME("RenderCommandBuffer");
             if (layer.renderResourceCache) {
                 for (auto& [id, bitmap] : layer.renderResourceCache->bitmaps) {
                     auto imageTextureRef = getOrCreateBackendTexture(bitmap.buffer, false);
@@ -1453,8 +1454,7 @@ void SkiaRenderEngine::drawLayersInternal(
                 canvas->clipRRect(bounds);
             }
             renderCommandBufferToCanvas(layer.renderResourceCache.get(),
-                                        layer.renderCommandBufferConsumer.get(), canvas,
-                                        [&](int) {});
+                                        layer.renderCommandBuffer.get(), canvas, [&](int) {});
         } else if (!bounds.isRect()) {
             paint.setAntiAlias(true);
             canvas->drawRRect(bounds, paint);
