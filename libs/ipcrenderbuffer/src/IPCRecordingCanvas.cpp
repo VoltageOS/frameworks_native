@@ -385,4 +385,20 @@ void IPCRecordingCanvas::onDrawShadowRec(const SkPath&, const SkDrawShadowRec&) 
     ALOGE("onDrawShadowRec Not implemented");
 }
 
+void IPCRecordingCanvas::beginRenderTarget(uint64_t bufferId) {
+    IPC_CANVAS_TRACE_CALL;
+    LOG_ALWAYS_FATAL_IF(mCurrentRenderCommandBuffer == nullptr, "Not recording");
+    auto op = BeginRenderTargetOp::Create(mCurrentRenderCommandBuffer, bufferId);
+    LOG_ALWAYS_FATAL_IF(op == nullptr, "%s : Failed to alloc op", __func__);
+    mCurrentRenderCommandBuffer->pushOp(op);
+}
+
+void IPCRecordingCanvas::endRenderTarget() {
+    IPC_CANVAS_TRACE_CALL;
+    LOG_ALWAYS_FATAL_IF(mCurrentRenderCommandBuffer == nullptr, "Not recording");
+    auto op = EndRenderTargetOp::Create(mCurrentRenderCommandBuffer);
+    LOG_ALWAYS_FATAL_IF(op == nullptr, "%s : Failed to alloc op", __func__);
+    mCurrentRenderCommandBuffer->pushOp(op);
+}
+
 } // namespace android
