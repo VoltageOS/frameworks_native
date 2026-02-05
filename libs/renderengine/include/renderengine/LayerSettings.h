@@ -50,6 +50,7 @@
 namespace android {
 
 struct IPCServerResourceCache;
+class RenderCommandBuffer;
 
 namespace renderengine {
 
@@ -178,7 +179,7 @@ struct LayerSettings {
     std::shared_ptr<gui::DisplayLuts> luts;
 
     std::shared_ptr<IPCServerResourceCache> renderResourceCache;
-    std::shared_ptr<RenderCommandBufferConsumer> renderCommandBufferConsumer;
+    std::shared_ptr<RenderCommandBuffer> renderCommandBuffer;
 };
 
 // Keep in sync with custom comparison function in
@@ -360,6 +361,9 @@ static inline void PrintTo(const LayerSettings& settings, ::std::ostream* os,
     if (settings.luts) {
         *os << newline << ".luts = ";
         PrintTo(settings.luts, os);
+    }
+    if (settings.renderCommandBuffer) {
+        *os << newline << ".renderCommandBuffer = " << settings.renderCommandBuffer.get();
     }
 
     *os << IndentedNewline(currentIndent) << "}";
