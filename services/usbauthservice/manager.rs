@@ -14,7 +14,7 @@
 
 //! Manages USB device authorization policies and decisions.
 
-use crate::authorization;
+use crate::authorization::Authorizer;
 use crate::device_info::UsbDeviceInfoWithState;
 use crate::parser::{Parser, PolicyLoadError};
 use crate::rules::{
@@ -106,6 +106,8 @@ pub struct UsbDeviceAuthManager {
     /// The root directory for the etc files. Typically /etc, but might be
     /// different for testing.
     root_etc_dir: PathBuf,
+    /// Used for processing authorization of device with policy rules.
+    authorizer: Authorizer,
     /// Devices that have been processed and their authorization state determined.
     processed_devices: Vec<UsbDeviceInfoWithState>,
     /// Devices whose authorization was deferred pending a system state change.
@@ -183,6 +185,7 @@ impl UsbDeviceAuthManager {
         use_interactive_policy: bool,
     ) -> Result<Self, Error> {
         let mut manager = Self {
+            authorizer: Authorizer::new(),
             processed_devices: Vec::new(),
             deferred_devices: Vec::new(),
             ask_devices: Vec::new(),
@@ -235,6 +238,7 @@ impl UsbDeviceAuthManager {
 
         Ok(())
     }
+
     /// Loads the static USB policy from a file or creates a default one if the file does not exist.
     fn load_static_policy(&mut self) -> Result<(), Error> {
         debug!("Loading static USB policy");
@@ -248,6 +252,7 @@ impl UsbDeviceAuthManager {
         }
         Ok(())
     }
+
     /// Iterates through existing USB devices and sets their 'authorized_default' to '0' (deny).
     /// This is called during the initial setup of the UsbDeviceAuthManager.
     fn set_default_to_deny_for_new_devices(&mut self) -> Result<(), Error> {
@@ -349,7 +354,7 @@ impl UsbDeviceAuthManager {
     /// appropriate list within the `UsbDeviceManager`.
     pub fn process_usb_device(&mut self, mut device_with_state: UsbDeviceInfoWithState) {
         let action =
-            authorization::authorize_device(&device_with_state, &self.policy, self.system_state);
+            self.authorizer.authorize_device(&device_with_state, &self.policy, self.system_state);
         device_with_state.authorized = action == Action::Allow;
         device_with_state.is_deferred = action == Action::Defer;
         match action {
@@ -401,7 +406,7 @@ impl UsbDeviceAuthManager {
         status: UsbAuthorizationStatus,
     ) -> Result<(), Error> {
         let authorized: bool = status == UsbAuthorizationStatus::AUTHORIZED;
-        authorization::authorize_device_via_sysfs(&device_with_state.info.syspath, authorized)?;
+        self.authorizer.authorize_device_via_sysfs(&device_with_state.info.syspath, authorized)?;
         device_with_state.authorized = authorized;
 
         for cb in &mut self.callbacks {
