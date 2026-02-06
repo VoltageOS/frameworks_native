@@ -109,6 +109,9 @@ public:
 
     //    void onDrawProxySurfaceControl(int id) override;
 
+    void beginRenderTarget(uint64_t bufferId);
+    void endRenderTarget();
+
     void storeSize(int width, int height);
 
     std::shared_ptr<RenderCommandBufferProducer> getRenderCommandBufferProducer() {
