@@ -1416,7 +1416,6 @@ private:
 
     std::atomic_bool mMustComposite = false;
     std::atomic_bool mGeometryDirty = false;
-    std::atomic_bool mOptimizeForPerformance = false;
 
     // constant members (no synchronization needed for access)
     const nsecs_t mBootTime = systemTime();
