@@ -97,8 +97,6 @@ public:
     bool enable_user_preferred_hdr_mode() const;
     bool frame_rate_category_mrr() const;
     bool graphite_renderengine() const;
-    bool hdcp_level_hal() const;
-    bool hdcp_negotiation() const;
     bool idle_screen_refresh_rate_timeout() const;
     bool local_tonemap_screenshots() const;
     bool luts_api() const;

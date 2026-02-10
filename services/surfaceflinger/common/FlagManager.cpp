@@ -171,8 +171,6 @@ void FlagManager::dump(std::string& result) const {
     DUMP_ACONFIG_FLAG(force_slower_follower_gpu_composition_platform);
     DUMP_ACONFIG_FLAG(frame_rate_category_mrr);
     DUMP_ACONFIG_FLAG(graphite_renderengine);
-    DUMP_ACONFIG_FLAG(hdcp_level_hal);
-    DUMP_ACONFIG_FLAG(hdcp_negotiation);
     DUMP_ACONFIG_FLAG(local_tonemap_screenshots);
     DUMP_ACONFIG_FLAG(modeset_multi_display);
     DUMP_ACONFIG_FLAG(modeset_state_machine);
@@ -287,8 +285,6 @@ FLAG_MANAGER_ACONFIG_FLAG(force_slower_follower_gpu_composition_platform,
 FLAG_MANAGER_ACONFIG_FLAG(frame_rate_category_mrr, "debug.sf.frame_rate_category_mrr")
 FLAG_MANAGER_ACONFIG_FLAG(frametimeline_boottime_in_lambda, "");
 FLAG_MANAGER_ACONFIG_FLAG(graphite_renderengine, "debug.renderengine.graphite")
-FLAG_MANAGER_ACONFIG_FLAG(hdcp_level_hal, "")
-FLAG_MANAGER_ACONFIG_FLAG(hdcp_negotiation, "debug.sf.hdcp_negotiation");
 FLAG_MANAGER_ACONFIG_FLAG(local_tonemap_screenshots, "debug.sf.local_tonemap_screenshots");
 FLAG_MANAGER_ACONFIG_FLAG(modeset_multi_display, "");
 FLAG_MANAGER_ACONFIG_FLAG(modeset_state_machine, "");
