@@ -8725,6 +8725,36 @@ TEST_F(InputDispatcherTest, DisplayRemoved) {
 }
 
 /**
+ * Currently, `displayRemoved` call can come in to the dispatcher at any point, even if there's
+ * an active gesture. Ensure that the dispatcher handles this condition correctly.
+ * This test reproduces a crash caused by the InputVerifier.
+ */
+TEST_F(InputDispatcherTest, RemoveDisplayWhileGestureIsActive) {
+    std::shared_ptr<FakeApplicationHandle> application = std::make_shared<FakeApplicationHandle>();
+    constexpr ui::LogicalDisplayId SECOND_DISPLAY{1};
+    sp<FakeWindowHandle> window =
+            sp<FakeWindowHandle>::make(application, mDispatcher, "window", SECOND_DISPLAY);
+    mDispatcher->onWindowInfosChanged({{*window->getInfo()}, {}, 0, 0});
+
+    // Start a gesture on the second display.
+    mDispatcher->notifyMotion(MotionArgsBuilder(ACTION_DOWN, AINPUT_SOURCE_TOUCHSCREEN)
+                                      .pointer(PointerBuilder(1, ToolType::FINGER).x(110).y(110))
+                                      .displayId(SECOND_DISPLAY)
+                                      .build());
+    window->consumeMotionEvent(WithMotionAction(ACTION_DOWN));
+
+    // Remove the second display.
+    mDispatcher->displayRemoved(SECOND_DISPLAY);
+
+    // Finish the gesture on the second display.
+    mDispatcher->notifyMotion(MotionArgsBuilder(ACTION_UP, AINPUT_SOURCE_TOUCHSCREEN)
+                                      .pointer(PointerBuilder(1, ToolType::FINGER).x(110).y(110))
+                                      .displayId(SECOND_DISPLAY)
+                                      .build());
+    window->consumeMotionEvent(WithMotionAction(ACTION_CANCEL));
+}
+
+/**
  * Launch two windows, with different owners. One window (slipperyExitWindow) has Flag::SLIPPERY,
  * and overlaps the other window, slipperyEnterWindow. The window 'slipperyExitWindow' is on top
  * of the 'slipperyEnterWindow'.

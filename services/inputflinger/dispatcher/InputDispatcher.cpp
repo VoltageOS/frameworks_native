@@ -4648,7 +4648,7 @@ void InputDispatcher::notifyMotion(const NotifyMotionArgs& args) {
                 mVerifiersByDisplay.try_emplace(resolvedDisplayId,
                                                 StringPrintf("display %s",
                                                              resolvedDisplayId.toString().c_str()));
-        Result<void> result =
+        Result<bool> result =
                 it->second.processMovement(args.deviceId, args.eventTime, args.source, args.action,
                                            args.actionButton, args.getPointerCount(),
                                            args.pointerProperties.data(), args.pointerCoords.data(),
@@ -4656,6 +4656,11 @@ void InputDispatcher::notifyMotion(const NotifyMotionArgs& args) {
         if (!result.ok()) {
             logDispatchStateLocked();
             LOG(FATAL) << "Bad stream: " << result.error() << " caused by " << args.dump();
+        } else if (*result) {
+            // The verifier is empty. Remove it if the display is gone.
+            if (!mWindowInfos.hasDisplay(resolvedDisplayId)) {
+                mVerifiersByDisplay.erase(it);
+            }
         }
     }
 
@@ -4843,7 +4848,7 @@ bool InputDispatcher::shouldRejectInjectedMotionLocked(const MotionEvent& motion
                                                                       displayId.toString());
     InputVerifier& verifier = it->second;
 
-    Result<void> result =
+    Result<bool> result =
             verifier.processMovement(deviceId, motionEvent.getEventTime(), motionEvent.getSource(),
                                      motionEvent.getAction(), motionEvent.getActionButton(),
                                      motionEvent.getPointerCount(),
@@ -5286,6 +5291,10 @@ void InputDispatcher::DispatcherWindowInfo::setWindowHandlesForDisplay(
     mWindowHandlesByDisplay[displayId] = std::move(windowHandles);
 }
 
+bool InputDispatcher::DispatcherWindowInfo::hasDisplay(ui::LogicalDisplayId displayId) const {
+    return mDisplayInfos.find(displayId) != mDisplayInfos.end();
+}
+
 void InputDispatcher::DispatcherWindowInfo::setDisplayInfos(
         const std::vector<android::gui::DisplayInfo>& displayInfos) {
     mDisplayInfos.clear();
@@ -5296,6 +5305,7 @@ void InputDispatcher::DispatcherWindowInfo::setDisplayInfos(
 
 void InputDispatcher::DispatcherWindowInfo::removeDisplay(ui::LogicalDisplayId displayId) {
     mWindowHandlesByDisplay.erase(displayId);
+    mDisplayInfos.erase(displayId);
 }
 
 const std::vector<sp<android::gui::WindowInfoHandle>>&
@@ -7264,7 +7274,14 @@ void InputDispatcher::displayRemoved(ui::LogicalDisplayId displayId) {
         std::erase(mIneligibleDisplaysForPointerCapture, displayId);
         // Remove the associated touch mode state.
         mTouchModePerDisplay.erase(displayId);
-        mVerifiersByDisplay.erase(displayId);
+        if (auto it = mVerifiersByDisplay.find(displayId); it != mVerifiersByDisplay.end()) {
+            if (it->second.isEmpty()) {
+                mVerifiersByDisplay.erase(it);
+            } else {
+                LOG(INFO) << "Not erasing InputVerifier on display " << displayId
+                          << ", it still has active input";
+            }
+        }
         mInputFilterVerifiersByDisplay.erase(displayId);
         mInteractionConnectionTokensByDisplay.erase(displayId);
     } // release lock
