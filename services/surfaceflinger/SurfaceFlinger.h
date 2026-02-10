@@ -784,8 +784,7 @@ private:
             compositionengine::CompositionRefreshArgs& refreshArgs, bool cursorOnly)
             REQUIRES(kMainThreadContext);
 
-    void moveSnapshotsFromCompositionArgs(compositionengine::CompositionRefreshArgs& refreshArgs,
-                                          const std::vector<std::pair<Layer*, LayerFE*>>& layers)
+    void moveSnapshotsFromCompositionArgs(const std::vector<std::pair<Layer*, LayerFE*>>& layers)
             REQUIRES(kMainThreadContext);
     std::vector<std::pair<Layer*, LayerFE*>> copyMergedSnapshots(
             compositionengine::CompositionRefreshArgs& refreshArgs) REQUIRES(kMainThreadContext);
@@ -1731,13 +1730,8 @@ private:
     void sfdo_resetForcedPacesetter();
 
     // Partition displays: physical for main thread, virtual for offloaded.
-    struct RefreshArgsPartition {
-        compositionengine::CompositionRefreshArgs mainThreadRefreshArgs;
-        std::optional<compositionengine::CompositionRefreshArgs> offloadedRefreshArgs;
-    };
-    RefreshArgsPartition addOutputsToRefreshArgs(
-            PhysicalDisplayId pacesetterId,
-            const compositionengine::CompositionRefreshArgs& refreshArgs,
+    std::optional<compositionengine::CompositionRefreshArgs> addOutputsToRefreshArgs(
+            PhysicalDisplayId pacesetterId, compositionengine::CompositionRefreshArgs& refreshArgs,
             const scheduler::FrameTargeters& frameTargeters);
     std::future<void> offloadGpuCompositedDisplays(
             compositionengine::CompositionRefreshArgs offloadedRefreshArgs);
