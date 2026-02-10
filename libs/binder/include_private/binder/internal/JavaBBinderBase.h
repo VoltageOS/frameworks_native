@@ -17,6 +17,7 @@
 #pragma once
 
 #include <binder/Binder.h>
+#include <binder/Functional.h>
 
 namespace android {
 
@@ -29,6 +30,10 @@ public:
     JavaBBinderBase();
 
     static const void* getSubclassID();
+
+    virtual void getFunctionName(
+            uint32_t code,
+            const android::binder::impl::SmallFunction<void(const char*)>& callback) const = 0;
 
 protected:
     virtual ~JavaBBinderBase();
