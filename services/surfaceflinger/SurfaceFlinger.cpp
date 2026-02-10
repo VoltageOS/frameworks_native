@@ -9126,7 +9126,8 @@ status_t SurfaceFlinger::getMaxAcquiredBufferCount(int* buffers) const {
     if (!getHwComposer().isHeadless()) {
         const sp<const DisplayDevice> display = getPacesetterDisplay();
         if (display) {
-            maxRefreshRate = display->refreshRateSelector().getSupportedRefreshRateRange().max;
+            maxRefreshRate = display->refreshRateSelector().
+                getConfigGroupSupportedRefreshRateRange().max;
         }
     }
 
