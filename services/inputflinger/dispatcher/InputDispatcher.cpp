@@ -6091,7 +6091,7 @@ InputDispatcher::DispatcherTouchState::transferTouchGesture(
     // Transferring touch focus using this API should not effect the focused window.
     newTargetFlags |= InputTarget::Flags::NO_FOCUS_CHANGE;
     sp<IBinder> forwardingWindowToken;
-    if (transferEntireGesture && com::android::input::flags::allow_transfer_of_entire_gesture()) {
+    if (transferEntireGesture) {
         forwardingWindowToken = fromToken;
     }
     state.addOrUpdateWindow(toWindowHandle, InputTarget::DispatchMode::AS_IS, newTargetFlags,
