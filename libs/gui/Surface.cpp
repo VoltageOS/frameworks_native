@@ -174,7 +174,16 @@ Surface::Surface(const sp<IGraphicBufferProducer>& bufferProducer, bool controll
     mProducerControlledByApp = controlledByApp;
     mSwapIntervalZero = false;
     mMaxBufferCount = NUM_BUFFER_SLOTS;
+    mIsSlotExpansionAllowed = false;
     mSurfaceControlHandle = surfaceControlHandle;
+
+    IGraphicBufferProducer::SurfaceConfig config;
+    if (auto status = mGraphicBufferProducer->getConfigForSurface(&config); status == OK) {
+        mIsSlotExpansionAllowed = config.isSlotExpansionAllowed;
+        if (config.slotCount > mSlots.size()) {
+            mSlots.resize(config.slotCount);
+        }
+    }
 }
 
 Surface::~Surface() {
@@ -2559,6 +2568,9 @@ int Surface::setMaxDequeuedBufferCount(int maxDequeuedBuffers) {
     Mutex::Autolock lock(mMutex);
 
     if (maxDequeuedBuffers > BufferQueueDefs::NUM_BUFFER_SLOTS && !mIsSlotExpansionAllowed) {
+        SURF_LOGE("setMaxDequeuedBufferCount: maxDequeuedBuffers (%d) > NUM_BUFFER_SLOTS (%d) and "
+                  "slot expansion is not allowed",
+                  maxDequeuedBuffers, BufferQueueDefs::NUM_BUFFER_SLOTS);
         return BAD_VALUE;
     }
 
