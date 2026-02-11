@@ -15,8 +15,6 @@
  */
 package com.android.internal.aiseal;
 
-import android.system.virtualizationcommon.ICEStoreKEK;
-
 /**
  * An internal service system_server can communicate with.
  */
@@ -26,7 +24,7 @@ interface IAiSealInternalService {
      * Called when CE storage of the given {@code userId} is unlocked.
      * At this point a CE storage of this user in the aiseal VM can also be unlocked.
      */
-    void onUserUnlocking(int userId, String kekFile);
+    void onUserUnlocking(int userId);
 
     /**
      * Called when given {@code userId} is stopped.
