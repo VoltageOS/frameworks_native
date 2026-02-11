@@ -2449,6 +2449,11 @@ void SurfaceFlinger::scheduleSample() {
     static_cast<void>(mScheduler->schedule([this] { sample(); }));
 }
 
+#define REQUIRE_SCHEDULER                                      \
+    std::lock_guard<std::mutex> schedulerLock(mSchedulerLock); \
+    if (!mScheduler) [[unlikely]]                              \
+    return
+
 void SurfaceFlinger::onComposerHalVsync(hal::HWDisplayId hwcDisplayId, int64_t timestamp,
                                         std::optional<hal::VsyncPeriodNanos> vsyncPeriod) {
     SFTRACE_NAME(vsyncPeriod
@@ -2457,6 +2462,8 @@ void SurfaceFlinger::onComposerHalVsync(hal::HWDisplayId hwcDisplayId, int64_t t
 
     Mutex::Autolock lock(mStateLock);
     if (const auto displayIdOpt = getHwComposer().onVsync(hwcDisplayId, timestamp)) {
+        REQUIRE_SCHEDULER;
+
         if (mScheduler->addResyncSample(*displayIdOpt, timestamp, vsyncPeriod,
                                         VSyncTracker::VsyncTimeSource::HwVsyncCallback)) {
             // period flushed
@@ -2476,10 +2483,8 @@ void SurfaceFlinger::onComposerHalHotplugEvent(hal::HWDisplayId hwcDisplayId,
             mPendingHotplugEvents.push_back(HotplugEvent{hwcDisplayId, hotplugEvent});
         }
 
-        if (mScheduler) {
-            mScheduler->scheduleConfigure();
-        }
-
+        REQUIRE_SCHEDULER;
+        mScheduler->scheduleConfigure();
         return;
     }
 
@@ -2497,21 +2502,25 @@ void SurfaceFlinger::onComposerHalHotplugEvent(hal::HWDisplayId hwcDisplayId,
             mPendingHotplugEvents.push_back(
                     HotplugEvent{hwcDisplayId, HWComposer::HotplugEvent::LinkUnstable});
         }
-        if (mScheduler) {
-            mScheduler->scheduleConfigure();
-        }
+
+        REQUIRE_SCHEDULER;
+        mScheduler->scheduleConfigure();
         // do not return to also report the error.
     }
 
     // TODO(b/311403559): use enum type instead of int
     const auto errorCode = static_cast<int32_t>(event);
     ALOGD("%s: Hotplug error %d for hwcDisplayId %" PRIu64, __func__, errorCode, hwcDisplayId);
+
+    REQUIRE_SCHEDULER;
     mScheduler->dispatchHotplugError(errorCode);
 }
 
 void SurfaceFlinger::onComposerHalVsyncPeriodTimingChanged(
         hal::HWDisplayId, const hal::VsyncPeriodChangeTimeline& timeline) {
     Mutex::Autolock lock(mStateLock);
+
+    REQUIRE_SCHEDULER;
     mScheduler->onNewVsyncPeriodChangeTimeline(timeline);
 
     if (timeline.refreshRequired) {
@@ -2526,16 +2535,19 @@ void SurfaceFlinger::onComposerHalSeamlessPossible(hal::HWDisplayId) {
 
 void SurfaceFlinger::onComposerHalRefresh(hal::HWDisplayId) {
     Mutex::Autolock lock(mStateLock);
+    REQUIRE_SCHEDULER;
     scheduleComposite(FrameHint::kNone);
 }
 
 void SurfaceFlinger::onComposerHalVsyncIdle(hal::HWDisplayId) {
     SFTRACE_CALL();
+    REQUIRE_SCHEDULER;
     mScheduler->forceNextResync();
 }
 
 void SurfaceFlinger::onRefreshRateChangedDebug(const RefreshRateChangedDebugData& data) {
     SFTRACE_CALL();
+    REQUIRE_SCHEDULER;
     const char* const whence = __func__;
     static_cast<void>(mScheduler->schedule([=, this]() FTL_FAKE_GUARD(mStateLock) FTL_FAKE_GUARD(
                                                    kMainThreadContext) {
@@ -5049,9 +5061,12 @@ void SurfaceFlinger::initScheduler(const sp<const DisplayDevice>& display) {
         features |= Feature::kExpectedPresentTime;
     }
 
-    mScheduler = std::make_unique<Scheduler>(static_cast<ICompositor&>(*this),
-                                             static_cast<ISchedulerCallback&>(*this), features,
-                                             getFactory(), activeRefreshRate, *mTimeStats);
+    {
+        std::lock_guard lock(mSchedulerLock);
+        mScheduler = std::make_unique<Scheduler>(static_cast<ICompositor&>(*this),
+                                                 static_cast<ISchedulerCallback&>(*this), features,
+                                                 getFactory(), activeRefreshRate, *mTimeStats);
+    }
 
     // The pacesetter must be registered before EventThread creation below.
     const auto displayId = display->getPhysicalId();
@@ -9240,6 +9255,7 @@ void SurfaceFlinger::updateHdcpLevels(hal::HWDisplayId hwcDisplayId, int32_t con
         return;
     }
 
+    REQUIRE_SCHEDULER;
     static_cast<void>(mScheduler->schedule([this, displayId = *idOpt, connectedLevel, maxLevel]() {
         const bool secure = connectedLevel >= 2 /* HDCP_V1 */;
         if (const auto display = FTL_FAKE_GUARD(mStateLock, getDisplayDeviceLocked(displayId))) {
