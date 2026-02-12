@@ -15,10 +15,6 @@
   ~ limitations under the License.
   -->
 
-<!-- Standard configuration for Android desktop devices.
-     These are built on Headless System User Mode in which the Headless System User (user 0) acts as
-     a login screen.
-     For config definitions, see frameworks/base/core/res/res/values/config.xml -->
 <resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
 
     <!-- Support the native serial service ("serialservice" package). -->
