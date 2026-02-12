@@ -797,8 +797,8 @@ private:
     void updateInputFlinger(VsyncId vsyncId, TimePoint frameTime) REQUIRES(kMainThreadContext);
     void persistDisplayBrightness(bool needsComposite) REQUIRES(kMainThreadContext);
     void buildWindowInfos(std::vector<gui::WindowInfo>& outWindowInfos,
-                          std::vector<gui::DisplayInfo>& outDisplayInfos)
-            REQUIRES(kMainThreadContext);
+                          std::vector<gui::DisplayInfo>& outDisplayInfos,
+                          std::vector<int32_t>& outVisibleWindowIds) REQUIRES(kMainThreadContext);
     void commitInputWindowCommands() REQUIRES(mStateLock);
     void updateCursorAsync() REQUIRES(kMainThreadContext);
 
@@ -1678,7 +1678,8 @@ private:
     bool mFrontEndDisplayInfosChanged GUARDED_BY(kMainThreadContext) = false;
 
     // WindowInfo ids visible during the last commit.
-    std::unordered_set<int32_t> mVisibleWindowIds GUARDED_BY(kMainThreadContext);
+    std::vector<int32_t> mVisibleWindowIds GUARDED_BY(kMainThreadContext);
+    std::vector<int32_t> mLastVisibleWindowIds GUARDED_BY(kMainThreadContext);
 
     // Mirroring
     // Map of displayid to mirrorRoot

@@ -4700,22 +4700,15 @@ void SurfaceFlinger::updateInputFlinger(VsyncId vsyncId, TimePoint frameTime) {
     std::vector<WindowInfo> windowInfos;
     std::vector<DisplayInfo> displayInfos;
     bool updateWindowInfo = false;
+    bool visibleWindowsChanged = false;
     if (mUpdateInputInfo) {
         mUpdateInputInfo = false;
         updateWindowInfo = true;
-        buildWindowInfos(windowInfos, displayInfos);
-    }
-
-    std::unordered_set<int32_t> visibleWindowIds;
-    for (WindowInfo& windowInfo : windowInfos) {
-        if (!windowInfo.inputConfig.test(WindowInfo::InputConfig::NOT_VISIBLE)) {
-            visibleWindowIds.insert(windowInfo.id);
+        buildWindowInfos(windowInfos, displayInfos, mVisibleWindowIds);
+        if (mVisibleWindowIds != mLastVisibleWindowIds) {
+            visibleWindowsChanged = true;
+            std::swap(mLastVisibleWindowIds, mVisibleWindowIds);
         }
-    }
-    bool visibleWindowsChanged = false;
-    if (visibleWindowIds != mVisibleWindowIds) {
-        visibleWindowsChanged = true;
-        mVisibleWindowIds = std::move(visibleWindowIds);
     }
 
     BackgroundExecutor::getInstance().sendCallbacks(
@@ -4782,14 +4775,18 @@ void SurfaceFlinger::persistDisplayBrightness(bool needsComposite) {
 }
 
 void SurfaceFlinger::buildWindowInfos(std::vector<WindowInfo>& outWindowInfos,
-                                      std::vector<DisplayInfo>& outDisplayInfos) {
+                                      std::vector<DisplayInfo>& outDisplayInfos,
+                                      std::vector<int32_t>& outVisibleWindowIds) {
     static size_t sNumWindowInfos = 0;
     outWindowInfos.reserve(sNumWindowInfos);
-    sNumWindowInfos = 0;
+    outVisibleWindowIds.clear();
 
     mLayerSnapshotBuilder.forEachInputSnapshot(
-            [&outWindowInfos](const frontend::LayerSnapshot& snapshot) {
+            [&outWindowInfos, &outVisibleWindowIds](const frontend::LayerSnapshot& snapshot) {
                 outWindowInfos.push_back(snapshot.inputInfo);
+                if (!snapshot.inputInfo.inputConfig.test(WindowInfo::InputConfig::NOT_VISIBLE)) {
+                    outVisibleWindowIds.push_back(snapshot.inputInfo.id);
+                }
             });
 
     sNumWindowInfos = outWindowInfos.size();
