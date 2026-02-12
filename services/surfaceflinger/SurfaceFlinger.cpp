@@ -2938,8 +2938,7 @@ bool SurfaceFlinger::commit(PhysicalDisplayId pacesetterId,
 
     // Determine if any displays, either physical or virtual, are on so that
     // power hints may be reported for performance boosts.
-
-    bool shouldEnablePowerHintSession = mOptimizeForPerformance.load();
+    bool shouldEnablePowerHintSession = true;
     if (!FlagManager::getInstance().align_adpf_with_sf_opt_policy()) {
         shouldEnablePowerHintSession =
                 FTL_FAKE_GUARD(mStateLock, hasDisplay([](const DisplayDevice& display) {
@@ -4857,10 +4856,7 @@ void SurfaceFlinger::requestDisplayModes(std::vector<display::DisplayModeRequest
 }
 
 void SurfaceFlinger::notifyCpuLoadUp() {
-    if (!FlagManager::getInstance().align_adpf_with_sf_opt_policy() ||
-        mOptimizeForPerformance.load()) {
-        mPowerAdvisor->notifyCpuLoadUp();
-    }
+    mPowerAdvisor->notifyCpuLoadUp();
 }
 
 void SurfaceFlinger::onChoreographerAttached() {
@@ -6386,7 +6382,7 @@ void SurfaceFlinger::applyOptimizationPolicy(const char* whence) FTL_FAKE_GUARD(
                         OptimizationPolicy::optimizeForPerformance;
             });
     if (FlagManager::getInstance().align_adpf_with_sf_opt_policy()) {
-        mOptimizeForPerformance = optimizeForPerformance;
+        mPowerAdvisor->setOptimizeForPerformance(optimizeForPerformance);
     }
     optimizeThreadScheduling(whence,
                              optimizeForPerformance ? OptimizationPolicy::optimizeForPerformance
