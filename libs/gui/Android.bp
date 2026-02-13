@@ -299,6 +299,7 @@ filegroup {
         ":inputconstants_aidl",
         ":libgui_bufferqueue_sources",
         ":rendercommandbuffer_sources",
+        "AsyncWorker.cpp",
         "BitTube.cpp",
         "BLASTBufferQueue.cpp",
         "BufferItemConsumer.cpp",
