@@ -630,3 +630,9 @@ cc_library_static {
 }
 
 subdirs = ["tests"]
+
+cc_library_headers {
+    name: "liblocklessqueue_headers",
+    host_supported: true,
+    export_include_dirs: ["include"],
+}

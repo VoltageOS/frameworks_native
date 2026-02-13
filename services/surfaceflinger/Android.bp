@@ -250,12 +250,6 @@ cc_library_headers {
     export_static_lib_headers: ["libserviceutils"],
 }
 
-cc_library_headers {
-    name: "liblocklessqueue_headers",
-    host_supported: true,
-    export_include_dirs: ["."],
-}
-
 filegroup {
     name: "libsurfaceflinger_sources",
     srcs: [
