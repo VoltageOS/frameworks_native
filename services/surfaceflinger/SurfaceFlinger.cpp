@@ -9530,6 +9530,7 @@ SurfaceFlinger::getLayerSnapshotsForScreenshots(const SnapshotRequestArgs& args)
             builderArgs.root = mLayerHierarchyBuilder.getHierarchy();
             builderArgs.parentCrop.reset();
         }
+        builderArgs.rootSnapshot.isSecure = false;
         builderArgs.excludeLayerIds.clear();
         mLayerSnapshotBuilder.update(builderArgs);
 
