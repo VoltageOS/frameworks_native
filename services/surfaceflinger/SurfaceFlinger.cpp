@@ -160,7 +160,6 @@
 #include "Jank/JankTracker.h"
 #include "Layer.h"
 #include "LayerProtoHelper.h"
-#include "LayerVector.h"
 #include "MutexUtils.h"
 #include "PowerAdvisor/PowerAdvisor.h"
 #include "PowerAdvisor/Workload.h"
@@ -8741,12 +8740,6 @@ ftl::SharedFuture<FenceResult> SurfaceFlinger::renderScreenImpl(
             : mScheduler->schedule(std::move(present)).share();
 
     return presentFuture;
-}
-
-void SurfaceFlinger::traverseLegacyLayers(const LayerVector::Visitor& visitor) const {
-    for (auto& layer : mLegacyLayers) {
-        visitor(layer.second.get());
-    }
 }
 
 // ---------------------------------------------------------------------------

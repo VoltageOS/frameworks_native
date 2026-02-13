@@ -299,7 +299,6 @@ filegroup {
         "Layer.cpp",
         "LayerFE.cpp",
         "LayerProtoHelper.cpp",
-        "LayerVector.cpp",
         "RefreshRateOverlay.cpp",
         "RegionSamplingThread.cpp",
         "Scheduler/EventThread.cpp",
