@@ -2938,8 +2938,7 @@ bool SurfaceFlinger::commit(PhysicalDisplayId pacesetterId,
 
     // Determine if any displays, either physical or virtual, are on so that
     // power hints may be reported for performance boosts.
-
-    bool shouldEnablePowerHintSession = mOptimizeForPerformance.load();
+    bool shouldEnablePowerHintSession = true;
     if (!FlagManager::getInstance().align_adpf_with_sf_opt_policy()) {
         shouldEnablePowerHintSession =
                 FTL_FAKE_GUARD(mStateLock, hasDisplay([](const DisplayDevice& display) {
@@ -4701,22 +4700,15 @@ void SurfaceFlinger::updateInputFlinger(VsyncId vsyncId, TimePoint frameTime) {
     std::vector<WindowInfo> windowInfos;
     std::vector<DisplayInfo> displayInfos;
     bool updateWindowInfo = false;
+    bool visibleWindowsChanged = false;
     if (mUpdateInputInfo) {
         mUpdateInputInfo = false;
         updateWindowInfo = true;
-        buildWindowInfos(windowInfos, displayInfos);
-    }
-
-    std::unordered_set<int32_t> visibleWindowIds;
-    for (WindowInfo& windowInfo : windowInfos) {
-        if (!windowInfo.inputConfig.test(WindowInfo::InputConfig::NOT_VISIBLE)) {
-            visibleWindowIds.insert(windowInfo.id);
+        buildWindowInfos(windowInfos, displayInfos, mVisibleWindowIds);
+        if (mVisibleWindowIds != mLastVisibleWindowIds) {
+            visibleWindowsChanged = true;
+            std::swap(mLastVisibleWindowIds, mVisibleWindowIds);
         }
-    }
-    bool visibleWindowsChanged = false;
-    if (visibleWindowIds != mVisibleWindowIds) {
-        visibleWindowsChanged = true;
-        mVisibleWindowIds = std::move(visibleWindowIds);
     }
 
     BackgroundExecutor::getInstance().sendCallbacks(
@@ -4783,14 +4775,18 @@ void SurfaceFlinger::persistDisplayBrightness(bool needsComposite) {
 }
 
 void SurfaceFlinger::buildWindowInfos(std::vector<WindowInfo>& outWindowInfos,
-                                      std::vector<DisplayInfo>& outDisplayInfos) {
+                                      std::vector<DisplayInfo>& outDisplayInfos,
+                                      std::vector<int32_t>& outVisibleWindowIds) {
     static size_t sNumWindowInfos = 0;
     outWindowInfos.reserve(sNumWindowInfos);
-    sNumWindowInfos = 0;
+    outVisibleWindowIds.clear();
 
     mLayerSnapshotBuilder.forEachInputSnapshot(
-            [&outWindowInfos](const frontend::LayerSnapshot& snapshot) {
+            [&outWindowInfos, &outVisibleWindowIds](const frontend::LayerSnapshot& snapshot) {
                 outWindowInfos.push_back(snapshot.inputInfo);
+                if (!snapshot.inputInfo.inputConfig.test(WindowInfo::InputConfig::NOT_VISIBLE)) {
+                    outVisibleWindowIds.push_back(snapshot.inputInfo.id);
+                }
             });
 
     sNumWindowInfos = outWindowInfos.size();
@@ -4857,10 +4853,7 @@ void SurfaceFlinger::requestDisplayModes(std::vector<display::DisplayModeRequest
 }
 
 void SurfaceFlinger::notifyCpuLoadUp() {
-    if (!FlagManager::getInstance().align_adpf_with_sf_opt_policy() ||
-        mOptimizeForPerformance.load()) {
-        mPowerAdvisor->notifyCpuLoadUp();
-    }
+    mPowerAdvisor->notifyCpuLoadUp();
 }
 
 void SurfaceFlinger::onChoreographerAttached() {
@@ -6386,7 +6379,7 @@ void SurfaceFlinger::applyOptimizationPolicy(const char* whence) FTL_FAKE_GUARD(
                         OptimizationPolicy::optimizeForPerformance;
             });
     if (FlagManager::getInstance().align_adpf_with_sf_opt_policy()) {
-        mOptimizeForPerformance = optimizeForPerformance;
+        mPowerAdvisor->setOptimizeForPerformance(optimizeForPerformance);
     }
     optimizeThreadScheduling(whence,
                              optimizeForPerformance ? OptimizationPolicy::optimizeForPerformance
@@ -8026,25 +8019,26 @@ void SurfaceFlinger::captureDisplay(const DisplayCaptureArgs& args,
         return;
     }
 
-    ScreenshotArgs screenshotArgs{.captureTypeVariant = args.displayToken,
-                                  .snapshotRequest =
-                                          SnapshotRequestArgs{.uid = gui::Uid{static_cast<uid_t>(
-                                                                      captureArgs.uid)},
-                                                              .excludeLayerIds =
-                                                                      excludeLayerIds.value()},
-                                  .sourceCrop = gui::aidl_utils::fromARect(captureArgs.sourceCrop),
-                                  .size = ui::Size(args.width, args.height),
-                                  .dataspace = static_cast<ui::Dataspace>(captureArgs.dataspace),
-                                  .disableBlur = false,
-                                  .isGrayscale = captureArgs.grayscale,
-                                  .isSecure =
-                                          captureArgs.secureLayerMode == SecureLayerMode::Capture,
-                                  .includeProtected = captureArgs.protectedLayerMode ==
-                                          ProtectedLayerMode::Capture,
-                                  .preserveDisplayColors = captureArgs.preserveDisplayColors,
-                                  .requireDpuReadback =
-                                          captureArgs.captureMode == CaptureMode::RequireOptimized,
-                                  .debugName = "ScreenCapture"};
+    ScreenshotArgs
+            screenshotArgs{.captureTypeVariant = args.displayToken,
+                           .snapshotRequest =
+                                   SnapshotRequestArgs{.uid = gui::Uid{static_cast<uid_t>(
+                                                               captureArgs.uid)},
+                                                       .excludeLayerIds = excludeLayerIds.value(),
+                                                       .exclusionMask = static_cast<uint32_t>(
+                                                               captureArgs.exclusionMask)},
+                           .sourceCrop = gui::aidl_utils::fromARect(captureArgs.sourceCrop),
+                           .size = ui::Size(args.width, args.height),
+                           .dataspace = static_cast<ui::Dataspace>(captureArgs.dataspace),
+                           .disableBlur = false,
+                           .isGrayscale = captureArgs.grayscale,
+                           .isSecure = captureArgs.secureLayerMode == SecureLayerMode::Capture,
+                           .includeProtected =
+                                   captureArgs.protectedLayerMode == ProtectedLayerMode::Capture,
+                           .preserveDisplayColors = captureArgs.preserveDisplayColors,
+                           .requireDpuReadback =
+                                   captureArgs.captureMode == CaptureMode::RequireOptimized,
+                           .debugName = "ScreenCapture"};
 
     captureScreenCommon(screenshotArgs, static_cast<ui::PixelFormat>(captureArgs.pixelFormat),
                         captureListener);
@@ -8115,28 +8109,28 @@ void SurfaceFlinger::captureLayers(const LayerCaptureArgs& args,
         return;
     }
 
-    ScreenshotArgs screenshotArgs{.captureTypeVariant = LayerHandle::getLayerId(args.layerHandle),
-                                  .snapshotRequest =
-                                          SnapshotRequestArgs{.uid = gui::Uid{static_cast<uid_t>(
-                                                                      captureArgs.uid)},
-                                                              .rootLayerId =
-                                                                      LayerHandle::getLayerId(
-                                                                              args.layerHandle),
-                                                              .excludeLayerIds =
-                                                                      excludeLayerIds.value(),
-                                                              .childrenOnly = args.childrenOnly},
-                                  .sourceCrop = gui::aidl_utils::fromARect(captureArgs.sourceCrop),
-                                  .dataspace = static_cast<ui::Dataspace>(captureArgs.dataspace),
-                                  .frameScaleX = captureArgs.frameScaleX,
-                                  .frameScaleY = captureArgs.frameScaleY,
-                                  .disableBlur = false,
-                                  .isGrayscale = captureArgs.grayscale,
-                                  .isSecure =
-                                          captureArgs.secureLayerMode == SecureLayerMode::Capture,
-                                  .includeProtected = captureArgs.protectedLayerMode ==
-                                          ProtectedLayerMode::Capture,
-                                  .preserveDisplayColors = captureArgs.preserveDisplayColors,
-                                  .debugName = "ScreenCapture"};
+    ScreenshotArgs
+            screenshotArgs{.captureTypeVariant = LayerHandle::getLayerId(args.layerHandle),
+                           .snapshotRequest =
+                                   SnapshotRequestArgs{.uid = gui::Uid{static_cast<uid_t>(
+                                                               captureArgs.uid)},
+                                                       .rootLayerId = LayerHandle::getLayerId(
+                                                               args.layerHandle),
+                                                       .excludeLayerIds = excludeLayerIds.value(),
+                                                       .childrenOnly = args.childrenOnly,
+                                                       .exclusionMask = static_cast<uint32_t>(
+                                                               captureArgs.exclusionMask)},
+                           .sourceCrop = gui::aidl_utils::fromARect(captureArgs.sourceCrop),
+                           .dataspace = static_cast<ui::Dataspace>(captureArgs.dataspace),
+                           .frameScaleX = captureArgs.frameScaleX,
+                           .frameScaleY = captureArgs.frameScaleY,
+                           .disableBlur = false,
+                           .isGrayscale = captureArgs.grayscale,
+                           .isSecure = captureArgs.secureLayerMode == SecureLayerMode::Capture,
+                           .includeProtected =
+                                   captureArgs.protectedLayerMode == ProtectedLayerMode::Capture,
+                           .preserveDisplayColors = captureArgs.preserveDisplayColors,
+                           .debugName = "ScreenCapture"};
 
     captureScreenCommon(screenshotArgs, static_cast<ui::PixelFormat>(captureArgs.pixelFormat),
                         captureListener);
@@ -9483,7 +9477,7 @@ SurfaceFlinger::getLayerSnapshotsForScreenshots(const SnapshotRequestArgs& args)
     };
 
     std::vector<std::pair<Layer*, sp<LayerFE>>> layers;
-    if (args.rootLayerId || !args.excludeLayerIds.empty()) {
+    if (args.rootLayerId || !args.excludeLayerIds.empty() || args.exclusionMask) {
         // Create and update LayerSnapshotBuilder args before iterating through snapshots
         frontend::LayerSnapshotBuilder::Args
                 builderArgs{.root = args.rootLayerId
@@ -9505,7 +9499,8 @@ SurfaceFlinger::getLayerSnapshotsForScreenshots(const SnapshotRequestArgs& args)
                             .genericLayerMetadataKeyMap = getGenericLayerMetadataKeyMap(),
                             .skipRoundCornersWhenProtected =
                                     !getRenderEngine().supportsProtectedContent(),
-                            .renderResourceCache = mIpcCache.get()};
+                            .renderResourceCache = mIpcCache.get(),
+                            .exclusionMask = args.exclusionMask};
         if (args.rootLayerId) {
             if (builderArgs.root.hasLayerCycle()) {
                 return base::unexpected(BAD_VALUE);
