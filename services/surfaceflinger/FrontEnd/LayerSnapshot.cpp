@@ -130,7 +130,7 @@ LayerSnapshot::LayerSnapshot(const RequestedLayerState& state,
     pid = state.ownerPid;
     permissions = state.ownerPermissions;
     changes = RequestedLayerState::Changes::Created;
-    clientChanges = 0;
+    clientChanges.reset();
     mirrorRootPath =
             LayerHierarchy::isMirror(path.variant) ? path : LayerHierarchy::TraversalPath::ROOT;
     stopLayerId = state.stopLayerId;
