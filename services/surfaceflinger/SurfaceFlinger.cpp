@@ -3131,6 +3131,9 @@ std::optional<compositionengine::CompositionRefreshArgs> SurfaceFlinger::addOutp
                 ? pacesetterTarget.expectedPresentTime()
                 : pacesetterTarget.frameBeginTime();
         if (refreshRate.isValid() && !mScheduler->isVsyncInPhase(vsyncTime, refreshRate)) {
+            if (FlagManager::getInstance().bugfix_virtual_display_refresh_rate()) {
+                mScheduler->scheduleFrame();
+            }
             continue;
         }
 
