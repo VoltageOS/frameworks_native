@@ -2985,10 +2985,14 @@ bool SurfaceFlinger::commit(PhysicalDisplayId pacesetterId,
     // Composite if transactions were committed, or if requested by HWC.
     bool mustComposite = mMustComposite.exchange(false);
     {
+        const bool powerModeChangeInProgress = mPowerModeInProgressCount > 0 ||
+                (mustComposite ? mPowerModeChangeInProgress.exchange(false)
+                               : mPowerModeChangeInProgress.load());
         scheduler::FrameTimelineDisplayState displayState = {
                 .poweredOn = FTL_FAKE_GUARD(mStateLock, getDisplayDeviceLocked(pacesetterId))
                                      ->getPowerMode() == hal::PowerMode::ON,
                 .modeChangeInProgress = mScheduler->getVsyncSchedule()->isModeChangeInProgress(),
+                .powerModeChangeInProgress = powerModeChangeInProgress,
         };
         mFrameTimeline->setSfWakeUp(ftl::to_underlying(vsyncId),
                                     pacesetterFrameTargetPtr->frameBeginTime().ns(),
@@ -6176,6 +6180,7 @@ void SurfaceFlinger::setPhysicalDisplayPowerMode(const sp<DisplayDevice>& displa
 ftl::FinalizerStd SurfaceFlinger::makePowerModeAsyncFinalizer(PhysicalDisplayId displayId,
                                                               hal::PowerMode mode) {
     return ftl::Finalizer([this, displayId, mode]() FTL_FAKE_GUARD(kMainThreadContext) {
+        mPowerModeChangeInProgress = true;
         if (displayId == mFrontInternalDisplayId) {
             mTimeStats->setPowerMode(mode);
             mScheduler->setActiveDisplayPowerModeForRefreshRateStats(mode);
@@ -6203,6 +6208,7 @@ SurfaceFlinger::setPhysicalDisplayPowerModeAsync(const sp<DisplayDevice>& displa
     if (currentMode == mode) {
         return {ftl::yield<status_t>(NO_ERROR), ftl::FinalizerStd()};
     }
+    mPowerModeChangeInProgress = true;
 
     const bool isInternalDisplay = (ftl::FakeGuard(mStateLock),
                                     mPhysicalDisplays.get(displayId)
@@ -6345,7 +6351,7 @@ void SurfaceFlinger::setVirtualDisplayPowerMode(const sp<DisplayDevice>& display
     const auto displayId = display->getVirtualId();
     ALOGD("Setting power mode %d on virtual display %s %s", mode, to_string(displayId).c_str(),
           display->getDisplayName().c_str());
-
+    mPowerModeChangeInProgress = true;
     display->setPowerMode(static_cast<hal::PowerMode>(mode));
 
     applyOptimizationPolicy(__func__);
@@ -6402,9 +6408,14 @@ void SurfaceFlinger::applyOptimizationPolicy(const char* whence) FTL_FAKE_GUARD(
 }
 
 void SurfaceFlinger::setPowerMode(const sp<IBinder>& displayToken, int mode) {
+    const auto powerMode = static_cast<hal::PowerMode>(mode);
+    const char* whence = __func__;
+    SFTRACE_FORMAT("%s(%s)", whence, toString(powerMode).c_str());
+    mPowerModeInProgressCount++;
     auto future = mScheduler->schedule([=, this]() FTL_FAKE_GUARD(kMainThreadContext)
                                                -> std::pair<ftl::Future<status_t>,
                                                             ftl::FinalizerStd> {
+        SFTRACE_FORMAT("%s(%s)", whence, toString(powerMode).c_str());
         mSkipPowerOnForQuiescent = false;
         const auto display = FTL_FAKE_GUARD(mStateLock, getDisplayDeviceLocked(displayToken));
         if (!display) {
@@ -6414,23 +6425,23 @@ void SurfaceFlinger::setPowerMode(const sp<IBinder>& displayToken, int mode) {
                 if (state.isVirtual()) {
                     ALOGD("Setting power mode %d for a dormant virtual display with token %p", mode,
                           displayToken.get());
-                    state.initialPowerMode = static_cast<hal::PowerMode>(mode);
+                    state.initialPowerMode = powerMode;
                     return {ftl::yield<status_t>(NO_ERROR), ftl::FinalizerStd()};
                 }
             }
             ALOGE("Failed to set power mode %d for display token %p", mode, displayToken.get());
         } else if (display->isVirtual()) {
-            setVirtualDisplayPowerMode(display, static_cast<hal::PowerMode>(mode));
+            setVirtualDisplayPowerMode(display, powerMode);
         } else {
             if (FlagManager::getInstance().set_power_mode_async() &&
                 display->getCompositionDisplay()->supportsOffloadPresent()) {
                 ALOGD("Setting power mode %d asynchronously for a physical display with token %p",
                       mode, displayToken.get());
-                return setPhysicalDisplayPowerModeAsync(display, static_cast<hal::PowerMode>(mode));
+                return setPhysicalDisplayPowerModeAsync(display, powerMode);
             } else {
                 ALOGD("Setting power mode %d synchronously for a physical display with token %p",
                       mode, displayToken.get());
-                setPhysicalDisplayPowerMode(display, static_cast<hal::PowerMode>(mode));
+                setPhysicalDisplayPowerMode(display, powerMode);
             }
         }
         return {ftl::yield<status_t>(NO_ERROR), ftl::FinalizerStd()};
@@ -6439,6 +6450,7 @@ void SurfaceFlinger::setPowerMode(const sp<IBinder>& displayToken, int mode) {
     auto [hwcFuture, finalizer] = future.get();
     hwcFuture.get();
     mScheduler->schedule([c = std::move(finalizer)]() {}).wait();
+    mPowerModeInProgressCount--;
 }
 
 status_t SurfaceFlinger::doDump(int fd, const DumpArgs& args, bool asProto) {

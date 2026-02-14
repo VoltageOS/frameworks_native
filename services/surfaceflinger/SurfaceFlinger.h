@@ -1649,6 +1649,8 @@ private:
     }
 
     std::atomic_bool mPowerHintSessionEnabled;
+    std::atomic_int mPowerModeInProgressCount{0};
+    std::atomic_bool mPowerModeChangeInProgress{false};
     // Whether a display should be turned on when initialized
     bool mSkipPowerOnForQuiescent;
 
