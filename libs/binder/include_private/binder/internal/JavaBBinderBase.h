@@ -29,7 +29,8 @@ class LIBBINDER_EXPORTED JavaBBinderBase : public BBinder {
 public:
     JavaBBinderBase();
 
-    static const void* getSubclassID();
+    // Only use this method to check if the binder belongs to type JavaBBinderExt
+    static const void* getExtSubclassID();
 
     virtual void getFunctionName(
             uint32_t code,
