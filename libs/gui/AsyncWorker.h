@@ -16,29 +16,27 @@
 
 #pragma once
 
-#include <binder/Binder.h>
-#include <binder/Functional.h>
+#include <condition_variable>
+#include <deque>
+#include <functional>
+#include <mutex>
+#include <thread>
 
-namespace android {
-
-namespace internal {
-
-// This API is internal to the binder platform. Many libbinder APIs are intended to be internal,
-// but please avoid using this API directly.
-class LIBBINDER_EXPORTED JavaBBinderBase : public BBinder {
+// A single worker thread that services a list of runnables.
+class AsyncWorker {
 public:
-    JavaBBinderBase();
+    AsyncWorker();
+    ~AsyncWorker();
 
-    static const void* getSubclassID();
+    void post(std::function<void()> runnable);
 
-    virtual void getFunctionName(
-            uint32_t code,
-            const android::binder::impl::SmallFunction<void(const char*)>& callback) const = 0;
+private:
+    std::thread mThread;
+    bool mDone = false;
+    std::deque<std::function<void()>> mRunnables;
+    std::mutex mMutex;
+    std::condition_variable mCv;
 
-protected:
-    virtual ~JavaBBinderBase();
+    void run();
+    void execute(std::deque<std::function<void()>>& runnables);
 };
-
-} // namespace internal
-
-} // namespace android
