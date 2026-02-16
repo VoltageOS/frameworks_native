@@ -931,11 +931,13 @@ void SkiaRenderEngine::drawLayersInternal(
     const LayerSettings* blurCompositionLayer = nullptr;
     if (mBlurFilter) {
         bool requiresCompositionLayer = false;
+        bool hasBlur = false;
         for (const auto& layer : layers) {
             // if the layer doesn't have blur or it is not visible then continue
             if (!layerHasBlur(layer, ctModifiesAlpha)) {
                 continue;
             }
+            hasBlur = true;
             if (layer.backgroundBlurRadius > 0 &&
                 layer.backgroundBlurRadius < mBlurFilter->getMaxCrossFadeRadius()) {
                 requiresCompositionLayer = true;
@@ -953,10 +955,11 @@ void SkiaRenderEngine::drawLayersInternal(
             }
         }
         if (FlagManager::getInstance().window_blur_kawase2_preallocate_buffers() &&
-            mInProtectedContext && !display.physicalDisplay.isEmpty() &&
+            hasBlur && mInProtectedContext && !display.physicalDisplay.isEmpty() &&
             !mBlurFilter->isBufferPreallocated(display.physicalDisplay.getSize())) {
             ALOGE("Allocating protected blur surfaces during draw! Preallocation failed, or "
-                  "destination size (%dx%d) doesn't match last active display size change",
+                  "destination size (%dx%d) is bigger than the preallocated size from the last"
+                  "active display size change",
                   display.physicalDisplay.getSize().width,
                   display.physicalDisplay.getSize().height);
             mBlurFilter->preallocateBuffer(getActiveContext(), display.physicalDisplay.getSize());
