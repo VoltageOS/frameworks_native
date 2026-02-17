@@ -28,6 +28,8 @@
 #include <ui/DebugUtils.h>
 #include <ui/HdrRenderTypeUtils.h>
 
+#include "SurfaceFlingerProperties.h"
+
 namespace android::compositionengine::impl::planner {
 
 const bool CachedSet::sDebugHighlighLayers =
@@ -57,7 +59,9 @@ CachedSet::Layer::Layer(const LayerState* state, std::chrono::steady_clock::time
       : mState(state), mHash(state->getHash()), mLastUpdate(lastUpdate) {}
 
 CachedSet::CachedSet(const LayerState* layer, std::chrono::steady_clock::time_point lastUpdate)
-      : mFingerprint(layer->getHash()), mLastUpdate(lastUpdate) {
+      : mFingerprint(layer->getHash()),
+        mLastUpdate(lastUpdate),
+        mForceHolePunch(sysprop::force_hole_punch(false)) {
     addLayer(layer, lastUpdate);
 }
 
@@ -65,7 +69,8 @@ CachedSet::CachedSet(Layer layer)
       : mFingerprint(layer.getHash()),
         mLastUpdate(layer.getLastUpdate()),
         mBounds(layer.getDisplayFrame()),
-        mVisibleRegion(layer.getVisibleRegion()) {
+        mVisibleRegion(layer.getVisibleRegion()),
+        mForceHolePunch(sysprop::force_hole_punch(false)) {
     mLayers.emplace_back(std::move(layer));
 }
 
@@ -322,7 +327,7 @@ bool CachedSet::requiresHolePunch() const {
         return false;
     }
 
-    return layerFE.hasRoundedCorners();
+    return mForceHolePunch || layerFE.hasRoundedCorners();
 }
 
 bool CachedSet::hasBlurBehind() const {
