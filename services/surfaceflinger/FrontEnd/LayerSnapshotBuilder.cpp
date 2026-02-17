@@ -331,7 +331,7 @@ void updateMetadataAndGameMode(LayerSnapshot& snapshot, const RequestedLayerStat
 
 void clearChanges(LayerSnapshot& snapshot) {
     snapshot.changes.clear();
-    snapshot.clientChanges = 0;
+    snapshot.clientChanges.reset();
     snapshot.contentDirty = snapshot.autoRefresh;
     snapshot.hasReadyFrame = snapshot.autoRefresh;
     snapshot.sidebandStreamHasFrame = false;
@@ -344,7 +344,7 @@ LayerSnapshot LayerSnapshotBuilder::getRootSnapshot() {
     LayerSnapshot snapshot;
     snapshot.path = LayerHierarchy::TraversalPath::ROOT;
     snapshot.changes = ftl::Flags<RequestedLayerState::Changes>();
-    snapshot.clientChanges = 0;
+    snapshot.clientChanges.reset();
     snapshot.isHiddenByPolicyFromParent = false;
     snapshot.isHiddenByPolicyFromRelativeParent = false;
     snapshot.parentTransform.reset();
@@ -766,7 +766,7 @@ void LayerSnapshotBuilder::updateSnapshot(LayerSnapshot& snapshot, const Args& a
     snapshot.clientChanges |= (parentSnapshot.clientChanges & layer_state_t::AFFECTS_CHILDREN);
     // mark the content as dirty if the parent state changes can dirty the child's content (for
     // example alpha)
-    snapshot.contentDirty |= (snapshot.clientChanges & layer_state_t::CONTENT_DIRTY) != 0;
+    snapshot.contentDirty |= bool(snapshot.clientChanges & layer_state_t::CONTENT_DIRTY);
     snapshot.isHiddenByPolicyFromParent = parentSnapshot.isHiddenByPolicyFromParent ||
             parentSnapshot.invalidTransform || requested.isHiddenByPolicy() ||
             (args.excludeLayerIds.find(path.id) != args.excludeLayerIds.end()) ||
@@ -1071,7 +1071,7 @@ void LayerSnapshotBuilder::updateSnapshot(LayerSnapshot& snapshot, const Args& a
           args.forceUpdate == ForceUpdateFlags::ALL ? "Force " : "",
           snapshot.getDebugString().c_str(), snapshot.changes.string().c_str(),
           parentSnapshot.changes.string().c_str(), requested.changes.string().c_str(),
-          std::to_string(requested.what).c_str(), parentSnapshot.getDebugString().c_str());
+          requested.what.to_string().c_str(), parentSnapshot.getDebugString().c_str());
 }
 
 void LayerSnapshotBuilder::updateRoundedCorner(LayerSnapshot& snapshot,
