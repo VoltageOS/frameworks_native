@@ -1195,12 +1195,11 @@ void SkiaRenderEngine::drawLayersInternal(
                 outlineRect.outset(layer.borderSettings.strokeWidth,
                                    layer.borderSettings.strokeWidth);
 
-                SkPaint paint;
-                // When rotated / scaling the lack of AA is imperceptible for the outline.
-                paint.setAntiAlias(enableAntiAlias);
-                paint.setColor(layer.borderSettings.color);
-                paint.setStyle(SkPaint::kFill_Style);
-                canvas->drawDRRect(outlineRect, preferredOriginalBounds, paint);
+                float cornerRadius = roundf(outlineRect.radii(SkRRect::kUpperLeft_Corner).fX);
+
+                mBoxShadowUtils.drawBorder(canvas, outlineRect.rect(), cornerRadius,
+                                           SkColor4f::FromColor(layer.borderSettings.color),
+                                           layer.borderSettings.strokeWidth);
             }
         }
 
