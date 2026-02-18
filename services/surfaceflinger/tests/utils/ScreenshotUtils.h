@@ -327,13 +327,36 @@ public:
         }
     }
 
-    Color getPixelColor(uint32_t x, uint32_t y) {
+    Color getPixelColor(uint32_t x, uint32_t y) const {
         if (!mOutBuffer || mOutBuffer->getPixelFormat() != HAL_PIXEL_FORMAT_RGBA_8888) {
             return {0, 0, 0, 0};
         }
 
         const uint8_t* pixel = mPixels + (4 * (y * mOutBuffer->getStride() + x));
         return {pixel[0], pixel[1], pixel[2], pixel[3]};
+    }
+
+    sp<GraphicBuffer> getBuffer() const { return mOutBuffer; }
+
+    ui::Size getBufferSize() const {
+        return mOutBuffer ? ui::Size(mOutBuffer->getWidth(), mOutBuffer->getHeight()) : ui::Size();
+    }
+
+    void expectBufferMatches(const ScreenCapture& other) const {
+        ui::Size s1 = getBufferSize();
+        ui::Size s2 = other.getBufferSize();
+        ASSERT_EQ(s1.width, s2.width);
+        ASSERT_EQ(s1.height, s2.height);
+
+        for (int32_t y = 0; y < s1.height; y++) {
+            for (int32_t x = 0; x < s1.width; x++) {
+                Color c1 = getPixelColor(x, y);
+                Color c2 = other.getPixelColor(x, y);
+                if (c1.r != c2.r || c1.g != c2.g || c1.b != c2.b || c1.a != c2.a) {
+                    ASSERT_EQ(c1, c2) << "Pixel mismatch at (" << x << ", " << y << ")";
+                }
+            }
+        }
     }
 
     void expectFGColor(uint32_t x, uint32_t y) { checkPixel(x, y, 195, 63, 63); }
@@ -360,7 +383,7 @@ public:
 
 private:
     sp<GraphicBuffer> mOutBuffer;
-    bool mContainsHdr = mContainsHdr;
+    bool mContainsHdr;
     uint8_t* mPixels = nullptr;
 };
 } // namespace
