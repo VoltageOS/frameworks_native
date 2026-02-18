@@ -342,7 +342,8 @@ public:
         return mOutBuffer ? ui::Size(mOutBuffer->getWidth(), mOutBuffer->getHeight()) : ui::Size();
     }
 
-    void expectBufferMatches(const ScreenCapture& other) const {
+    void expectBufferMatches(const ScreenCapture& other, const char* name = "mismatch",
+                             std::function<bool(Color)> filter = nullptr) const {
         ui::Size s1 = getBufferSize();
         ui::Size s2 = other.getBufferSize();
         ASSERT_EQ(s1.width, s2.width);
@@ -351,9 +352,25 @@ public:
         for (int32_t y = 0; y < s1.height; y++) {
             for (int32_t x = 0; x < s1.width; x++) {
                 Color c1 = getPixelColor(x, y);
+                if (filter && !filter(c1)) {
+                    continue;
+                }
                 Color c2 = other.getPixelColor(x, y);
-                if (c1.r != c2.r || c1.g != c2.g || c1.b != c2.b || c1.a != c2.a) {
-                    ASSERT_EQ(c1, c2) << "Pixel mismatch at (" << x << ", " << y << ")";
+                if (c1 != c2) {
+                    std::filesystem::path debugDir = std::filesystem::temp_directory_path() /
+                            "SurfaceFlinger_test_screenshots";
+                    std::error_code ec;
+                    std::filesystem::create_directories(debugDir, ec);
+
+                    std::filesystem::path path1 = debugDir / (std::string(name) + "_expected.png");
+                    std::filesystem::path path2 = debugDir / (std::string(name) + "_actual.png");
+
+                    writeGraphicBufferToPng(path1, mOutBuffer);
+                    writeGraphicBufferToPng(path2, other.mOutBuffer);
+
+                    ASSERT_EQ(c1, c2) << "Pixel mismatch at (" << x << ", " << y << ")\n"
+                                      << "Expected image: " << path1 << "\n"
+                                      << "Actual image:   " << path2;
                 }
             }
         }

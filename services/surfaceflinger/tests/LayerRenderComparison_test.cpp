@@ -120,6 +120,70 @@ public:
         }
     }
 
+    void fillLayerQuadrant(const sp<SurfaceControl>& layer, uint32_t bufferWidth,
+                           uint32_t bufferHeight, const Color& topLeft, const Color& topRight,
+                           const Color& bottomLeft, const Color& bottomRight) {
+        if (mLayerType == LAYER_TYPE_RENDER_COMMAND_BUFFER) {
+            auto it = mRenderCommandCanvases.find(layer.get());
+            ASSERT_NE(it, mRenderCommandCanvases.end());
+            auto canvas = it->second;
+            auto& frameId = mRenderCommandFrameIds[layer.get()];
+            frameId++;
+
+            canvas->storeSize(bufferWidth, bufferHeight);
+            canvas->startRecording();
+
+            ASSERT_TRUE(bufferWidth % 2 == 0 && bufferHeight % 2 == 0);
+            const int32_t halfW = bufferWidth / 2;
+            const int32_t halfH = bufferHeight / 2;
+
+            SkPaint paint;
+            paint.setAntiAlias(false);
+
+            paint.setColor(SkColorSetARGB(topLeft.a, topLeft.r, topLeft.g, topLeft.b));
+            canvas->drawRect(SkRect::MakeLTRB(0, 0, halfW, halfH), paint);
+
+            paint.setColor(SkColorSetARGB(topRight.a, topRight.r, topRight.g, topRight.b));
+            canvas->drawRect(SkRect::MakeLTRB(halfW, 0, bufferWidth, halfH), paint);
+
+            paint.setColor(SkColorSetARGB(bottomLeft.a, bottomLeft.r, bottomLeft.g, bottomLeft.b));
+            canvas->drawRect(SkRect::MakeLTRB(0, halfH, halfW, bufferHeight), paint);
+
+            paint.setColor(SkColorSetARGB(bottomRight.a, bottomRight.r, bottomRight.g,
+                                          bottomRight.b));
+            canvas->drawRect(SkRect::MakeLTRB(halfW, halfH, bufferWidth, bufferHeight), paint);
+
+            canvas->endRecording();
+
+            SurfaceComposerClient::Transaction()
+                    .setRenderCommandBufferFrameId(layer, frameId)
+                    .setCrop(layer, Rect(bufferWidth, bufferHeight))
+                    .apply(true);
+        } else {
+            using android::hardware::graphics::common::V1_1::BufferUsage;
+            sp<GraphicBuffer> buffer =
+                    sp<GraphicBuffer>::make(bufferWidth, bufferHeight, PIXEL_FORMAT_RGBA_8888, 1u,
+                                            static_cast<uint64_t>(BufferUsage::CPU_READ_OFTEN |
+                                                                  BufferUsage::CPU_WRITE_OFTEN |
+                                                                  BufferUsage::COMPOSER_OVERLAY |
+                                                                  BufferUsage::GPU_TEXTURE),
+                                            "test");
+            ASSERT_TRUE(bufferWidth % 2 == 0 && bufferHeight % 2 == 0);
+
+            const int32_t halfW = bufferWidth / 2;
+            const int32_t halfH = bufferHeight / 2;
+            TransactionUtils::fillGraphicBufferColor(buffer, Rect(0, 0, halfW, halfH), topLeft);
+            TransactionUtils::fillGraphicBufferColor(buffer, Rect(halfW, 0, bufferWidth, halfH),
+                                                     topRight);
+            TransactionUtils::fillGraphicBufferColor(buffer, Rect(0, halfH, halfW, bufferHeight),
+                                                     bottomLeft);
+            TransactionUtils::fillGraphicBufferColor(buffer,
+                                                     Rect(halfW, halfH, bufferWidth, bufferHeight),
+                                                     bottomRight);
+            SurfaceComposerClient::Transaction().setBuffer(layer, buffer).apply();
+        }
+    }
+
     std::unique_ptr<ScreenCapture> screenshot() {
         std::unique_ptr<ScreenCapture> sc;
         ScreenCapture::captureScreen(&sc);
@@ -137,7 +201,8 @@ private:
 
 class LayerRenderComparisonTest : public LayerTransactionTest {
 protected:
-    void runComparisonTest(std::function<void(ComparisonHarness&)> testLogic) {
+    void runComparisonTest(std::function<void(ComparisonHarness&)> testLogic,
+                           std::function<bool(Color)> filter = nullptr) {
         if (!com_android_graphics_libgui_flags_out_of_process_rendering()) {
             GTEST_SKIP();
         }
@@ -161,7 +226,11 @@ protected:
             harness.TearDown();
         }
 
-        scBuffer->expectBufferMatches(*scRender);
+        const auto info = ::testing::UnitTest::GetInstance()->current_test_info();
+        std::string testName = info->test_suite_name();
+        testName += "_";
+        testName += info->name();
+        scBuffer->expectBufferMatches(*scRender, testName.c_str(), filter);
     }
 };
 
@@ -230,6 +299,155 @@ TEST_F(LayerRenderComparisonTest, ChildLayerAlpha) {
                 .setAlpha(child, 0.5f)
                 .apply();
     });
+}
+
+TEST_F(LayerRenderComparisonTest, ParentScalingChildCrop) {
+    // Scaling the buffer based quadrant produces some blended regions whereas the
+    // RenderCommandBuffer based ones remain perfectly sharp. We only expect matching
+    // on pixels that are one of the solid colors we constructed the quadrants with.
+    auto quadrantFilter = [](Color c) {
+        return c == Color::RED || c == Color::GREEN || c == Color::BLUE || c == Color::WHITE ||
+                c == Color::BLACK;
+    };
+    runComparisonTest([](ComparisonHarness& harness) {
+        sp<SurfaceControl> parent = harness.createLayer("Parent", 64, 64);
+        harness.fillLayerQuadrant(parent, 64, 64, Color::RED, Color::GREEN, Color::BLUE,
+                                  Color::WHITE);
+
+        sp<SurfaceControl> child = harness.createLayer("Child", 32, 32, 0, parent.get());
+        harness.fillLayerQuadrant(child, 32, 32, Color::WHITE, Color::RED, Color::BLUE,
+                                  Color::BLACK);
+
+        SurfaceComposerClient::Transaction()
+                .show(parent)
+                .show(child)
+                .setMatrix(parent, 2.0f, 0.0f, 0.0f, 2.0f)
+                .setCrop(child, Rect(0, 0, 16, 16))
+                .apply();
+    }, quadrantFilter);
+}
+
+TEST_F(LayerRenderComparisonTest, ParentCropChildScaling) {
+    auto quadrantFilter = [](Color c) {
+        return c == Color::RED || c == Color::GREEN || c == Color::BLUE || c == Color::WHITE ||
+                c == Color::BLACK;
+    };
+    runComparisonTest([](ComparisonHarness& harness) {
+        sp<SurfaceControl> parent = harness.createLayer("Parent", 64, 64);
+        harness.fillLayerQuadrant(parent, 64, 64, Color::RED, Color::GREEN, Color::BLUE,
+                                  Color::WHITE);
+
+        sp<SurfaceControl> child = harness.createLayer("Child", 32, 32, 0, parent.get());
+        harness.fillLayerQuadrant(child, 32, 32, Color::WHITE, Color::RED, Color::BLUE,
+                                  Color::BLACK);
+
+        SurfaceComposerClient::Transaction()
+                .show(parent)
+                .show(child)
+                .setCrop(parent, Rect(0, 0, 32, 32))
+                .setMatrix(child, 2.0f, 0.0f, 0.0f, 2.0f)
+                .apply();
+    }, quadrantFilter);
+}
+
+TEST_F(LayerRenderComparisonTest, ParentRotationChildCrop) {
+    auto quadrantFilter = [](Color c) {
+        return c == Color::RED || c == Color::GREEN || c == Color::BLUE || c == Color::WHITE ||
+                c == Color::BLACK;
+    };
+    runComparisonTest([](ComparisonHarness& harness) {
+        sp<SurfaceControl> parent = harness.createLayer("Parent", 64, 64);
+        harness.fillLayerQuadrant(parent, 64, 64, Color::RED, Color::GREEN, Color::BLUE,
+                                  Color::WHITE);
+
+        sp<SurfaceControl> child = harness.createLayer("Child", 32, 32, 0, parent.get());
+        harness.fillLayerQuadrant(child, 32, 32, Color::WHITE, Color::RED, Color::BLUE,
+                                  Color::BLACK);
+
+        // Rotate parent 90 degrees
+        SurfaceComposerClient::Transaction()
+                .show(parent)
+                .show(child)
+                .setMatrix(parent, 0.0f, 1.0f, -1.0f, 0.0f)
+                .setPosition(parent, 64, 0)
+                .setCrop(child, Rect(0, 0, 16, 16))
+                .apply();
+    }, quadrantFilter);
+}
+
+TEST_F(LayerRenderComparisonTest, ParentCropChildRotation) {
+    auto quadrantFilter = [](Color c) {
+        return c == Color::RED || c == Color::GREEN || c == Color::BLUE || c == Color::WHITE ||
+                c == Color::BLACK;
+    };
+    runComparisonTest([](ComparisonHarness& harness) {
+        sp<SurfaceControl> parent = harness.createLayer("Parent", 64, 64);
+        harness.fillLayerQuadrant(parent, 64, 64, Color::RED, Color::GREEN, Color::BLUE,
+                                  Color::WHITE);
+
+        sp<SurfaceControl> child = harness.createLayer("Child", 32, 32, 0, parent.get());
+        harness.fillLayerQuadrant(child, 32, 32, Color::WHITE, Color::RED, Color::BLUE,
+                                  Color::BLACK);
+
+        // Rotate child 90 degrees
+        SurfaceComposerClient::Transaction()
+                .show(parent)
+                .show(child)
+                .setCrop(parent, Rect(0, 0, 32, 32))
+                .setMatrix(child, 0.0f, 1.0f, -1.0f, 0.0f)
+                .setPosition(child, 32, 0)
+                .apply();
+    }, quadrantFilter);
+}
+
+TEST_F(LayerRenderComparisonTest, ParentRotationChildScaling) {
+    auto quadrantFilter = [](Color c) {
+        return c == Color::RED || c == Color::GREEN || c == Color::BLUE || c == Color::WHITE ||
+                c == Color::BLACK;
+    };
+    runComparisonTest([](ComparisonHarness& harness) {
+        sp<SurfaceControl> parent = harness.createLayer("Parent", 64, 64);
+        harness.fillLayerQuadrant(parent, 64, 64, Color::RED, Color::GREEN, Color::BLUE,
+                                  Color::WHITE);
+
+        sp<SurfaceControl> child = harness.createLayer("Child", 32, 32, 0, parent.get());
+        harness.fillLayerQuadrant(child, 32, 32, Color::WHITE, Color::RED, Color::BLUE,
+                                  Color::BLACK);
+
+        // Rotate parent 90 degrees, scale child 2x
+        SurfaceComposerClient::Transaction()
+                .show(parent)
+                .show(child)
+                .setMatrix(parent, 0.0f, 1.0f, -1.0f, 0.0f)
+                .setPosition(parent, 64, 0)
+                .setMatrix(child, 2.0f, 0.0f, 0.0f, 2.0f)
+                .apply();
+    }, quadrantFilter);
+}
+
+TEST_F(LayerRenderComparisonTest, ParentScalingChildRotation) {
+    auto quadrantFilter = [](Color c) {
+        return c == Color::RED || c == Color::GREEN || c == Color::BLUE || c == Color::WHITE ||
+                c == Color::BLACK;
+    };
+    runComparisonTest([](ComparisonHarness& harness) {
+        sp<SurfaceControl> parent = harness.createLayer("Parent", 64, 64);
+        harness.fillLayerQuadrant(parent, 64, 64, Color::RED, Color::GREEN, Color::BLUE,
+                                  Color::WHITE);
+
+        sp<SurfaceControl> child = harness.createLayer("Child", 32, 32, 0, parent.get());
+        harness.fillLayerQuadrant(child, 32, 32, Color::WHITE, Color::RED, Color::BLUE,
+                                  Color::BLACK);
+
+        // Scale parent 2x, rotate child 90 degrees
+        SurfaceComposerClient::Transaction()
+                .show(parent)
+                .show(child)
+                .setMatrix(parent, 2.0f, 0.0f, 0.0f, 2.0f)
+                .setMatrix(child, 0.0f, 1.0f, -1.0f, 0.0f)
+                .setPosition(child, 32, 0)
+                .apply();
+    }, quadrantFilter);
 }
 
 } // namespace android
