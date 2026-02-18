@@ -664,9 +664,6 @@ public:
     const auto& hwcPhysicalDisplayIdMap() const { return getHwComposer().mPhysicalDisplayIdMap; }
     const auto& hwcDisplayData() const { return getHwComposer().mDisplayData; }
 
-    using BootStage = SurfaceFlinger::BootStage;
-    auto& mutableBootStage() { return mFlinger->mBootStage; }
-
     auto& mutableSupportsWideColor() { return mFlinger->mSupportsWideColor; }
 
     auto& mutableDisplayModeController() { return mFlinger->mDisplayModeController; }
