@@ -28,6 +28,7 @@
 #include <common/FlagManager.h>
 #include <common/trace.h>
 #include <ftl/small_map.h>
+#include <include/private/SkHdrMetadata.h>
 #include <math/vec2.h>
 #include <ui/DisplayMap.h>
 #include <ui/FloatRect.h>
@@ -1049,8 +1050,17 @@ void LayerSnapshotBuilder::updateSnapshot(LayerSnapshot& snapshot, const Args& a
     // For now we don't check LUT support so guard by a debug sysprop
     if (FlagManager::getInstance().force_agtm_without_luts() && snapshot.buffer) {
         std::optional<std::vector<uint8_t>> smpte2094_50;
-        status_t err = snapshot.buffer->getSmpte2094_50(&smpte2094_50);
+        status_t err;
+        {
+            SFTRACE_NAME("getSmpte2094_50");
+            err = snapshot.buffer->getSmpte2094_50(&smpte2094_50);
+        }
+
         hasSmpte2094_50 = err == OK && smpte2094_50;
+
+        if (hasSmpte2094_50) {
+            SFTRACE_NAME("Found smpte2094-50 on a layer!");
+        }
     }
 
     // computed snapshot properties
