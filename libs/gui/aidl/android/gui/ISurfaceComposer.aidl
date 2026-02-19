@@ -77,6 +77,21 @@ interface ISurfaceComposer {
     }
 
     /**
+     * Policy for controlling which content is visible on a virtual display.
+     */
+    enum ContentAccessPolicy {
+        /**
+         * Only content from the same UID as the virtual display owner is visible.
+         * Content from other UIDs is not shown on the virtual display.
+         */
+        SameUid = 0,
+        /**
+         * All content is visible, regardless of the UID of the content source.
+         */
+        AllUids = 1,
+    }
+
+    /**
      * Signal that we're done booting.
      * Requires ACCESS_SURFACE_FLINGER permission
      */
@@ -110,6 +125,8 @@ interface ISurfaceComposer {
      *     Whether to optimize for power or performance. Displays that are optimizing for power may
      *     be dependent on a different display that optimizes for performance when they are on,
      *     which will guarantee performance for all of the other displays.
+     * contentAccessPolicy
+     *     Specifies the policy for controlling which content is visible on this virtual display.
      * uniqueId
      *     The unique ID for the display.
      * ownerUid
@@ -123,9 +140,14 @@ interface ISurfaceComposer {
      *
      * requires ACCESS_SURFACE_FLINGER permission.
      */
-    @nullable IBinder createVirtualDisplay(@utf8InCpp String displayName, boolean isSecure,
-            OptimizationPolicy optimizationPolicy, @utf8InCpp String uniqueId, int /* uid_t */ ownerUid, float requestedRefreshRate);
-
+    @nullable IBinder createVirtualDisplay(
+                @utf8InCpp String displayName,
+                boolean isSecure,
+                OptimizationPolicy optimizationPolicy,
+                ContentAccessPolicy contentAccessPolicy,
+                @utf8InCpp String uniqueId,
+                int /* uid_t */ ownerUid,
+                float requestedRefreshRate);
     /**
      * Destroy a virtual display.
      * requires ACCESS_SURFACE_FLINGER permission.
