@@ -3736,7 +3736,7 @@ binder::Status InstalldNativeService::createOrDeletePccDirectoryLocked(
         int32_t previousPccUid =
                 previousPccId > 0 ? (int32_t)multiuser_get_uid(userId, previousPccId) : -1;
         // Create the PCC directory and its subdirectories (cache, code_cache).
-        res = createAppDataDirs(pccPath, pccId, pccUid, previousPccUid, cacheGid, seInfo,
+        res = createAppDataDirs(pccPath, pccUid, pccUid, previousPccUid, cacheGid, seInfo,
                                 targetMode, projectIdApp, projectIdCache);
         if (!res.isOk()) {
             return res;
