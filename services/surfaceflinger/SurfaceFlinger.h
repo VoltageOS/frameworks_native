@@ -1520,6 +1520,11 @@ private:
     display::DisplayModeController mDisplayModeController;
     std::mutex mModeTransitionMutex;
 
+    bool shouldSyncResolutionSwitch() const {
+        return FlagManager::getInstance().synced_resolution_switch() &&
+                mBootStage == BootStage::FINISHED;
+    }
+
     struct {
         std::unique_ptr<DisplayIdGenerator<GpuVirtualDisplayId>> gpu =
                 std::make_unique<DisplayIdGenerator<GpuVirtualDisplayId>>();

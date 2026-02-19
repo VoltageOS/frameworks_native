@@ -1438,7 +1438,7 @@ void SurfaceFlinger::setDesiredMode(display::DisplayModeRequest desiredMode) {
             // The mode set to switch resolution is not initiated until the display transaction that
             // resizes the display. DM sends this transaction in response to a mode change event, so
             // emit the event now, not when finalizing the mode change as for a refresh rate switch.
-            if (FlagManager::getInstance().synced_resolution_switch()) {
+            if (shouldSyncResolutionSwitch()) {
                 if (const auto selectorPtr = mDisplayModeController.selectorPtrFor(displayId)) {
                     const auto activeMode = selectorPtr->getActiveMode();
                     if (!mode.matchesResolution(activeMode)) {
@@ -1532,7 +1532,7 @@ bool SurfaceFlinger::finalizeDisplayModeChange(PhysicalDisplayId displayId) {
     const bool resolutionMatch =
             pendingMode.matchesResolution(mDisplayModeController.getActiveMode(displayId));
 
-    if (!FlagManager::getInstance().synced_resolution_switch() && !resolutionMatch) {
+    if (!shouldSyncResolutionSwitch() && !resolutionMatch) {
         auto& state = mCurrentState.displays.get(getPhysicalDisplayTokenLocked(displayId))->get();
 
         // We need to generate new sequenceId in order to recreate the display (and this
@@ -1588,8 +1588,7 @@ bool SurfaceFlinger::finalizeDisplayModeChange(PhysicalDisplayId displayId) {
 
         // Skip for resolution changes, since the event was already emitted on setting the desired
         // mode.
-        if ((!FlagManager::getInstance().synced_resolution_switch() || resolutionMatch) &&
-            pendingModeOpt->emitEvent) {
+        if ((!shouldSyncResolutionSwitch() || resolutionMatch) && pendingModeOpt->emitEvent) {
             mScheduler->onDisplayModeChanged(displayId, pendingMode,
                                              /*clearContentRequirements*/ true);
         }
@@ -1619,18 +1618,14 @@ void SurfaceFlinger::applyActiveMode(display::DisplayModeRequest&& activeMode) {
 }
 
 void SurfaceFlinger::initiateDisplayModeChanges() {
-    if (FlagManager::getInstance().synced_resolution_switch() && mBootStage != BootStage::FINISHED)
-            [[unlikely]] {
-        return;
-    }
-
     SFTRACE_CALL();
 
     for (const auto& [displayId, physical] : mPhysicalDisplays) {
         const auto display = getDisplayDeviceLocked(displayId);
 
         auto desiredModeOpt = FlagManager::getInstance().modeset_state_machine()
-                ? mDisplayModeController.takeDesiredModeIfMatches(displayId, display->getSize())
+                ? mDisplayModeController.takeDesiredModeIfMatches(displayId, display->getSize(),
+                                                                  shouldSyncResolutionSwitch())
                 : mDisplayModeController.getDesiredMode(displayId);
 
         if (!desiredModeOpt) {
@@ -1692,8 +1687,7 @@ void SurfaceFlinger::initiateDisplayModeChanges() {
         hal::VsyncPeriodChangeTimeline outTimeline;
 
         // When initiating a resolution change, wait until the commit that resizes the display.
-        if (FlagManager::getInstance().synced_resolution_switch() &&
-            !FlagManager::getInstance().modeset_state_machine() &&
+        if (shouldSyncResolutionSwitch() && !FlagManager::getInstance().modeset_state_machine() &&
             !activeMode.matchesResolution(desiredMode.mode)) {
             const auto display = getDisplayDeviceLocked(displayId);
             if (display->getSize() != desiredMode.mode.modePtr->getResolution()) {
@@ -3060,7 +3054,7 @@ bool SurfaceFlinger::commit(PhysicalDisplayId pacesetterId,
         initiateDisplayModeChanges();
 
         // A resolution change without refresh required may have just destroyed the original.
-        if (!FlagManager::getInstance().synced_resolution_switch()) {
+        if (!shouldSyncResolutionSwitch()) {
             pacesetterFrameTargetPtr = mScheduler->pacesetterFrameTarget();
         }
     }
@@ -4608,7 +4602,7 @@ void SurfaceFlinger::processDisplayChanged(const wp<IBinder>& displayToken,
                 // Resize the framebuffer. For a virtual display, always do so. For a physical
                 // display, only do so if it has a pending modeset for the matching resolution.
                 if (currentState.isVirtual() ||
-                    (FlagManager::getInstance().synced_resolution_switch() &&
+                    (shouldSyncResolutionSwitch() &&
                      mDisplayModeController.getDesiredMode(display->getPhysicalId())
                              .transform([resolution](const auto& request) {
                                  return resolution == request.mode.modePtr->getResolution();
@@ -4625,7 +4619,7 @@ void SurfaceFlinger::processDisplayChanged(const wp<IBinder>& displayToken,
             }
         };
 
-        if (FlagManager::getInstance().synced_resolution_switch()) {
+        if (shouldSyncResolutionSwitch()) {
             // Update display size first, as display projection below depends on it.
             updateDisplaySize();
         }
@@ -4642,7 +4636,7 @@ void SurfaceFlinger::processDisplayChanged(const wp<IBinder>& displayToken,
             }
         }
 
-        if (!FlagManager::getInstance().synced_resolution_switch()) {
+        if (!shouldSyncResolutionSwitch()) {
             updateDisplaySize();
         }
     }
