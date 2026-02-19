@@ -52,6 +52,7 @@
 #include "Scheduler/VsyncController.h"
 #include "SurfaceFlinger.h"
 #include "TestableScheduler.h"
+#include "android/gui/ISurfaceComposer.h"
 #include "android/gui/ISurfaceComposerClient.h"
 
 #include "mock/DisplayHardware/MockComposer.h"
@@ -369,6 +370,7 @@ public:
         return mFlinger
                 ->createVirtualDisplay(displayName, isSecure,
                                        gui::ISurfaceComposer::OptimizationPolicy::optimizeForPower,
+                                       gui::ISurfaceComposer::ContentAccessPolicy::SameUid,
                                        kTestId, ownerUid, requestedRefreshRate);
     }
 
@@ -376,8 +378,19 @@ public:
                               gui::ISurfaceComposer::OptimizationPolicy optimizationPolicy,
                               const std::string& uniqueId, float requestedRefreshRate = 0.0f) {
         uid_t ownerUid = static_cast<uid_t>(gui::Uid::INVALID);
-        return mFlinger->createVirtualDisplay(displayName, isSecure, optimizationPolicy, uniqueId,
-                                              ownerUid, requestedRefreshRate);
+        return mFlinger->createVirtualDisplay(displayName, isSecure, optimizationPolicy,
+                                              gui::ISurfaceComposer::ContentAccessPolicy::SameUid,
+                                              uniqueId, ownerUid, requestedRefreshRate);
+    }
+
+    auto createVirtualDisplay(const std::string& displayName, bool isSecure,
+                              gui::ISurfaceComposer::OptimizationPolicy optimizationPolicy,
+                              gui::ISurfaceComposer::ContentAccessPolicy contentAccessPolicy,
+                              const std::string& uniqueId, uid_t ownerUid,
+                              float requestedRefreshRate = 0.0f) {
+        return mFlinger->createVirtualDisplay(displayName, isSecure, optimizationPolicy,
+                                              contentAccessPolicy, uniqueId, ownerUid,
+                                              requestedRefreshRate);
     }
 
     auto acquireVirtualDisplay(ui::Size resolution, ui::PixelFormat format,
