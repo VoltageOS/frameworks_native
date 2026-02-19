@@ -79,8 +79,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     debug!("UsbAuth service is starting...");
     let use_interactive_policy = usb_flags_lib_rust::enable_usb_host_authorization();
-    let device_manager = UsbDeviceAuthManager::new(use_interactive_policy)?;
-    let device_manager = Arc::new(Mutex::new(device_manager));
+    let device_manager = Arc::new(Mutex::new(UsbDeviceAuthManager::new(use_interactive_policy)?));
 
     let (mut watcher, event_stream) = Watcher::new().await?;
 
@@ -88,6 +87,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         watcher.run_event_loop().await;
     });
     tokio::spawn(handle_device_events(event_stream, device_manager.clone()));
+
+    tokio::spawn(UsbDeviceAuthManager::pending_devices_worker(device_manager.clone()));
 
     let service =
         UsbAuthServiceImpl::new_binder(device_manager).expect("Failed to create binder service");

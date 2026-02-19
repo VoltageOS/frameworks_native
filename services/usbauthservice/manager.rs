@@ -27,7 +27,10 @@ use log::debug;
 use std::any::Any;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
 use thiserror::Error;
+use tokio::sync::Notify;
 use ueventd::device::Device;
 
 /// Represents the possible errors that can occur in the `UsbDeviceAuthManager`.
@@ -62,6 +65,12 @@ const USB_AUTH_INTERACTIVE_POLICY_CONF_RELATIVE_PATH: &str = "usb_auth/interacti
 
 /// Relative path to the internal devices configuration file.
 const USB_AUTH_INTERNAL_DEVICES_CONF_RELATIVE_PATH: &str = "usb_auth/internal_devices.conf";
+
+/// Maximum number of retry attempts for processing a device that is pending.
+const MAX_RETRY_ATTEMPTS: u8 = 5;
+
+/// Interval for checking pending devices.
+const PENDING_DEVICE_CHECK_INTERVAL: Duration = Duration::from_millis(100);
 
 // Placeholder for the list of internal devices.
 struct InternalDevices;
@@ -103,6 +112,8 @@ pub struct UsbDeviceAuthManager {
     deferred_devices: Vec<UsbDeviceInfoWithState>,
     /// Devices that require user interaction for authorization.
     ask_devices: Vec<UsbDeviceInfoWithState>,
+    /// Devices that are pending to be processed because their sysfs path did not exist.
+    pending_devices: Vec<(Device, u8)>,
     /// Devices that requires looking up previous user interaction for authorization.
     allow_persisted_devices: Vec<UsbDeviceInfoWithState>,
     /// The current system authorization state.
@@ -111,6 +122,8 @@ pub struct UsbDeviceAuthManager {
     policy: Policy,
     /// Registered callbacks for auth events.
     callbacks: Vec<Box<dyn AuthEventsCallback>>,
+    /// Notifier to wake up the pending device processing loop.
+    notify: Arc<Notify>,
 }
 
 impl UsbDeviceAuthManager {
@@ -173,12 +186,14 @@ impl UsbDeviceAuthManager {
             processed_devices: Vec::new(),
             deferred_devices: Vec::new(),
             ask_devices: Vec::new(),
+            pending_devices: Vec::new(),
             allow_persisted_devices: Vec::new(),
             system_state: UsbAuthorizationSystemState::BOOTED,
             root_sys_dir: root_sys_dir_path.as_ref().to_path_buf(),
             root_etc_dir: root_etc_dir_path.as_ref().to_path_buf(),
             policy: create_default_policy(),
             callbacks: Vec::new(),
+            notify: Arc::new(Notify::new()),
         };
         debug!("Setting initial USB authorization state to deny all devices.");
         manager.set_default_to_deny_for_new_devices()?;
@@ -464,12 +479,81 @@ impl UsbDeviceAuthManager {
     /// * `Err(Error::DeviceNotFound)` if there was an issue getting device info from the `Device` object.
     pub fn add_usb_device(&mut self, device: &Device) -> Result<(), Error> {
         debug!("Add USB device: {:?}", device.name());
+        if !device.syspath().exists() {
+            debug!(
+                "Device syspath {:?} does not exist, adding to pending list with 0 retries",
+                device.syspath()
+            );
+            self.pending_devices.push((device.clone(), 0));
+            self.notify.notify_one();
+            return Ok(());
+        }
+
+        self.handle_device(device)
+    }
+
+    /// Helper function to process the result of `UsbDeviceInfoWithState::from_device`.
+    fn handle_device(&mut self, device: &Device) -> Result<(), Error> {
         match UsbDeviceInfoWithState::from_device(device) {
             Ok(device_with_state) => {
                 self.process_usb_device(device_with_state);
                 Ok(())
             }
-            Err(_) => Err(Error::DeviceNotFound(device.syspath().display().to_string())),
+            Err(e) => {
+                debug!("Failed to get UsbDeviceInfoWithState: {}", e);
+                Err(Error::DeviceNotFound(device.syspath().display().to_string()))
+            }
+        }
+    }
+
+    /// Processes pending devices that were added to the pending list because their sysfs path
+    /// did not exist.
+    fn process_pending_devices(&mut self) -> bool {
+        // Returns true if there are still pending devices after this process.
+        let mut devices_to_process = Vec::new();
+
+        self.pending_devices.retain_mut(|(device, retries)| {
+            *retries += 1;
+            if *retries > MAX_RETRY_ATTEMPTS {
+                debug!(
+                    "Giving up on pending device {:?} after {} attempts.",
+                    device.syspath(),
+                    MAX_RETRY_ATTEMPTS
+                );
+                return false;
+            }
+            if !device.syspath().exists() {
+                return true; // Keep in pending for retry
+            }
+
+            devices_to_process.push(device.clone());
+            false
+        });
+
+        for device in devices_to_process {
+            // Ignore errors for now as they are logged in handle_device
+            let _ = self.handle_device(&device);
+        }
+        !self.pending_devices.is_empty()
+    }
+
+    /// Periodically processes pending USB devices upon notification.
+    ///
+    /// This function waits for a notification from the manager, then enters a loop
+    /// to process any pending devices. If devices remain pending (e.g., waiting for
+    /// sysfs paths to appear), it sleeps for a short interval before retrying.
+    pub async fn pending_devices_worker(manager: Arc<Mutex<Self>>) {
+        let notify = manager.lock().unwrap().notify.clone();
+        loop {
+            notify.notified().await;
+            loop {
+                let has_pending = manager.lock().unwrap().process_pending_devices();
+                if has_pending {
+                    tokio::time::sleep(PENDING_DEVICE_CHECK_INTERVAL).await;
+                } else {
+                    break;
+                }
+            }
         }
     }
 
@@ -482,6 +566,7 @@ impl UsbDeviceAuthManager {
     /// * `device` - The `Device` object representing the USB device to be removed.
     pub fn remove_usb_device(&mut self, device: &Device) -> Result<(), Error> {
         if let Some(device_syspath) = device.syspath().to_str() {
+            self.pending_devices.retain(|(d, _)| d.syspath() != device.syspath());
             self.deferred_devices.retain(|d| d.info.syspath != device_syspath);
             self.ask_devices.retain(|d| d.info.syspath != device_syspath);
             self.allow_persisted_devices.retain(|d| d.info.syspath != device_syspath);
