@@ -412,14 +412,6 @@ void invokeScreenCaptureError(const status_t status,
     captureListener->onScreenCaptureCompleted(captureResults);
 }
 
-gui::Uid getFilterUidFromContentAccessPolicy(
-        gui::ISurfaceComposerDefault::ContentAccessPolicy contentAccessPolicy, gui::Uid ownerUid) {
-    if (contentAccessPolicy == gui::ISurfaceComposerDefault::ContentAccessPolicy::SameUid) {
-        return ownerUid;
-    }
-    return gui::Uid::INVALID;
-}
-
 } // namespace
 
 // ---------------------------------------------------------------------------
@@ -636,29 +628,17 @@ void SurfaceFlinger::run() {
 
 sp<IBinder> SurfaceFlinger::createVirtualDisplay(
         const std::string& displayName, bool isSecure,
-        gui::ISurfaceComposer::OptimizationPolicy optimizationPolicy,
-        gui::ISurfaceComposerDefault::ContentAccessPolicy contentAccessPolicy,
-        const std::string& uniqueId, uid_t ownerUid, float requestedRefreshRate) {
+        gui::ISurfaceComposer::OptimizationPolicy optimizationPolicy, const std::string& uniqueId,
+        uid_t ownerUid, float requestedRefreshRate) {
+    (void)ownerUid;
+
     // SurfaceComposerAIDL checks for some permissions, but adding an additional check here.
     // This is to ensure that only root, system, and graphics can request to create a secure
     // display. Secure displays can show secure content so we add an additional restriction on it.
     const uid_t uid = IPCThreadState::self()->getCallingUid();
-    const bool isPrivileged = uid == AID_ROOT || uid == AID_GRAPHICS || uid == AID_SYSTEM;
-
-    if (!isPrivileged) {
-        if (isSecure) {
-            ALOGE("Only privileged processes can create a secure display");
-            return nullptr;
-        }
-        if (contentAccessPolicy == gui::ISurfaceComposerDefault::ContentAccessPolicy::AllUids) {
-            ALOGE("Only privileged processes can create a virtual display that includes content "
-                  "from all UIDs.");
-            return nullptr;
-        }
-        if (ownerUid != uid) {
-            ALOGW("Only privileged processes can override the owner UID of a virtual display.");
-            ownerUid = uid;
-        }
+    if (isSecure && uid != AID_ROOT && uid != AID_GRAPHICS && uid != AID_SYSTEM) {
+        ALOGE("Only privileged processes can create a secure display");
+        return nullptr;
     }
 
     ALOGD("Creating virtual display: %s", displayName.c_str());
@@ -691,8 +671,6 @@ sp<IBinder> SurfaceFlinger::createVirtualDisplay(
     state.displayName = displayName;
     state.uniqueId = uniqueId;
     state.requestedRefreshRate = Fps::fromValue(requestedRefreshRate);
-    state.ownerUid = gui::Uid{static_cast<unsigned int>(ownerUid)};
-    state.contentAccessPolicy = contentAccessPolicy;
     mCurrentState.displays.emplace_or_replace(token, state);
     return token;
 }
@@ -4311,11 +4289,8 @@ sp<DisplayDevice> SurfaceFlinger::setupNewDisplayDeviceInternal(
             compositionengine::Output::ColorProfile{defaultColorMode, defaultDataSpace,
                                                     RenderIntent::COLORIMETRIC});
 
-    display->setLayerFilter(makeLayerFilterForDisplay(display->getDisplayIdVariant(),
-                                                     state.layerStack,
-                                                     getFilterUidFromContentAccessPolicy(
-                                                             state.contentAccessPolicy,
-                                                             state.ownerUid)));
+    display->setLayerFilter(
+            makeLayerFilterForDisplay(display->getDisplayIdVariant(), state.layerStack));
     display->setProjection(state.orientation, state.layerStackSpaceRect,
                            state.orientedDisplaySpaceRect);
     display->setDisplayName(state.displayName);
@@ -4597,12 +4572,8 @@ void SurfaceFlinger::processDisplayChanged(const wp<IBinder>& displayToken,
 
     if (const auto display = getDisplayDeviceLocked(displayToken)) {
         if (currentState.layerStack != drawingState.layerStack) {
-            display->setLayerFilter(
-                    makeLayerFilterForDisplay(display->getDisplayIdVariant(),
-                                              currentState.layerStack,
-                                              getFilterUidFromContentAccessPolicy(
-                                                      currentState.contentAccessPolicy,
-                                                      currentState.ownerUid)));
+            display->setLayerFilter(makeLayerFilterForDisplay(display->getDisplayIdVariant(),
+                                                              currentState.layerStack));
         }
         if (currentState.flags != drawingState.flags) {
             auto prevOptimizationPolicy = display->getOptimizationPolicy();
@@ -9716,17 +9687,14 @@ binder::Status SurfaceComposerAIDL::createConnection(sp<gui::ISurfaceComposerCli
 
 binder::Status SurfaceComposerAIDL::createVirtualDisplay(
         const std::string& displayName, bool isSecure,
-        gui::ISurfaceComposer::OptimizationPolicy optimizationPolicy,
-        gui::ISurfaceComposerDefault::ContentAccessPolicy contentAccessPolicy,
-        const std::string& uniqueId, int32_t ownerUid, float requestedRefreshRate,
-        sp<IBinder>* outDisplay) {
+        gui::ISurfaceComposer::OptimizationPolicy optimizationPolicy, const std::string& uniqueId,
+        int32_t ownerUid, float requestedRefreshRate, sp<IBinder>* outDisplay) {
     status_t status = checkAccessPermission();
     if (status != OK) {
         return binderStatusFromStatusT(status);
     }
     *outDisplay = mFlinger->createVirtualDisplay(displayName, isSecure, optimizationPolicy,
-                                                 contentAccessPolicy, uniqueId, ownerUid,
-                                                 requestedRefreshRate);
+                                                 uniqueId, ownerUid, requestedRefreshRate);
     return binder::Status::ok();
 }
 

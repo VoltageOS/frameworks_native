@@ -17,13 +17,7 @@
 #undef LOG_TAG
 #define LOG_TAG "LibSurfaceFlingerUnittests"
 
-#include <cstdint>
-#include <gtest/gtest.h>
-#include <gui/ISurfaceComposer.h>
-#include <gui/PidUid.h>
 #include <scheduler/Fps.h>
-#include <string>
-#include <ui/DisplayId.h>
 
 #include "DisplayTransactionTestHelpers.h"
 #include "FpsOps.h"
@@ -246,93 +240,6 @@ TEST_F(CreateDisplayTest, createDisplayWithRequestedRefreshRateNoneDivisorMax) {
     constexpr float kExpectedAdjustedRefreshRate = 120.f;
     createDisplayWithRequestedRefreshRate(kDisplayName, kDisplayId, kPacesetterDisplayRefreshRate,
                                           kRequestedRefreshRate, kExpectedAdjustedRefreshRate);
-}
-
-TEST_F(CreateDisplayTest, createVirtualDisplaySetsContentAccessPolicySameUid) {
-    static const std::string kDisplayName("virtual.policy.test");
-    static const std::string kUniqueId(
-            "virtual:CreateDisplayTest:createVirtualDisplaySetsContentAccessPolicy");
-    constexpr uid_t kOwnerUid = 12345;
-    constexpr uint32_t kDisplayId = 123ull;
-
-    // Set the calling identity to graphics so create virtual displays for specific ownerUid is
-    // allowed.
-    int64_t oldId = IPCThreadState::self()->clearCallingIdentity();
-    IPCThreadState::self()->restoreCallingIdentity(static_cast<int64_t>(AID_GRAPHICS) << 32 |
-                                                   AID_GRAPHICS);
-    sp<IBinder> displayToken =
-            mFlinger.createVirtualDisplay(kDisplayName, false /* isSecure */,
-                                          gui::ISurfaceComposer::OptimizationPolicy::
-                                                  optimizeForPower,
-                                          gui::ISurfaceComposer::ContentAccessPolicy::SameUid,
-                                          kUniqueId, kOwnerUid);
-    IPCThreadState::self()->restoreCallingIdentity(oldId);
-
-    // Verify state propagation.
-    ASSERT_TRUE(hasCurrentDisplayState(displayToken));
-    const auto& displayState = getCurrentDisplayState(displayToken);
-    EXPECT_EQ(displayState.contentAccessPolicy,
-              gui::ISurfaceComposer::ContentAccessPolicy::SameUid);
-
-    // Setup a DisplayDevice using the internal testable method.
-    sp<mock::GraphicBufferProducer> producer = sp<mock::GraphicBufferProducer>::make();
-    sp<Surface> surface = sp<Surface>::make(producer);
-    auto compositionDisplay =
-            compositionengine::impl::createDisplay(mFlinger.getCompositionEngine(),
-                                                   compositionengine::DisplayCreationArgsBuilder()
-                                                           .setId(GpuVirtualDisplayId(kDisplayId))
-                                                           .setPixels({1080, 1920})
-                                                           .setPowerAdvisor(&mPowerAdvisor)
-                                                           .build());
-    auto device = mFlinger.setupNewDisplayDeviceInternal(displayToken, compositionDisplay,
-                                                         displayState, mDisplaySurface, surface);
-
-    // Verify LayerFilter with filterUid set to owner's Uid.
-    const auto& state = device->getCompositionDisplay()->getState();
-    EXPECT_EQ(state.layerFilter.filterUid, gui::Uid{kOwnerUid});
-}
-
-TEST_F(CreateDisplayTest, createVirtualDisplaySetsContentAccessPolicyAllUids) {
-    static const std::string kDisplayName("virtual.policy.test");
-    static const std::string kUniqueId(
-            "virtual:CreateDisplayTest:createVirtualDisplaySetsContentAccessPolicy");
-    constexpr uid_t kOwnerUid = 12345;
-    constexpr uint32_t kDisplayId = 123ull;
-
-    // Set the calling identity to graphics so captureDisplay with embedded content is allowed.
-    int64_t oldId = IPCThreadState::self()->clearCallingIdentity();
-    IPCThreadState::self()->restoreCallingIdentity(static_cast<int64_t>(AID_GRAPHICS) << 32 |
-                                                   AID_GRAPHICS);
-    sp<IBinder> displayToken =
-            mFlinger.createVirtualDisplay(kDisplayName, false /* isSecure */,
-                                          gui::ISurfaceComposer::OptimizationPolicy::
-                                                  optimizeForPower,
-                                          gui::ISurfaceComposer::ContentAccessPolicy::AllUids,
-                                          kUniqueId, kOwnerUid);
-    IPCThreadState::self()->restoreCallingIdentity(oldId);
-
-    // Verify state propagation.
-    ASSERT_TRUE(hasCurrentDisplayState(displayToken));
-    const auto& displayState = getCurrentDisplayState(displayToken);
-    EXPECT_EQ(displayState.contentAccessPolicy,
-              gui::ISurfaceComposer::ContentAccessPolicy::AllUids);
-
-    // Setup a DisplayDevice using the internal testable method.
-    sp<mock::GraphicBufferProducer> producer = sp<mock::GraphicBufferProducer>::make();
-    sp<Surface> surface = sp<Surface>::make(producer);
-    auto compositionDisplay =
-            compositionengine::impl::createDisplay(mFlinger.getCompositionEngine(),
-                                                   compositionengine::DisplayCreationArgsBuilder()
-                                                           .setId(GpuVirtualDisplayId(kDisplayId))
-                                                           .setPixels({1080, 1920})
-                                                           .setPowerAdvisor(&mPowerAdvisor)
-                                                           .build());
-    auto device = mFlinger.setupNewDisplayDeviceInternal(displayToken, compositionDisplay,
-                                                         displayState, mDisplaySurface, surface);
-
-    // Verify LayerFilter with filterUid unset.
-    const auto& state = device->getCompositionDisplay()->getState();
-    EXPECT_EQ(state.layerFilter.filterUid, gui::Uid::INVALID);
 }
 
 } // namespace
