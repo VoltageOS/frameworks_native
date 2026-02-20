@@ -655,6 +655,12 @@ private:
     void binderDied(const wp<IBinder>& who) override;
 
     // HWC2::ComposerCallback overrides:
+    //
+    // Callbacks that access mScheduler must check for nullptr under mSchedulerLock, because they
+    // could be invoked before initScheduler.
+    //
+    // TODO: b/241285191 - Reorder Scheduler initialization before HWComposer::setCallback.
+    //
     void onComposerHalVsync(hal::HWDisplayId, nsecs_t timestamp,
                             std::optional<hal::VsyncPeriodNanos>) override;
     void onComposerHalHotplugEvent(hal::HWDisplayId, DisplayHotplugEvent) override;
@@ -1514,6 +1520,11 @@ private:
     display::DisplayModeController mDisplayModeController;
     std::mutex mModeTransitionMutex;
 
+    bool shouldSyncResolutionSwitch() const {
+        return FlagManager::getInstance().synced_resolution_switch() &&
+                mBootStage == BootStage::FINISHED;
+    }
+
     struct {
         std::unique_ptr<DisplayIdGenerator<GpuVirtualDisplayId>> gpu =
                 std::make_unique<DisplayIdGenerator<GpuVirtualDisplayId>>();
@@ -1589,6 +1600,9 @@ private:
     const std::string mHwcServiceName;
 
     std::unique_ptr<scheduler::Scheduler> mScheduler;
+
+    // Used during boot. See HWC2::ComposerCallback overrides.
+    std::mutex mSchedulerLock;
 
     scheduler::PresentLatencyTracker mPresentLatencyTracker GUARDED_BY(kMainThreadContext);
 

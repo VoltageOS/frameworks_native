@@ -240,6 +240,7 @@ public:
         if (!com_android_graphics_libgui_flags_out_of_process_rendering()) {
             return;
         }
+        canvas->storeSize(bufferWidth, bufferHeight);
         canvas->startRecording();
         canvas->drawColor(SkColorSetARGB(color.a, color.r, color.g, color.b), SkBlendMode::kSrc);
         canvas->endRecording();
@@ -259,6 +260,7 @@ public:
         if (!com_android_graphics_libgui_flags_out_of_process_rendering()) {
             return;
         }
+        canvas->storeSize(bufferWidth, bufferHeight);
         canvas->startRecording();
 
         ASSERT_TRUE(bufferWidth % 2 == 0 && bufferHeight % 2 == 0);

@@ -103,6 +103,7 @@ status_t BufferQueueProducer::getConfigForSurface(SurfaceConfig* outConfig) {
     }
 
     std::lock_guard<std::mutex> lock(mCore->mMutex);
+    outConfig->consumerName = mCore->mConsumerName;
     outConfig->slotCount = mSlots.size();
     outConfig->isSlotExpansionAllowed = mCore->mAllowExtendedSlotCount;
     return NO_ERROR;

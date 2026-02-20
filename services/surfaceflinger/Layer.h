@@ -443,8 +443,6 @@ protected:
     // statistical history needs to only be tracked by count of frames.
     // TODO: Deprecate the '--latency-clear' and get rid of this.
     std::atomic<uint32_t> mFrameStatsHistorySize;
-    // Timestamp history for UIAutomation. Thread safe.
-    FrameTracker mDeprecatedFrameTracker;
 
     // main thread
     sp<NativeHandle> mSidebandStream;

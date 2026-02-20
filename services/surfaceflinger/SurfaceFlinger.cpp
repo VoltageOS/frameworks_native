@@ -1438,7 +1438,7 @@ void SurfaceFlinger::setDesiredMode(display::DisplayModeRequest desiredMode) {
             // The mode set to switch resolution is not initiated until the display transaction that
             // resizes the display. DM sends this transaction in response to a mode change event, so
             // emit the event now, not when finalizing the mode change as for a refresh rate switch.
-            if (FlagManager::getInstance().synced_resolution_switch()) {
+            if (shouldSyncResolutionSwitch()) {
                 if (const auto selectorPtr = mDisplayModeController.selectorPtrFor(displayId)) {
                     const auto activeMode = selectorPtr->getActiveMode();
                     if (!mode.matchesResolution(activeMode)) {
@@ -1532,7 +1532,7 @@ bool SurfaceFlinger::finalizeDisplayModeChange(PhysicalDisplayId displayId) {
     const bool resolutionMatch =
             pendingMode.matchesResolution(mDisplayModeController.getActiveMode(displayId));
 
-    if (!FlagManager::getInstance().synced_resolution_switch() && !resolutionMatch) {
+    if (!shouldSyncResolutionSwitch() && !resolutionMatch) {
         auto& state = mCurrentState.displays.get(getPhysicalDisplayTokenLocked(displayId))->get();
 
         // We need to generate new sequenceId in order to recreate the display (and this
@@ -1588,8 +1588,7 @@ bool SurfaceFlinger::finalizeDisplayModeChange(PhysicalDisplayId displayId) {
 
         // Skip for resolution changes, since the event was already emitted on setting the desired
         // mode.
-        if ((!FlagManager::getInstance().synced_resolution_switch() || resolutionMatch) &&
-            pendingModeOpt->emitEvent) {
+        if ((!shouldSyncResolutionSwitch() || resolutionMatch) && pendingModeOpt->emitEvent) {
             mScheduler->onDisplayModeChanged(displayId, pendingMode,
                                              /*clearContentRequirements*/ true);
         }
@@ -1619,18 +1618,14 @@ void SurfaceFlinger::applyActiveMode(display::DisplayModeRequest&& activeMode) {
 }
 
 void SurfaceFlinger::initiateDisplayModeChanges() {
-    if (FlagManager::getInstance().synced_resolution_switch() && mBootStage != BootStage::FINISHED)
-            [[unlikely]] {
-        return;
-    }
-
     SFTRACE_CALL();
 
     for (const auto& [displayId, physical] : mPhysicalDisplays) {
         const auto display = getDisplayDeviceLocked(displayId);
 
         auto desiredModeOpt = FlagManager::getInstance().modeset_state_machine()
-                ? mDisplayModeController.takeDesiredModeIfMatches(displayId, display->getSize())
+                ? mDisplayModeController.takeDesiredModeIfMatches(displayId, display->getSize(),
+                                                                  shouldSyncResolutionSwitch())
                 : mDisplayModeController.getDesiredMode(displayId);
 
         if (!desiredModeOpt) {
@@ -1692,8 +1687,7 @@ void SurfaceFlinger::initiateDisplayModeChanges() {
         hal::VsyncPeriodChangeTimeline outTimeline;
 
         // When initiating a resolution change, wait until the commit that resizes the display.
-        if (FlagManager::getInstance().synced_resolution_switch() &&
-            !FlagManager::getInstance().modeset_state_machine() &&
+        if (shouldSyncResolutionSwitch() && !FlagManager::getInstance().modeset_state_machine() &&
             !activeMode.matchesResolution(desiredMode.mode)) {
             const auto display = getDisplayDeviceLocked(displayId);
             if (display->getSize() != desiredMode.mode.modePtr->getResolution()) {
@@ -2448,6 +2442,11 @@ void SurfaceFlinger::scheduleSample() {
     static_cast<void>(mScheduler->schedule([this] { sample(); }));
 }
 
+#define REQUIRE_SCHEDULER                                      \
+    std::lock_guard<std::mutex> schedulerLock(mSchedulerLock); \
+    if (!mScheduler) [[unlikely]]                              \
+    return
+
 void SurfaceFlinger::onComposerHalVsync(hal::HWDisplayId hwcDisplayId, int64_t timestamp,
                                         std::optional<hal::VsyncPeriodNanos> vsyncPeriod) {
     SFTRACE_NAME(vsyncPeriod
@@ -2456,6 +2455,8 @@ void SurfaceFlinger::onComposerHalVsync(hal::HWDisplayId hwcDisplayId, int64_t t
 
     Mutex::Autolock lock(mStateLock);
     if (const auto displayIdOpt = getHwComposer().onVsync(hwcDisplayId, timestamp)) {
+        REQUIRE_SCHEDULER;
+
         if (mScheduler->addResyncSample(*displayIdOpt, timestamp, vsyncPeriod,
                                         VSyncTracker::VsyncTimeSource::HwVsyncCallback)) {
             // period flushed
@@ -2475,10 +2476,8 @@ void SurfaceFlinger::onComposerHalHotplugEvent(hal::HWDisplayId hwcDisplayId,
             mPendingHotplugEvents.push_back(HotplugEvent{hwcDisplayId, hotplugEvent});
         }
 
-        if (mScheduler) {
-            mScheduler->scheduleConfigure();
-        }
-
+        REQUIRE_SCHEDULER;
+        mScheduler->scheduleConfigure();
         return;
     }
 
@@ -2496,21 +2495,25 @@ void SurfaceFlinger::onComposerHalHotplugEvent(hal::HWDisplayId hwcDisplayId,
             mPendingHotplugEvents.push_back(
                     HotplugEvent{hwcDisplayId, HWComposer::HotplugEvent::LinkUnstable});
         }
-        if (mScheduler) {
-            mScheduler->scheduleConfigure();
-        }
+
+        REQUIRE_SCHEDULER;
+        mScheduler->scheduleConfigure();
         // do not return to also report the error.
     }
 
     // TODO(b/311403559): use enum type instead of int
     const auto errorCode = static_cast<int32_t>(event);
     ALOGD("%s: Hotplug error %d for hwcDisplayId %" PRIu64, __func__, errorCode, hwcDisplayId);
+
+    REQUIRE_SCHEDULER;
     mScheduler->dispatchHotplugError(errorCode);
 }
 
 void SurfaceFlinger::onComposerHalVsyncPeriodTimingChanged(
         hal::HWDisplayId, const hal::VsyncPeriodChangeTimeline& timeline) {
     Mutex::Autolock lock(mStateLock);
+
+    REQUIRE_SCHEDULER;
     mScheduler->onNewVsyncPeriodChangeTimeline(timeline);
 
     if (timeline.refreshRequired) {
@@ -2525,16 +2528,19 @@ void SurfaceFlinger::onComposerHalSeamlessPossible(hal::HWDisplayId) {
 
 void SurfaceFlinger::onComposerHalRefresh(hal::HWDisplayId) {
     Mutex::Autolock lock(mStateLock);
+    REQUIRE_SCHEDULER;
     scheduleComposite(FrameHint::kNone);
 }
 
 void SurfaceFlinger::onComposerHalVsyncIdle(hal::HWDisplayId) {
     SFTRACE_CALL();
+    REQUIRE_SCHEDULER;
     mScheduler->forceNextResync();
 }
 
 void SurfaceFlinger::onRefreshRateChangedDebug(const RefreshRateChangedDebugData& data) {
     SFTRACE_CALL();
+    REQUIRE_SCHEDULER;
     const char* const whence = __func__;
     static_cast<void>(mScheduler->schedule([=, this]() FTL_FAKE_GUARD(mStateLock) FTL_FAKE_GUARD(
                                                    kMainThreadContext) {
@@ -3048,7 +3054,7 @@ bool SurfaceFlinger::commit(PhysicalDisplayId pacesetterId,
         initiateDisplayModeChanges();
 
         // A resolution change without refresh required may have just destroyed the original.
-        if (!FlagManager::getInstance().synced_resolution_switch()) {
+        if (!shouldSyncResolutionSwitch()) {
             pacesetterFrameTargetPtr = mScheduler->pacesetterFrameTarget();
         }
     }
@@ -4596,7 +4602,7 @@ void SurfaceFlinger::processDisplayChanged(const wp<IBinder>& displayToken,
                 // Resize the framebuffer. For a virtual display, always do so. For a physical
                 // display, only do so if it has a pending modeset for the matching resolution.
                 if (currentState.isVirtual() ||
-                    (FlagManager::getInstance().synced_resolution_switch() &&
+                    (shouldSyncResolutionSwitch() &&
                      mDisplayModeController.getDesiredMode(display->getPhysicalId())
                              .transform([resolution](const auto& request) {
                                  return resolution == request.mode.modePtr->getResolution();
@@ -4613,7 +4619,7 @@ void SurfaceFlinger::processDisplayChanged(const wp<IBinder>& displayToken,
             }
         };
 
-        if (FlagManager::getInstance().synced_resolution_switch()) {
+        if (shouldSyncResolutionSwitch()) {
             // Update display size first, as display projection below depends on it.
             updateDisplaySize();
         }
@@ -4630,7 +4636,7 @@ void SurfaceFlinger::processDisplayChanged(const wp<IBinder>& displayToken,
             }
         }
 
-        if (!FlagManager::getInstance().synced_resolution_switch()) {
+        if (!shouldSyncResolutionSwitch()) {
             updateDisplaySize();
         }
     }
@@ -5047,9 +5053,12 @@ void SurfaceFlinger::initScheduler(const sp<const DisplayDevice>& display) {
         features |= Feature::kExpectedPresentTime;
     }
 
-    mScheduler = std::make_unique<Scheduler>(static_cast<ICompositor&>(*this),
-                                             static_cast<ISchedulerCallback&>(*this), features,
-                                             getFactory(), activeRefreshRate, *mTimeStats);
+    {
+        std::lock_guard lock(mSchedulerLock);
+        mScheduler = std::make_unique<Scheduler>(static_cast<ICompositor&>(*this),
+                                                 static_cast<ISchedulerCallback&>(*this), features,
+                                                 getFactory(), activeRefreshRate, *mTimeStats);
+    }
 
     // The pacesetter must be registered before EventThread creation below.
     const auto displayId = display->getPhysicalId();
@@ -9241,6 +9250,7 @@ void SurfaceFlinger::updateHdcpLevels(hal::HWDisplayId hwcDisplayId, int32_t con
         return;
     }
 
+    REQUIRE_SCHEDULER;
     static_cast<void>(mScheduler->schedule([this, displayId = *idOpt, connectedLevel, maxLevel]() {
         const bool secure = connectedLevel >= 2 /* HDCP_V1 */;
         if (const auto display = FTL_FAKE_GUARD(mStateLock, getDisplayDeviceLocked(displayId))) {
@@ -9537,6 +9547,7 @@ SurfaceFlinger::getLayerSnapshotsForScreenshots(const SnapshotRequestArgs& args)
             builderArgs.root = mLayerHierarchyBuilder.getHierarchy();
             builderArgs.parentCrop.reset();
         }
+        builderArgs.rootSnapshot.isSecure = false;
         builderArgs.excludeLayerIds.clear();
         mLayerSnapshotBuilder.update(builderArgs);
 

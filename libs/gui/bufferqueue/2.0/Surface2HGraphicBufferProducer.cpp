@@ -528,11 +528,12 @@ Return<void> Surface2HGraphicBufferProducer::connect(const sp<HProducerListener>
         _hidl_cb(HStatus::UNKNOWN_ERROR, QueueBufferOutput{});
         return {};
     }
-    HStatus hStatus{};
-    bool converted =
-            b2h(mBase->connect(bConnectionType, bListener, producerControlledByApp), &hStatus);
-    mConsumerName = mBase->getConsumerName();
 
+    mBase->setProducerControlledByApp(producerControlledByApp);
+
+    HStatus hStatus{};
+    bool converted = b2h(mBase->connect(bConnectionType, bListener), &hStatus);
+    // TODO: what to do about this
 #ifdef NO_BINDER
     if (converted && hListener != nullptr) {
         mObituary = new Obituary(this, hListener, hConnectionType);
