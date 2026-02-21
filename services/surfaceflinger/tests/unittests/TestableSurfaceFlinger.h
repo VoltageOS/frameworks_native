@@ -361,6 +361,11 @@ public:
         commit(kComposite);
     }
 
+    auto applyOptimizationPolicy(const char* where) {
+        ftl::FakeGuard guard(kMainThreadContext);
+        return mFlinger->applyOptimizationPolicy(where);
+    }
+
     auto createVirtualDisplay(const std::string& displayName, bool isSecure,
                               float requestedRefreshRate = 0.0f) {
         static const std::string kTestId =

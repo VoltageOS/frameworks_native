@@ -194,9 +194,19 @@ void Surface2HGraphicBufferProducer::enableFrameTimestamps(bool enable) {
 }
 
 status_t Surface2HGraphicBufferProducer::getFrameTimestamps(uint64_t frameNumber,
-                                                            nsecs_t* outLatchTime) {
-    return mBase->getFrameTimestamps(frameNumber, nullptr, nullptr, outLatchTime, nullptr, nullptr,
-                                     nullptr, nullptr, nullptr, nullptr);
+                                                            FrameTimestamps* frameTimestamps) {
+    if (frameTimestamps == NULL) {
+        ALOGE("Surface2HGraphicBufferProducer::getFrameTimestamps frameTimestamps was null");
+        return BAD_VALUE;
+    }
+    return mBase->getFrameTimestamps(frameNumber, &(frameTimestamps->requestedPresentTime),
+                                     &(frameTimestamps->acquireTime), &(frameTimestamps->latchTime),
+                                     &(frameTimestamps->firstRefreshStartTime),
+                                     &(frameTimestamps->lastRefreshStartTime),
+                                     &(frameTimestamps->gpuCompositionDoneTime),
+                                     &(frameTimestamps->displayPresentTime),
+                                     &(frameTimestamps->dequeueReadyTime),
+                                     &(frameTimestamps->releaseTime));
 }
 
 Return<HStatus> Surface2HGraphicBufferProducer::setMaxDequeuedBufferCount(
