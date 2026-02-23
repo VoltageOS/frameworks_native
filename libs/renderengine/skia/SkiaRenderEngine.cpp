@@ -942,6 +942,11 @@ void SkiaRenderEngine::drawLayersInternal(
     const bool ctModifiesAlpha =
             displayColorTransform && !displayColorTransform->isAlphaUnchanged();
 
+    sk_sp<SkColorFilter> shadowBoxBorderColorTransform;
+    if (FlagManager::getInstance().color_transform_box_shadows_and_border()) {
+        shadowBoxBorderColorTransform = displayColorTransform;
+    }
+
     // Find the max layer white point to determine the max luminance of the scene...
     const float maxLayerWhitePoint = std::transform_reduce(
             layers.cbegin(), layers.cend(), 0.f,
@@ -1253,7 +1258,7 @@ void SkiaRenderEngine::drawLayersInternal(
                         layer.alpha == 1.0f;
                 mBoxShadowUtils.drawBoxShadows(canvas, preferredOriginalBounds.rect(), cornerRadius,
                                                layer.boxShadowSettings, supportsForwardPixelKill(),
-                                               opaqueContent);
+                                               opaqueContent, shadowBoxBorderColorTransform);
             }
 
             // Similar to shadows, do the rendering before the clip is applied because even when the
@@ -1270,7 +1275,8 @@ void SkiaRenderEngine::drawLayersInternal(
 
                 mBoxShadowUtils.drawBorder(canvas, outlineRect.rect(), cornerRadius,
                                            SkColor4f::FromColor(layer.borderSettings.color),
-                                           layer.borderSettings.strokeWidth);
+                                           layer.borderSettings.strokeWidth,
+                                           shadowBoxBorderColorTransform);
             }
         }
 
