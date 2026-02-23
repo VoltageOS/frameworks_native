@@ -144,6 +144,7 @@
 #include "DisplayHardware/LegacyFramebufferSurface.h"
 #include "DisplayHardware/VirtualDisplay/LegacyVirtualDisplaySurface.h"
 #include "DisplayHardware/VirtualDisplay/VirtualDisplaySurface.h"
+#include "DisplayHardware/VirtualDisplay/VirtualDisplayThreadManager.h"
 #include "Effects/Daltonizer.h"
 #include "FpsReporter.h"
 #include "FrameTracer/FrameTracer.h"
@@ -6665,6 +6666,8 @@ void SurfaceFlinger::dumpDisplays(std::string& result) const {
             }
         }
     }
+
+    VirtualDisplayThreadManager::getInstance().dump(dumper);
 }
 
 void SurfaceFlinger::dumpDisplayIdentificationData(std::string& result) const {
