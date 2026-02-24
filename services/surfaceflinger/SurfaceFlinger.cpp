@@ -9342,9 +9342,10 @@ void SurfaceFlinger::removeActivePictureListener(const sp<gui::IActivePictureLis
     mActivePictureListenersToRemove.push_back(listener);
 }
 
-bool SurfaceFlinger::registerShader(const sp<IBinder>& shaderToken, const std::string& debugName,
+bool SurfaceFlinger::registerShader(const sp<IBinder>& shaderToken,
+                                    const std::string& uniqueShaderName,
                                     const std::string& shaderString) {
-    return mShaderRegistry->registerShader(shaderToken, debugName, shaderString);
+    return mShaderRegistry->registerShader(shaderToken, uniqueShaderName, shaderString);
 }
 
 void SurfaceFlinger::unregisterShader(const sp<IBinder>& shaderToken) {
@@ -10417,13 +10418,13 @@ binder::Status SurfaceComposerAIDL::removeHdrLayerInfoListener(
 }
 
 binder::Status SurfaceComposerAIDL::registerShader(const sp<IBinder>& shaderToken,
-                                                   const std::string& debugName,
+                                                   const std::string& uniqueShaderName,
                                                    const std::string& shaderString) {
     status_t status = checkReadFrameBufferPermission();
     if (status != OK) {
         return binderStatusFromStatusT(status);
     }
-    if (!mFlinger->registerShader(shaderToken, debugName, shaderString)) {
+    if (!mFlinger->registerShader(shaderToken, uniqueShaderName, shaderString)) {
         return binder::Status::fromExceptionCode(binder::Status::EX_SERVICE_SPECIFIC);
     }
     return binder::Status::ok();
