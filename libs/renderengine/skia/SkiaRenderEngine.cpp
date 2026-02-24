@@ -1529,8 +1529,15 @@ void SkiaRenderEngine::drawLayersInternal(
                 // Clip rect could be converted to bounds by getBoundsAndClip.
                 canvas->clipRRect(bounds);
             }
+
+            if (layer.alpha != 1.0f) {
+                canvas->saveLayerAlphaf(nullptr, layer.alpha);
+            }
             renderCommandBufferToCanvas(layer.renderResourceCache.get(),
                                         layer.renderCommandBuffer.get(), canvas, [&](int) {});
+            if (layer.alpha != 1.0f) {
+                canvas->restore();
+            }
         } else if (!bounds.isRect()) {
             paint.setAntiAlias(true);
             canvas->drawRRect(bounds, paint);
