@@ -1022,7 +1022,8 @@ compositionengine::OutputLayer* Output::findLayerRequestingBackgroundComposition
         if (compState->isOpaque) {
             continue;
         }
-        if (compState->backgroundBlurRadius > 0 || compState->blurRegions.size() > 0) {
+        if (compState->backgroundBlurRadius > 0 || compState->blurRegions.size() > 0 ||
+            compState->isTextureSamplingBehind) {
             layerRequestingBgComposition = layer;
         }
     }
