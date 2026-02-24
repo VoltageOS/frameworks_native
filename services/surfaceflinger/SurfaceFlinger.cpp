@@ -5869,6 +5869,14 @@ uint32_t SurfaceFlinger::updateLayerCallbacksAndStats(const FrameTimelineInfo& f
             flags |= eTraversalNeeded;
         }
     }
+    if (what & layer_state_t::eRenderCommandBufferFrameIdChanged) {
+        // TODO(b/485971052): It seems like we also want to add the layer
+        // to mLayersWithQueuedFrames in order to ensure onCompositionPresented
+        // is invoked, but currently that is highly coupled to mBufferInfo
+        layer->setRenderCommandBufferFrameId(s.renderCommandBufferFrameId, postTime,
+                                             desiredPresentTime, isAutoTimestamp,
+                                             frameTimelineInfo, gameMode);
+    }
     if (what & layer_state_t::eBufferChanged) {
         std::optional<ui::Transform::RotationFlags> transformHint = std::nullopt;
         if (snapshot) {
