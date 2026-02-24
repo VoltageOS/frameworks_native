@@ -116,6 +116,53 @@ TEST_F(RenderCommandBufferLayerTest, RenderCommandBufferAdvancesOnlyOnFrameIdUpd
     }
 }
 
+TEST_F(RenderCommandBufferLayerTest, RenderCommandBufferGeneratesSurfaceStats) {
+    if (!com_android_graphics_libgui_flags_out_of_process_rendering()) {
+        return;
+    }
+
+    ASSERT_NO_FATAL_FAILURE(mRenderCommandBufferLayer = createLayer("RenderCommandBufferLayer", 0, 0,
+                                                                    ISurfaceComposerClient::eFXSurfaceBufferState));
+
+    IPCClientResourceCache clientCache;
+    auto canvas = IPCRecordingCanvas(clientCache);
+    canvas.storeSize(mLayerWidth, mLayerHeight);
+    canvas.startRecording();
+    canvas.drawColor(0xFFFF0000, SkBlendMode::kSrc);
+    canvas.endRecording();
+
+    Transaction()
+            .setRenderCommandBuffer(mRenderCommandBufferLayer, canvas.getRenderCommandBufferProducer())
+            .apply();
+
+    std::mutex mutex;
+    std::condition_variable cv;
+    bool surfaceStatsReceived = false;
+
+    // Register a surface stats listener
+    auto listener = [&](void* /*context*/, nsecs_t /*latchTime*/, const sp<Fence>& /*presentFence*/,
+                        const SurfaceStats& /*stats*/) {
+        std::lock_guard<std::mutex> lock(mutex);
+        surfaceStatsReceived = true;
+        cv.notify_one();
+    };
+
+    TransactionCompletedListener::getInstance()->addSurfaceStatsListener(
+            this, reinterpret_cast<void*>(0x12345678), mRenderCommandBufferLayer, listener);
+
+    // Update frame ID, this should trigger the surface stats callback
+    Transaction().setRenderCommandBufferFrameId(mRenderCommandBufferLayer, 1).apply();
+
+    // Wait for the surface stats callback
+    std::unique_lock<std::mutex> lock(mutex);
+    cv.wait_for(lock, std::chrono::seconds(2), [&] { return surfaceStatsReceived; });
+
+    EXPECT_TRUE(surfaceStatsReceived);
+
+    TransactionCompletedListener::getInstance()->removeSurfaceStatsListener(
+            this, reinterpret_cast<void*>(0x12345678));
+}
+
 } // namespace android
 
 // TODO(b/129481165): remove the #pragma below and fix conversion issues
