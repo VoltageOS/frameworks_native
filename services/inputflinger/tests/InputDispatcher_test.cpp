@@ -10735,6 +10735,7 @@ class InputDispatcherSingleWindowAnr : public InputDispatcherTest {
     }
 
 protected:
+    FIXTURE_FLAG_OVERRIDE(enable_anr_warning_callback_input_dispatcher, true);
     static constexpr std::chrono::duration SPY_TIMEOUT = 200ms;
     std::shared_ptr<FakeApplicationHandle> mApplication;
     sp<FakeWindowHandle> mWindow;
@@ -10861,38 +10862,8 @@ TEST_F(InputDispatcherSingleWindowAnr, FocusedApplication_NoFocusedWindow) {
     ASSERT_TRUE(mDispatcher->waitForIdle());
 }
 
-// We have a focused application, but no focused window, ANR warning flag is disabled.
-TEST_F(InputDispatcherSingleWindowAnr, FocusedApplication_NoFocusedWindow_AnrWarningDisabled) {
-    SCOPED_FLAG_OVERRIDE(enable_anr_warning_callback_input_dispatcher, false);
-
-    mWindow->setFocusable(false);
-    mDispatcher->onWindowInfosChanged({{*mWindow->getInfo()}, {}, 0, 0});
-    mWindow->consumeFocusEvent(false);
-
-    // taps on the window work as normal
-    const auto touchingPointer =
-            PointerBuilder(/*id=*/0, ToolType::FINGER).x(WINDOW_LOCATION.x).y(WINDOW_LOCATION.y);
-    mDispatcher->notifyMotion(MotionArgsBuilder(ACTION_DOWN, AINPUT_SOURCE_TOUCHSCREEN)
-                                      .pointer(touchingPointer)
-                                      .build());
-    ASSERT_NO_FATAL_FAILURE(mWindow->consumeMotionDown());
-    mDispatcher->waitForIdle();
-    mFakePolicy->assertNotifyAnrWasNotCalled();
-
-    // Once a focused event arrives, we get an ANR for this application
-    // Send the key event but the event would not be processed as there is no focused window
-    // triggering ANR.
-    mDispatcher->notifyKey(generateKeyArgs(AKEY_EVENT_ACTION_DOWN, ui::LogicalDisplayId::DEFAULT));
-
-    const std::chrono::duration timeout = mApplication->getDispatchingTimeout(DISPATCHING_TIMEOUT);
-    mFakePolicy->assertNotifyNoFocusedWindowAnrWasCalled(timeout, mApplication);
-    mFakePolicy->assertNotifyPreNoFocusedWindowAnrWasNotCalled(timeout);
-}
-
 // We have a focused application, but no focused window, ANR warning flag is enabled
 TEST_F(InputDispatcherSingleWindowAnr, FocusedApplication_NoFocusedWindow_AnrWarningTriggered) {
-    SCOPED_FLAG_OVERRIDE(enable_anr_warning_callback_input_dispatcher, true);
-
     mWindow->setFocusable(false);
     mDispatcher->onWindowInfosChanged({{*mWindow->getInfo()}, {}, 0, 0});
     mWindow->consumeFocusEvent(false);
@@ -11003,8 +10974,6 @@ TEST_F(InputDispatcherSingleWindowAnr,
 // We have a focused application, but no focused window
 // Make sure that we don't notify policy twice about the same ANR.
 TEST_F(InputDispatcherSingleWindowAnr, NoFocusedWindow_DoesNotSendDuplicateAnr_AnrWarningEnabled) {
-    SCOPED_FLAG_OVERRIDE(enable_anr_warning_callback_input_dispatcher, true);
-
     const std::chrono::duration appTimeout = 400ms;
     mApplication->setDispatchingTimeout(appTimeout);
     mDispatcher->setFocusedApplication(ui::LogicalDisplayId::DEFAULT, mApplication);
@@ -11041,8 +11010,6 @@ TEST_F(InputDispatcherSingleWindowAnr, NoFocusedWindow_DoesNotSendDuplicateAnr_A
 
 // We have a focused application, but no focused window
 TEST_F(InputDispatcherSingleWindowAnr, NoFocusedWindow_DropsFocusedEvents_AnrWarningEnabled) {
-    SCOPED_FLAG_OVERRIDE(enable_anr_warning_callback_input_dispatcher, true);
-
     mWindow->setFocusable(false);
     mDispatcher->onWindowInfosChanged({{*mWindow->getInfo()}, {}, 0, 0});
     mWindow->consumeFocusEvent(false);
@@ -11509,6 +11476,90 @@ TEST_F(InputDispatcherSingleWindowAnr, AnrFollowedByWindowRemoval) {
     // Since the window was removed, Dispatcher does not know the PID associated with the window
     // becoming responsive, so the policy is notified without the PID.
     mFakePolicy->assertNotifyWindowResponsiveWasCalled(mWindow->getToken(), /*pid=*/std::nullopt);
+}
+
+// Test fixture used to confirm the behavior of flags when they are disabled.
+class InputDispatcherSingleWindowAnrFlagsDisabled : public InputDispatcherTest {
+    virtual void SetUp() override {
+        InputDispatcherTest::SetUp();
+
+        mApplication = std::make_shared<FakeApplicationHandle>();
+        mApplication->setDispatchingTimeout(100ms);
+        mWindow = sp<FakeWindowHandle>::make(mApplication, mDispatcher, "TestWindow",
+                                             ui::LogicalDisplayId::DEFAULT);
+        mWindow->setFrame(Rect(0, 0, 30, 30));
+        mWindow->setDispatchingTimeout(100ms);
+        mWindow->setFocusable(true);
+
+        // Set focused application.
+        mDispatcher->setFocusedApplication(ui::LogicalDisplayId::DEFAULT, mApplication);
+
+        mDispatcher->onWindowInfosChanged({{*mWindow->getInfo()}, {}, 0, 0});
+        setFocusedWindow(mWindow);
+        mWindow->consumeFocusEvent(true);
+    }
+
+    virtual void TearDown() override {
+        InputDispatcherTest::TearDown();
+        mWindow.clear();
+    }
+
+protected:
+    FIXTURE_FLAG_OVERRIDE(enable_anr_warning_callback_input_dispatcher, false);
+    static constexpr std::chrono::duration SPY_TIMEOUT = 200ms;
+    std::shared_ptr<FakeApplicationHandle> mApplication;
+    sp<FakeWindowHandle> mWindow;
+    static constexpr PointF WINDOW_LOCATION = {20, 20};
+
+    void tapOnWindow() {
+        const auto touchingPointer = PointerBuilder(/*id=*/0, ToolType::FINGER)
+                                             .x(WINDOW_LOCATION.x)
+                                             .y(WINDOW_LOCATION.y);
+        mDispatcher->notifyMotion(MotionArgsBuilder(ACTION_DOWN, AINPUT_SOURCE_TOUCHSCREEN)
+                                          .pointer(touchingPointer)
+                                          .build());
+        mDispatcher->notifyMotion(MotionArgsBuilder(ACTION_UP, AINPUT_SOURCE_TOUCHSCREEN)
+                                          .pointer(touchingPointer)
+                                          .build());
+    }
+
+    sp<FakeWindowHandle> addSpyWindow() {
+        sp<FakeWindowHandle> spy = sp<FakeWindowHandle>::make(mApplication, mDispatcher, "Spy",
+                                                              ui::LogicalDisplayId::DEFAULT);
+        spy->setTrustedOverlay(true);
+        spy->setFocusable(false);
+        spy->setSpy(true);
+        spy->setDispatchingTimeout(SPY_TIMEOUT);
+        mDispatcher->onWindowInfosChanged({{*spy->getInfo(), *mWindow->getInfo()}, {}, 0, 0});
+        return spy;
+    }
+};
+
+// We have a focused application, but no focused window, ANR warning flag is disabled.
+TEST_F(InputDispatcherSingleWindowAnrFlagsDisabled,
+       FocusedApplication_NoFocusedWindow_AnrWarningDisabled) {
+    mWindow->setFocusable(false);
+    mDispatcher->onWindowInfosChanged({{*mWindow->getInfo()}, {}, 0, 0});
+    mWindow->consumeFocusEvent(false);
+
+    // taps on the window work as normal
+    const auto touchingPointer =
+            PointerBuilder(/*id=*/0, ToolType::FINGER).x(WINDOW_LOCATION.x).y(WINDOW_LOCATION.y);
+    mDispatcher->notifyMotion(MotionArgsBuilder(ACTION_DOWN, AINPUT_SOURCE_TOUCHSCREEN)
+                                      .pointer(touchingPointer)
+                                      .build());
+    ASSERT_NO_FATAL_FAILURE(mWindow->consumeMotionDown());
+    mDispatcher->waitForIdle();
+    mFakePolicy->assertNotifyAnrWasNotCalled();
+
+    // Once a focused event arrives, we get an ANR for this application
+    // Send the key event but the event would not be processed as there is no focused window
+    // triggering ANR.
+    mDispatcher->notifyKey(generateKeyArgs(AKEY_EVENT_ACTION_DOWN, ui::LogicalDisplayId::DEFAULT));
+
+    const std::chrono::duration timeout = mApplication->getDispatchingTimeout(DISPATCHING_TIMEOUT);
+    mFakePolicy->assertNotifyNoFocusedWindowAnrWasCalled(timeout, mApplication);
+    mFakePolicy->assertNotifyPreNoFocusedWindowAnrWasNotCalled(timeout);
 }
 
 class InputDispatcherMultiWindowAnr : public InputDispatcherTest {
