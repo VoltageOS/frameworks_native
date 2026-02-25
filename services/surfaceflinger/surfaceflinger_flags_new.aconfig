@@ -473,6 +473,13 @@ flag {
 } # use_experimental_jank_classification
 
 flag {
+  name: "vd_aware_scheduler"
+  namespace: "core_graphics"
+  description: "Extend scheduler with support for virtual displays"
+  bug: "480207885"
+} # vd_aware_scheduler
+
+flag {
   name: "wb_framebuffersurface2"
   namespace: "core_graphics"
   description: "When enabled, use an updated FrameBufferSurface instead of the legacy one"
