@@ -158,6 +158,7 @@ public:
         bool useLuts = false;
         bool hasRenderCommandBufferFrameId = false;
         uint64_t renderCommandBufferFrameId = 0;
+        nsecs_t renderCommandBufferFrameIdQueueTime = 0;
     };
 
     explicit Layer(const surfaceflinger::LayerCreationArgs& args);
@@ -182,12 +183,10 @@ public:
                    nsecs_t /*desiredPresentTime*/, bool /*isAutoTimestamp*/,
                    const FrameTimelineInfo& /*info*/, gui::GameMode gameMode,
                    int32_t systemContentPriority);
-    bool setRenderCommandBufferFrameId(uint64_t frameId, nsecs_t postTime,
-                                       nsecs_t desiredPresentTime,
-                                       bool isAutoTimestamp,
-                                       const FrameTimelineInfo& info,
-                                       gui::GameMode gameMode,
-                                       int32_t systemContentPriority);
+    bool setRenderCommandBufferFrameId(uint64_t frameId, nsecs_t renderCommandBufferFrameIdQueueTime,
+                                       nsecs_t postTime, nsecs_t desiredPresentTime,
+                                       bool isAutoTimestamp, const FrameTimelineInfo& info,
+                                       gui::GameMode gameMode, int32_t systemContentPriority);
     void setDesiredPresentTime(nsecs_t /*desiredPresentTime*/, bool /*isAutoTimestamp*/);
     bool setDataspace(ui::Dataspace /*dataspace*/);
     bool setExtendedRangeBrightness(float currentBufferRatio, float desiredRatio);
@@ -577,7 +576,7 @@ private:
     }
 
     uint64_t getPendingBufferId();
-    nsecs_t getAcquireSignalTime(nsecs_t latchTime);
+    nsecs_t getAcquireSignalTime();
     void gatherBufferInfoRenderCommandBuffer();
 };
 
