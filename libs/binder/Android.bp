@@ -340,6 +340,8 @@ cc_defaults {
     srcs: [
         "OS_android.cpp",
         "OS_unix_base.cpp",
+        "PersistableBundle.cpp",
+        ":pcc_sandbox_manager_native_aidl",
     ],
 
     target: {
@@ -357,6 +359,9 @@ cc_defaults {
 
     aidl: {
         export_aidl_headers: true,
+        include_dirs: [
+            "frameworks/native/aidl/binder", // For PersistableBundle.aidl
+        ],
     },
 
     product_variables: {
@@ -584,6 +589,9 @@ cc_defaults {
         ":libbinder_device_interface_sources",
         ":libbinder_observer_sources",
         ":android-os-binderstatsconsumer-aidl",
+    ],
+    static_libs: [
+        "android.os.binder.flags-aconfig-cc",
     ],
     target: {
         vendor: {
@@ -1120,4 +1128,25 @@ cc_binary {
         "libutils",
         "android.debug_aidl-cpp",
     ],
+}
+
+/////////////////////////////////////////////////
+// flags
+/////////////////////////////////////////////////
+aconfig_declarations {
+    name: "android.os.binder.flags-aconfig",
+    package: "android.os.binder.flags",
+    container: "system",
+    srcs: ["flags.aconfig"],
+}
+
+cc_aconfig_library {
+    name: "android.os.binder.flags-aconfig-cc",
+    aconfig_declarations: "android.os.binder.flags-aconfig",
+    mode: "force-read-only",
+    vendor_available: true,
+    recovery_available: true,
+    host_supported: true,
+    native_bridge_supported: true,
+    cmake_snapshot_supported: true,
 }
