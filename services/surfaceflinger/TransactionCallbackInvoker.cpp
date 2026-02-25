@@ -100,30 +100,53 @@ void TransactionCallbackInvoker::addCallbackHandle(CallbackHandle&& handle) {
         return;
     }
 
-    sp<Fence> previousReleaseFence = handle.fenceMerger.waitAndGetFence(handle.name.c_str());
-
     FrameEventHistoryStats eventStats(handle.frameNumber, handle.previousFrameNumber,
                                       handle.gpuCompositionDoneFence->getSnapshot().fence,
                                       handle.compositorTiming, handle.refreshStartTime,
                                       handle.dequeueReadyTime);
-    transactionStats->surfaceStats.emplace_back(surfaceControl, handle.acquireTimeOrFence,
+    if (FlagManager::getInstance().fence_handling()) {
+        if (handle.previousReleaseCallbackId != ReleaseCallbackId::INVALID_ID) {
+            transactionStats->surfaceStats.emplace_back(surfaceControl, handle.acquireTimeOrFence,
+                                                Fence::NO_FENCE, handle.transformHint,
+                                                handle.currentMaxAcquiredBufferCount,
+                                                handle.cornerRadii, eventStats,
+                                                handle.previousReleaseCallbackId);
+            mReleaseIdToFenceMerger.try_emplace(handle.previousReleaseCallbackId,
+                                                 std::move(handle.fenceMerger));
+            if (handle.bufferReleaseChannel) {
+                mBufferReleases.emplace_back(std::move(handle.name),
+                                             std::move(handle.bufferReleaseChannel),
+                                             handle.previousReleaseCallbackId,
+                                             sp<Fence>(),
+                                             handle.currentMaxAcquiredBufferCount,
+                                             FlagManager::getInstance().monitor_buffer_fences()
+                                                     ? handle.previousBuffer
+                                                     : std::weak_ptr<renderengine::ExternalTexture>());
+            }
+        }
+    } else {
+        sp<Fence> previousReleaseFence =
+                handle.fenceMerger.waitAndGetFence(handle.name.c_str());
+        transactionStats->surfaceStats.emplace_back(surfaceControl, handle.acquireTimeOrFence,
                                                 previousReleaseFence, handle.transformHint,
                                                 handle.currentMaxAcquiredBufferCount,
                                                 handle.cornerRadii, eventStats,
                                                 handle.previousReleaseCallbackId);
-    if (handle.bufferReleaseChannel &&
-        handle.previousReleaseCallbackId != ReleaseCallbackId::INVALID_ID) {
-        if (FlagManager::getInstance().monitor_buffer_fences()) {
-            if (auto previousBuffer = handle.previousBuffer.lock()) {
-                previousBuffer->getBuffer()
-                        ->getDependencyMonitor()
-                        .addEgress(FenceTime::makeValid(previousReleaseFence), "Txn release");
+        if (handle.bufferReleaseChannel &&
+            handle.previousReleaseCallbackId != ReleaseCallbackId::INVALID_ID) {
+            if (FlagManager::getInstance().monitor_buffer_fences()) {
+                if (auto previousBuffer = handle.previousBuffer.lock()) {
+                    previousBuffer->getBuffer()
+                            ->getDependencyMonitor()
+                            .addEgress(FenceTime::makeValid(previousReleaseFence), "Txn release");
+                }
             }
+            mBufferReleases.emplace_back(std::move(handle.name),
+                                         std::move(handle.bufferReleaseChannel),
+                                         handle.previousReleaseCallbackId,
+                                         std::move(previousReleaseFence),
+                                         handle.currentMaxAcquiredBufferCount);
         }
-        mBufferReleases.emplace_back(std::move(handle.name), std::move(handle.bufferReleaseChannel),
-                                     handle.previousReleaseCallbackId,
-                                     std::move(previousReleaseFence),
-                                     handle.currentMaxAcquiredBufferCount);
     }
 }
 
@@ -132,16 +155,18 @@ void TransactionCallbackInvoker::addPresentFence(sp<Fence> presentFence) {
 }
 
 void TransactionCallbackInvoker::sendCallbacks(bool onCommitOnly) {
-    for (const auto& bufferRelease : mBufferReleases) {
-        status_t status = bufferRelease.channel
-                                  ->writeReleaseFence(bufferRelease.callbackId, bufferRelease.fence,
-                                                      bufferRelease.currentMaxAcquiredBufferCount);
-        if (status != OK) {
-            ALOGE("[%s] writeReleaseFence failed. error %d (%s)", bufferRelease.layerName.c_str(),
-                  -status, strerror(-status));
+    if (!FlagManager::getInstance().fence_handling()) {
+        for (const auto& bufferRelease : mBufferReleases) {
+            status_t status = bufferRelease.channel->writeReleaseFence(
+                bufferRelease.callbackId, bufferRelease.fence,
+                bufferRelease.currentMaxAcquiredBufferCount);
+            if (status != OK) {
+                ALOGE("[%s] writeReleaseFence failed. error %d (%s)",
+                      bufferRelease.layerName.c_str(), -status, strerror(-status));
+            }
         }
+        mBufferReleases.clear();
     }
-    mBufferReleases.clear();
 
     // For each listener
     auto completedTransactionsItr = mCompletedTransactions.begin();
@@ -190,14 +215,69 @@ void TransactionCallbackInvoker::sendCallbacks(bool onCommitOnly) {
         mPresentFence.clear();
     }
 
-    BackgroundExecutor::getInstanceForTransaction().sendCallbacks(
-            {[listenerStatsToSend = std::move(listenerStatsToSend)]() {
-                SFTRACE_NAME("TransactionCallbackInvoker::sendCallbacks");
-                for (auto& stats : listenerStatsToSend) {
-                    interface_cast<ITransactionCompletedListener>(stats.listener)
-                            ->onTransactionCompleted(stats);
-                }
-            }});
+    if (FlagManager::getInstance().fence_handling()) {
+        // Use a shared_ptr as FenceMerger is not copyable, but std::function requires the lambda
+        // to be copyable.
+        auto fenceMergers =
+                std::make_shared<ftl::SmallMap<ReleaseCallbackId, FenceMerger, 20>>(
+                        std::move(mReleaseIdToFenceMerger));
+        BackgroundExecutor::getInstanceForTransaction().sendCallbacks(
+                {[listenerStatsToSend = std::move(listenerStatsToSend),
+                  fenceMergers = std::move(fenceMergers),
+                  bufferReleases = std::move(mBufferReleases)]() mutable {
+                    SFTRACE_NAME("TransactionCallbackInvoker::sendCallbacks");
+
+                    for (auto& listenerStats : listenerStatsToSend) {
+                        for (auto& transactionStats : listenerStats.transactionStats) {
+                            for (auto& surfaceStats : transactionStats.surfaceStats) {
+                                auto it = fenceMergers->find(
+                                        surfaceStats.previousReleaseCallbackId);
+                                if (it != fenceMergers->end()) {
+                                    surfaceStats.previousReleaseFence =
+                                            it->second.waitAndGetFence("merged_fence");
+                                }
+                            }
+                        }
+                    }
+
+                    for (auto& bufferRelease : bufferReleases) {
+                        sp<Fence> fence =
+                                fenceMergers->find(bufferRelease.callbackId)
+                                        ->second.waitAndGetFence("merged_fence");
+                        if (FlagManager::getInstance().monitor_buffer_fences()) {
+                            if (auto previousBuffer = bufferRelease.previousBuffer.lock()) {
+                                previousBuffer->getBuffer()
+                                        ->getDependencyMonitor()
+                                        .addEgress(FenceTime::makeValid(fence), "Txn release");
+                            }
+                        }
+                        status_t status =
+                                bufferRelease.channel->writeReleaseFence(
+                                    bufferRelease.callbackId, fence,
+                                    bufferRelease.currentMaxAcquiredBufferCount);
+                        if (status != OK) {
+                            ALOGE("[%s] writeReleaseFence failed. error %d (%s)",
+                                    bufferRelease.layerName.c_str(), -status, strerror(-status));
+                        }
+                    }
+
+                    for (auto& stats : listenerStatsToSend) {
+                        interface_cast<ITransactionCompletedListener>(stats.listener)
+                                ->onTransactionCompleted(stats);
+                    }
+                }});
+                mReleaseIdToFenceMerger.clear();
+                mBufferReleases.clear();
+    } else {
+        BackgroundExecutor::getInstanceForTransaction().sendCallbacks(
+                {[listenerStatsToSend = std::move(listenerStatsToSend)]() {
+                    SFTRACE_NAME("TransactionCallbackInvoker::sendCallbacks");
+                    for (auto& stats : listenerStatsToSend) {
+                        interface_cast<ITransactionCompletedListener>(stats.listener)
+                                ->onTransactionCompleted(stats);
+                    }
+                }});
+    }
 }
 
 // -----------------------------------------------------------------------
