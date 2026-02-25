@@ -16,8 +16,6 @@
 
 #pragma once
 
-#include <deque>
-#include <functional>
 #include <memory>
 #include <optional>
 #include <vector>
@@ -26,6 +24,7 @@
 #include <binder/IBinder.h>
 #include <ftl/future.h>
 #include <ftl/small_map.h>
+#include <ftl/small_vector.h>
 #include <gui/BufferReleaseChannel.h>
 #include <gui/CornerRadii.h>
 #include <gui/ITransactionCompletedListener.h>
@@ -81,12 +80,11 @@ public:
 
     void addCallbackHandle(CallbackHandle&& handle);
 
-    private:
-    TransactionStats* findOrCreateTransactionStats(const sp<IBinder>& listener,
+private:
+    TransactionStats& findOrCreateTransactionStats(const sp<IBinder>& listener,
                                                    const std::vector<CallbackId>& callbackIds);
 
-    std::unordered_map<sp<IBinder>, std::deque<TransactionStats>, IListenerHash>
-            mCompletedTransactions;
+    ftl::SmallVector<std::pair<sp<IBinder>, TransactionStats>, 10> mCompletedTransactions;
 
     struct BufferRelease {
         std::string layerName;
