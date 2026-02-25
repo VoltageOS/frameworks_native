@@ -18,6 +18,8 @@
 
 #include "JoystickInputMapper.h"
 
+#include <input/Input.h>
+
 namespace android {
 
 JoystickInputMapper::JoystickInputMapper(InputDeviceContext& deviceContext,
@@ -73,20 +75,12 @@ void JoystickInputMapper::dump(std::string& dump) {
 
     dump += INDENT3 "Axes:\n";
     for (const auto& [rawAxis, axis] : mAxes) {
-        const char* label = InputEventLookup::getAxisLabel(axis.axisInfo.axis);
-        if (label) {
-            dump += StringPrintf(INDENT4 "%s", label);
-        } else {
-            dump += StringPrintf(INDENT4 "%d", axis.axisInfo.axis);
-        }
+        dump += INDENT4;
+        dump += MotionEvent::getLabelOrCode(axis.axisInfo.axis);
         if (axis.axisInfo.mode == AxisInfo::MODE_SPLIT) {
-            label = InputEventLookup::getAxisLabel(axis.axisInfo.highAxis);
-            if (label) {
-                dump += StringPrintf(" / %s (split at %d)", label, axis.axisInfo.splitValue);
-            } else {
-                dump += StringPrintf(" / %d (split at %d)", axis.axisInfo.highAxis,
-                                     axis.axisInfo.splitValue);
-            }
+            dump += StringPrintf(" / %s (split at %d)",
+                                 MotionEvent::getLabelOrCode(axis.axisInfo.highAxis).c_str(),
+                                 axis.axisInfo.splitValue);
         } else if (axis.axisInfo.mode == AxisInfo::MODE_INVERT) {
             dump += " (invert)";
         }

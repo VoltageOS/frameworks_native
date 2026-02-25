@@ -16,11 +16,14 @@
 
 #pragma once
 
+#include <optional>
+#include <ostream>
+#include <string_view>
+
 #include <android/input.h>
 #include <ftl/enum.h>
-#include <sys/types.h>
-#include <ostream>
 #include <input/InputEventLabels.h>
+#include <sys/types.h>
 
 namespace android {
 
@@ -42,9 +45,9 @@ enum class MotionEventAxis : int32_t {
 
 inline std::ostream& operator<<(std::ostream& stream, const MotionEventAxis& axis) {
     auto rawAxis = ftl::to_underlying(axis);
-    const char* label = InputEventLookup::getAxisLabel(rawAxis);
-    if (label) {
-        return stream << label;
+    if (const std::optional<std::string_view> label = InputEventLookup::getAxisLabel(rawAxis);
+        label.has_value()) {
+        return stream << label.value();
     }
     return stream << rawAxis;
 }
