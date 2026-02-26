@@ -40,10 +40,9 @@ interface IInstalld {
     void fixupAppData(@nullable @utf8InCpp String uuid, int flags);
 
     long[] getAppSize(@nullable @utf8InCpp String uuid, in @utf8InCpp String[] packageNames,
-            int userId, int flags, int appId, int pccId, in long[] ceDataInodes,
+            int userId, int flags, int appId, in long[] ceDataInodes,
             in @utf8InCpp String[] codePaths);
-    long[] getUserSize(@nullable @utf8InCpp String uuid, int userId, int flags, in int[] appIds,
-            in int[] pccIds);
+    long[] getUserSize(@nullable @utf8InCpp String uuid, int userId, int flags, in int[] appIds);
     long[] getExternalSize(@nullable @utf8InCpp String uuid, int userId, int flags, in int[] appIds);
 
     @nullable
