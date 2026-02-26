@@ -37,6 +37,7 @@
 #include <input/Input.h>
 #include <input/InputDevice.h>
 #include <input/KeyCharacterMap.h>
+#include <input/KeyCode.h>
 #include <input/KeyLayoutMap.h>
 #include <input/Keyboard.h>
 #include <input/PropertyMap.h>
@@ -226,6 +227,13 @@ struct RawLayoutInfo {
 extern ftl::Flags<InputDeviceClass> getAbsAxisUsage(int32_t axis,
                                                     ftl::Flags<InputDeviceClass> deviceClasses);
 
+struct MappedKey {
+    int32_t keyCode;
+    KeyCode originalKeyCode;
+    int32_t metaState;
+    uint32_t flags;
+};
+
 /*
  * Grand Central Station for events.
  *
@@ -282,9 +290,8 @@ public:
     virtual void setKeyRemapping(RawDeviceId deviceId,
                                  const std::unordered_map<int32_t, int32_t>& keyRemapping) = 0;
 
-    virtual status_t mapKey(RawDeviceId deviceId, int32_t scanCode, int32_t usageCode,
-                            int32_t metaState, int32_t* outKeycode, int32_t* outMetaState,
-                            uint32_t* outFlags) const = 0;
+    virtual std::optional<MappedKey> mapKey(RawDeviceId deviceId, int32_t scanCode,
+                                            int32_t usageCode, int32_t metaState) const = 0;
 
     virtual void setAxisRemapping(RawDeviceId deviceId,
                                   const std::unordered_map<int32_t, int32_t>& axisRemapping) = 0;
@@ -516,9 +523,8 @@ public:
     void setKeyRemapping(RawDeviceId deviceId,
                          const std::unordered_map<int32_t, int32_t>& keyRemapping) override final;
 
-    status_t mapKey(RawDeviceId deviceId, int32_t scanCode, int32_t usageCode, int32_t metaState,
-                    int32_t* outKeycode, int32_t* outMetaState,
-                    uint32_t* outFlags) const override final;
+    std::optional<MappedKey> mapKey(RawDeviceId deviceId, int32_t scanCode, int32_t usageCode,
+                                    int32_t metaState) const override final;
 
     void setAxisRemapping(RawDeviceId deviceId,
                           const std::unordered_map<int32_t, int32_t>& axisRemapping) override final;

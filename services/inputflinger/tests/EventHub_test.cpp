@@ -17,17 +17,21 @@
 #include "EventHub.h"
 
 #include "UinputDevice.h"
+#include "android/keycodes.h"
+#include "linux/input-event-codes.h"
 
 #include <chrono>
 #include <string>
 
 #include <gtest/gtest.h>
 #include <inttypes.h>
+#include <input/KeyCode.h>
 #include <linux/uinput.h>
 #include <log/log.h>
 
 #define TAG "EventHub_test"
 
+using android::KeyCode;
 using android::createUinputDevice;
 using android::EventHub;
 using android::EventHubInterface;
@@ -208,6 +212,61 @@ TEST_F(EventHubTest, InputEvent_TimestampIsMonotonic) {
                 << "Event times are too far apart";
         lastEventTime = event.when; // Ensure all returned events are monotonic
     }
+}
+
+TEST_F(EventHubTest, MapKey) {
+    auto mappedKey = mEventHub->mapKey(mDeviceId, BTN_SOUTH, 0, 0);
+
+    ASSERT_TRUE(mappedKey);
+    ASSERT_EQ(mappedKey->keyCode, AKEYCODE_BUTTON_A);
+    ASSERT_EQ(mappedKey->originalKeyCode, KeyCode::BUTTON_A);
+    ASSERT_EQ(mappedKey->metaState, 0);
+    ASSERT_EQ(mappedKey->flags, 0u);
+
+    mappedKey = mEventHub->mapKey(mDeviceId, BTN_EAST, 0, 0);
+
+    ASSERT_TRUE(mappedKey);
+    ASSERT_EQ(mappedKey->keyCode, AKEYCODE_BUTTON_B);
+    ASSERT_EQ(mappedKey->originalKeyCode, KeyCode::BUTTON_B);
+    ASSERT_EQ(mappedKey->metaState, 0);
+    ASSERT_EQ(mappedKey->flags, 0u);
+}
+
+TEST_F(EventHubTest, MapKey_withKeyRemapping) {
+    mEventHub->setKeyRemapping(mDeviceId,
+                               {{AKEYCODE_BUTTON_A, AKEYCODE_BUTTON_X},
+                                {AKEYCODE_BUTTON_B, AKEYCODE_BUTTON_Y}});
+
+    auto mappedKey = mEventHub->mapKey(mDeviceId, BTN_SOUTH, 0, 0);
+
+    ASSERT_TRUE(mappedKey);
+    ASSERT_EQ(mappedKey->keyCode, AKEYCODE_BUTTON_X);
+    ASSERT_EQ(mappedKey->originalKeyCode, KeyCode::BUTTON_A);
+    ASSERT_EQ(mappedKey->metaState, 0);
+    ASSERT_EQ(mappedKey->flags, 0u);
+
+    mappedKey = mEventHub->mapKey(mDeviceId, BTN_EAST, 0, 0);
+    ASSERT_TRUE(mappedKey);
+    ASSERT_EQ(mappedKey->keyCode, AKEYCODE_BUTTON_Y);
+    ASSERT_EQ(mappedKey->originalKeyCode, KeyCode::BUTTON_B);
+    ASSERT_EQ(mappedKey->metaState, 0);
+    ASSERT_EQ(mappedKey->flags, 0u);
+
+    mEventHub->setKeyRemapping(mDeviceId, {{AKEYCODE_BUTTON_A, AKEYCODE_BUTTON_L1}});
+
+    mappedKey = mEventHub->mapKey(mDeviceId, BTN_SOUTH, 0, 0);
+    ASSERT_TRUE(mappedKey);
+    ASSERT_EQ(mappedKey->keyCode, AKEYCODE_BUTTON_L1);
+    ASSERT_EQ(mappedKey->originalKeyCode, KeyCode::BUTTON_A);
+    ASSERT_EQ(mappedKey->metaState, 0);
+    ASSERT_EQ(mappedKey->flags, 0u);
+
+    mappedKey = mEventHub->mapKey(mDeviceId, BTN_EAST, 0, 0);
+    ASSERT_TRUE(mappedKey);
+    ASSERT_EQ(mappedKey->keyCode, AKEYCODE_BUTTON_B);
+    ASSERT_EQ(mappedKey->originalKeyCode, KeyCode::BUTTON_B);
+    ASSERT_EQ(mappedKey->metaState, 0);
+    ASSERT_EQ(mappedKey->flags, 0u);
 }
 
 // --- BitArrayTest ---
