@@ -56,12 +56,7 @@ namespace {
 const bool DEBUG_TRANSPORT_CONSUMER =
         __android_log_is_loggable(ANDROID_LOG_DEBUG, LOG_TAG "Consumer", ANDROID_LOG_INFO);
 
-const bool IS_DEBUGGABLE_BUILD =
-#if defined(__ANDROID__)
-        android::base::GetBoolProperty("ro.debuggable", false);
-#else
-        true;
-#endif
+const bool IS_DEBUGGABLE_BUILD = android::base::GetBoolProperty("ro.debuggable", false);
 
 /**
  * Log debug messages about touch event resampling.
