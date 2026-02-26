@@ -21,8 +21,14 @@ aconfig_declarations {
 
 cc_aconfig_library {
     name: "libsurfaceflingerflags",
+    host_supported: true,
     aconfig_declarations: "surfaceflinger_flags",
     vendor_available: true,
+    target: {
+        windows: {
+            enabled: true,
+        },
+    },
 }
 
 cc_defaults {
@@ -354,7 +360,10 @@ filegroup {
 
 cc_binary {
     name: "surfaceflinger",
-    defaults: ["libsurfaceflinger_binary"],
+    defaults: [
+        "libsurfaceflinger_binary",
+        "no_bti",
+    ],
     init_rc: ["surfaceflinger.rc"],
     srcs: [
         ":surfaceflinger_binary_sources",
