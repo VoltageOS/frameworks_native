@@ -227,7 +227,7 @@ void renderOpToCanvas(IPCServerResourceCache* cache, RenderCommandBuffer* buffer
             break;
         }
         default: {
-            ALOGE("Unexpected op in RenderCommandBuffer");
+            ALOGE("Unexpected op in RenderCommandBuffer %d", op->type);
             break;
         }
     }
@@ -906,7 +906,7 @@ void DrawImageRectOp::draw(SkCanvas* c, const SkMatrix&, IPCServerResourceCache&
     if (it == resourceCache.bitmaps.end()) {
         // This currently only happens when a process shuts down.
         // There may be a frame remaining that references bitmaps which were destroyed.
-        ALOGE("Bitmap not found in cache");
+        ALOGE("Bitmap not found in cache id=%" PRIu64, bitmapId);
         return;
     }
     SkPaint p;
