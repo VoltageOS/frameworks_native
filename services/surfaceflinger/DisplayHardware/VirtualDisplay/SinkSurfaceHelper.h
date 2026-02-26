@@ -28,6 +28,8 @@
 #include <ui/GraphicBuffer.h>
 #include <utils/Errors.h>
 
+#include "../../Utils/Dumper.h"
+
 #include <atomic>
 #include <cstdint>
 #include <future>
@@ -73,6 +75,8 @@ public:
     bool isFrozen();
 
     const std::string& getName() const { return mName; }
+
+    void dump(utils::Dumper& dumper) const;
 
     /**
      * Get a buffer that was previously dequeued by the app. If no buffers are available, this
@@ -138,7 +142,7 @@ private:
         bool inUse = false;
     };
 
-    std::mutex mDataMutex;
+    mutable std::mutex mDataMutex;
     std::vector<DequeuedSinkBuffer> mDequeuedBuffers GUARDED_BY(mDataMutex);
 };
 
