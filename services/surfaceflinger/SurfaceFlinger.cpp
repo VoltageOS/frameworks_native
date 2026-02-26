@@ -9140,7 +9140,7 @@ status_t SurfaceFlinger::getMaxAcquiredBufferCount(int* buffers) const {
         const sp<const DisplayDevice> display = getPacesetterDisplay();
         if (display) {
             maxRefreshRate = display->refreshRateSelector().
-                getConfigGroupSupportedRefreshRateRange().max;
+                getGlobalSupportedRefreshRateRange().max;
         }
     }
 
