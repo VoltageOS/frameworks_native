@@ -294,3 +294,16 @@ TEST_F(BitArrayTest, DumpSetIndices_EmptySet) {
     empty.loadFromBuffer({0x00000000UL});
     ASSERT_EQ("<none>", empty.dumpSetIndices(", ", [](int i) { return std::to_string(i); }));
 }
+
+TEST_F(BitArrayTest, ToVector) {
+    android::BitArray<70> bitArray;
+    bitArray.set(1, true);
+    bitArray.set(33, true);
+    bitArray.set(65, true);
+
+    std::vector<uint32_t> vec = bitArray.toVector();
+    ASSERT_EQ(3u, vec.size());
+    EXPECT_EQ(1u << 1, vec[0]);
+    EXPECT_EQ(1u << 1, vec[1]);
+    EXPECT_EQ(1u << 1, vec[2]);
+}
