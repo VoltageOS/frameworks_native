@@ -8941,7 +8941,7 @@ void SurfaceFlinger::updateWorkDuration(const sp<DisplayDevice>& display,
 }
 
 status_t SurfaceFlinger::setDesiredDisplayModeSpecs(
-        const std::vector<gui::DisplayModeSpecs>& perDisplaySpecs) {
+        const sp<IBinder>& applyToken, const std::vector<gui::DisplayModeSpecs>& perDisplaySpecs) {
     SFTRACE_CALL();
 
     if (perDisplaySpecs.empty()) {
@@ -8998,7 +8998,6 @@ status_t SurfaceFlinger::getDesiredDisplayModeSpecs(const sp<IBinder>& displayTo
     scheduler::RefreshRateSelector::Policy policy =
             display->refreshRateSelector().getDisplayManagerPolicy();
     outSpecs->displayToken = displayToken;
-    outSpecs->applyToken = nullptr;
     outSpecs->defaultMode = ftl::to_underlying(policy.defaultMode);
     outSpecs->allowGroupSwitching = policy.allowGroupSwitching;
     outSpecs->primaryRanges = translate(policy.primaryRanges);
@@ -10309,10 +10308,10 @@ binder::Status SurfaceComposerAIDL::removeTunnelModeEnabledListener(
 }
 
 binder::Status SurfaceComposerAIDL::setDesiredDisplayModeSpecs(
-        const std::vector<gui::DisplayModeSpecs>& specs) {
+        const sp<IBinder>& applyToken, const std::vector<gui::DisplayModeSpecs>& specs) {
     status_t status = checkAccessPermission();
     if (status == OK) {
-        status = mFlinger->setDesiredDisplayModeSpecs(specs);
+        status = mFlinger->setDesiredDisplayModeSpecs(applyToken, specs);
     }
     return binderStatusFromStatusT(status);
 }

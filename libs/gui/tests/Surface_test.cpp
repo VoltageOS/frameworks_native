@@ -972,7 +972,9 @@ public:
         return binder::Status::ok();
     }
 
-    binder::Status setDesiredDisplayModeSpecs(const std::vector<gui::DisplayModeSpecs>&) override {
+    binder::Status setDesiredDisplayModeSpecs(
+            const sp<IBinder>& /*applyToken*/,
+            const std::vector<gui::DisplayModeSpecs>&) override {
         return binder::Status::ok();
     }
 
