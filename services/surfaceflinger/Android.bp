@@ -33,6 +33,9 @@ cc_aconfig_library {
 
 cc_defaults {
     name: "surfaceflinger_defaults",
+    defaults: [
+        "no_bti",
+    ],
     tidy: true,
     tidy_flags: [
         // Only check our headers
@@ -362,7 +365,6 @@ cc_binary {
     name: "surfaceflinger",
     defaults: [
         "libsurfaceflinger_binary",
-        "no_bti",
     ],
     init_rc: ["surfaceflinger.rc"],
     srcs: [
