@@ -50,6 +50,8 @@
 #include <utils/Mutex.h>
 
 #include "InputReaderTracer.h"
+#include "InputTracingBackendInterface.h"
+#include "RawAbsoluteAxisInfo.h"
 #include "RawEvent.h"
 #include "TouchVideoDevice.h"
 #include "VibrationElement.h"
@@ -60,17 +62,6 @@ namespace android {
 
 /* Number of colors : {red, green, blue} */
 static constexpr size_t COLOR_NUM = 3;
-
-/* Describes an absolute axis. */
-struct RawAbsoluteAxisInfo {
-    int32_t minValue{};   // minimum value
-    int32_t maxValue{};   // maximum value
-    int32_t flat{};       // center flat position, eg. flat == 8 means center is between -8 and 8
-    int32_t fuzz{};       // error tolerance, eg. fuzz == 4 means value is +/- 4 due to noise
-    int32_t resolution{}; // resolution in units per mm or radians per mm
-};
-
-std::ostream& operator<<(std::ostream& out, const std::optional<RawAbsoluteAxisInfo>& info);
 
 /*
  * Input device classes.
@@ -447,6 +438,9 @@ public:
     /** Returns the total number of bytes needed for the array. */
     inline size_t bytes() { return (BITS + CHAR_BIT - 1) / CHAR_BIT; }
 
+    /** Returns true if any bit in the mask is set. */
+    bool any() const { return mData.any(); }
+
     /** Returns true if any bit in the range [startIndex, endIndex) is set. */
     bool any(size_t startIndex, size_t endIndex) {
         if (startIndex >= endIndex || startIndex >= BITS || endIndex > BITS) {
@@ -469,6 +463,21 @@ public:
             mData <<= WIDTH;
             mData |= buffer[i];
         }
+    }
+
+    /** Returns the bit array as a vector of raw 32-bit elements. */
+    std::vector<uint32_t> toVector() const {
+        std::vector<uint32_t> vec(COUNT);
+        for (size_t i = 0; i < COUNT; i++) {
+            Element element = 0;
+            for (size_t j = 0; j < WIDTH && (i * WIDTH + j) < BITS; j++) {
+                if (mData.test(i * WIDTH + j)) {
+                    element |= (1U << j);
+                }
+            }
+            vec[i] = element;
+        }
+        return vec;
     }
 
     /** Dump the indices in the bit array that are set. */
@@ -685,7 +694,7 @@ private:
         const std::shared_ptr<KeyCharacterMap> getKeyCharacterMap() const;
 
         template <std::size_t N>
-        status_t readDeviceBitMask(unsigned long ioctlCode, BitArray<N>& bitArray);
+        status_t readDeviceBitMask(unsigned long ioctlCode, BitArray<N>& bitArray) const;
 
         /**
          * Configures the device's FD and caches its current state.
@@ -709,6 +718,8 @@ private:
 
         bool currentFrameDropped;
         void trackInputEvent(const struct input_event& event);
+
+        input_trace::TracedEvdevDevice toTracedEvdevDevice(const std::string& devicePath) const;
     };
 
     /**

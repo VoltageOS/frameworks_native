@@ -144,6 +144,7 @@
 #include "DisplayHardware/LegacyFramebufferSurface.h"
 #include "DisplayHardware/VirtualDisplay/LegacyVirtualDisplaySurface.h"
 #include "DisplayHardware/VirtualDisplay/VirtualDisplaySurface.h"
+#include "DisplayHardware/VirtualDisplay/VirtualDisplayThreadManager.h"
 #include "Effects/Daltonizer.h"
 #include "FpsReporter.h"
 #include "FrameTracer/FrameTracer.h"
@@ -6674,6 +6675,8 @@ void SurfaceFlinger::dumpDisplays(std::string& result) const {
             }
         }
     }
+
+    VirtualDisplayThreadManager::getInstance().dump(dumper);
 }
 
 void SurfaceFlinger::dumpDisplayIdentificationData(std::string& result) const {
@@ -8938,7 +8941,7 @@ void SurfaceFlinger::updateWorkDuration(const sp<DisplayDevice>& display,
 }
 
 status_t SurfaceFlinger::setDesiredDisplayModeSpecs(
-        const std::vector<gui::DisplayModeSpecs>& perDisplaySpecs) {
+        const sp<IBinder>& applyToken, const std::vector<gui::DisplayModeSpecs>& perDisplaySpecs) {
     SFTRACE_CALL();
 
     if (perDisplaySpecs.empty()) {
@@ -8995,7 +8998,6 @@ status_t SurfaceFlinger::getDesiredDisplayModeSpecs(const sp<IBinder>& displayTo
     scheduler::RefreshRateSelector::Policy policy =
             display->refreshRateSelector().getDisplayManagerPolicy();
     outSpecs->displayToken = displayToken;
-    outSpecs->applyToken = nullptr;
     outSpecs->defaultMode = ftl::to_underlying(policy.defaultMode);
     outSpecs->allowGroupSwitching = policy.allowGroupSwitching;
     outSpecs->primaryRanges = translate(policy.primaryRanges);
@@ -9140,7 +9142,7 @@ status_t SurfaceFlinger::getMaxAcquiredBufferCount(int* buffers) const {
         const sp<const DisplayDevice> display = getPacesetterDisplay();
         if (display) {
             maxRefreshRate = display->refreshRateSelector().
-                getConfigGroupSupportedRefreshRateRange().max;
+                getGlobalSupportedRefreshRateRange().max;
         }
     }
 
@@ -10306,10 +10308,10 @@ binder::Status SurfaceComposerAIDL::removeTunnelModeEnabledListener(
 }
 
 binder::Status SurfaceComposerAIDL::setDesiredDisplayModeSpecs(
-        const std::vector<gui::DisplayModeSpecs>& specs) {
+        const sp<IBinder>& applyToken, const std::vector<gui::DisplayModeSpecs>& specs) {
     status_t status = checkAccessPermission();
     if (status == OK) {
-        status = mFlinger->setDesiredDisplayModeSpecs(specs);
+        status = mFlinger->setDesiredDisplayModeSpecs(applyToken, specs);
     }
     return binderStatusFromStatusT(status);
 }

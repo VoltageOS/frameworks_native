@@ -38,6 +38,7 @@
 
 // #define LOG_NDEBUG 0
 #include <android-base/file.h>
+#include <android-base/parseint.h>
 #include <android-base/stringprintf.h>
 #include <android-base/strings.h>
 #include <android_companion_virtualdevice_flags.h>
@@ -57,6 +58,7 @@
 #include <utils/Timers.h>
 
 #include <filesystem>
+#include <limits>
 #include <optional>
 #include <regex>
 #include <utility>
@@ -554,18 +556,6 @@ ftl::Flags<InputDeviceClass> getAbsAxisUsage(int32_t axis,
     return deviceClasses & InputDeviceClass::JOYSTICK;
 }
 
-// --- RawAbsoluteAxisInfo ---
-
-std::ostream& operator<<(std::ostream& out, const std::optional<RawAbsoluteAxisInfo>& info) {
-    if (info) {
-        out << "min=" << info->minValue << ", max=" << info->maxValue << ", flat=" << info->flat
-            << ", fuzz=" << info->fuzz << ", resolution=" << info->resolution;
-    } else {
-        out << "unknown range";
-    }
-    return out;
-}
-
 // --- EventHub::Device ---
 
 EventHub::Device::Device(int fd, int32_t id, std::string path, InputDeviceIdentifier identifier,
@@ -620,7 +610,7 @@ const std::shared_ptr<KeyCharacterMap> EventHub::Device::getKeyCharacterMap() co
 }
 
 template <std::size_t N>
-status_t EventHub::Device::readDeviceBitMask(unsigned long ioctlCode, BitArray<N>& bitArray) {
+status_t EventHub::Device::readDeviceBitMask(unsigned long ioctlCode, BitArray<N>& bitArray) const {
     if (!hasValidFd()) {
         return BAD_VALUE;
     }
@@ -876,6 +866,98 @@ void EventHub::Device::trackInputEvent(const struct input_event& event) {
         default:
             break;
     }
+}
+
+input_trace::TracedEvdevDevice EventHub::Device::toTracedEvdevDevice(
+        const std::string& devicePath) const {
+    uint32_t nodeNumber = std::numeric_limits<uint32_t>::max();
+    if (!base::ParseUint(devicePath.substr(devicePath.find_last_not_of("0123456789") + 1),
+                         &nodeNumber)) {
+        ALOGW("Couldn't parse evdev node number from device path '%s'; reporting %d instead",
+              devicePath.c_str(), nodeNumber);
+    }
+    BitArray<EV_MAX + 1> evBitmask;
+    readDeviceBitMask(EVIOCGBIT(0, 0), evBitmask);
+    input_trace::TracedEvdevDevice tracedDevice = {
+            .eventHubId = id,
+            .evdevNodeNumber = nodeNumber,
+            .identifier = identifier,
+            .evBitmask = evBitmask.toVector(),
+            .propBitmask = propBitmask.toVector(),
+    };
+
+    // We could check the bits in evBitmask in these if statements, but since the rest of the system
+    // processes events from an axis type whether or not that axis is present in evBitmask, let's
+    // match that behaviour with the data we record in the trace.
+    if (keyBitmask.any()) {
+        tracedDevice.eventTypeBitmasks[EV_KEY] = keyBitmask.toVector();
+        for (size_t i = 0; i <= KEY_MAX; i++) {
+            if (keyBitmask.test(i) && keyState.test(i)) {
+                tracedDevice.axisStates[EV_KEY][i] = 1;
+            }
+        }
+    }
+    if (absBitmask.any()) {
+        tracedDevice.eventTypeBitmasks[EV_ABS] = absBitmask.toVector();
+        for (const auto& [axis, state] : absState) {
+            tracedDevice.absInfos[axis] = state.info;
+            tracedDevice.axisStates[EV_ABS][axis] = state.value;
+        }
+
+        if (auto it = absState.find(ABS_MT_SLOT);
+            absBitmask.test(ABS_MT_SLOT) && it != absState.end()) {
+            const int32_t slotCount = it->second.info.maxValue + 1;
+            for (int32_t axis = ABS_MT_TOUCH_MAJOR; axis <= ABS_MT_TOOL_Y; axis++) {
+                if (!absBitmask.test(axis)) {
+                    continue;
+                }
+                std::vector<int32_t> outValues(slotCount + 1);
+                outValues[0] = axis;
+                if (status_t ret = ioctl(fd, EVIOCGMTSLOTS(outValues.size() * sizeof(int32_t)),
+                                         outValues.data());
+                    ret != OK) {
+                    ALOGW("Couldn't fetch current slot values for %s from device %d for tracing "
+                          "(status %d)",
+                          InputEventLookup::getLinuxEvdevLabel(EV_ABS, axis, 0).code.c_str(), id,
+                          ret);
+                }
+                outValues.erase(outValues.begin());
+                tracedDevice.absMtStates[axis] = outValues;
+            }
+        }
+    }
+    if (relBitmask.any()) {
+        tracedDevice.eventTypeBitmasks[EV_REL] = relBitmask.toVector();
+    }
+    if (swBitmask.any()) {
+        tracedDevice.eventTypeBitmasks[EV_SW] = swBitmask.toVector();
+        for (size_t i = 0; i <= SW_MAX; i++) {
+            if (swBitmask.test(i) && swState.test(i)) {
+                tracedDevice.axisStates[EV_SW][i] = 1;
+            }
+        }
+    }
+    if (ledBitmask.any()) {
+        tracedDevice.eventTypeBitmasks[EV_LED] = ledBitmask.toVector();
+        BitArray<LED_CNT> ledState;
+        if (status_t ret = readDeviceBitMask(EVIOCGLED(0), ledState); ret == OK) {
+            for (size_t i = 0; i <= LED_MAX; i++) {
+                if (ledBitmask.test(i) && ledState.test(i)) {
+                    tracedDevice.axisStates[EV_LED][i] = 1;
+                }
+            }
+        } else {
+            ALOGW("Couldn't fetch LED states from device %d for tracing (status %d)", id, ret);
+        }
+    }
+    if (ffBitmask.any()) {
+        tracedDevice.eventTypeBitmasks[EV_FF] = ffBitmask.toVector();
+    }
+    if (mscBitmask.any()) {
+        tracedDevice.eventTypeBitmasks[EV_MSC] = mscBitmask.toVector();
+    }
+
+    return tracedDevice;
 }
 
 /**
@@ -2689,6 +2771,11 @@ void EventHub::openDeviceLocked(const std::string& devicePath) {
           device->classes.string().c_str(), configFile.c_str(),
           device->keyMap.keyLayoutFile.c_str(), device->keyMap.keyCharacterMapFile.c_str(),
           toString(mBuiltInKeyboardId == deviceId));
+
+    if (mTracer) {
+        mTracer->traceDeviceAddition(systemTime(SYSTEM_TIME_MONOTONIC),
+                                     device->toTracedEvdevDevice(devicePath));
+    }
 
     addDeviceLocked(std::move(device));
 }

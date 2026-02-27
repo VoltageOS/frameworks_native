@@ -365,9 +365,8 @@ std::list<NotifyArgs> InputDevice::configureInternal(nsecs_t when,
             }
         }
 
+        const auto oldAssociatedDisplayId = getAssociatedDisplayId();
         if (!changes.any() || changes.test(Change::DISPLAY_INFO)) {
-            const auto oldAssociatedDisplayId = getAssociatedDisplayId();
-
             // In most situations, no port or name will be specified.
             mAssociatedDisplayPort = std::nullopt;
             mAssociatedDisplayUniqueIdByPort = std::nullopt;
@@ -438,16 +437,19 @@ std::list<NotifyArgs> InputDevice::configureInternal(nsecs_t when,
                           getName().c_str(), mAssociatedDisplayUniqueIdByPort->c_str());
                 }
             }
-
-            if (getAssociatedDisplayId() != oldAssociatedDisplayId) {
-                bumpGeneration();
-            }
         }
 
         for_each_mapper([this, when, &readerConfig, changes, &out](InputMapper& mapper) {
             out += mapper.reconfigure(when, readerConfig, changes);
             mSources |= mapper.getSources();
         });
+
+        if (!changes.any() || changes.test(Change::DISPLAY_INFO)) {
+            // Detect associated display changes after the mappers have been reconfigured.
+            if (getAssociatedDisplayId() != oldAssociatedDisplayId) {
+                bumpGeneration();
+            }
+        }
 
         if (!changes.any() || changes.test(Change::ENABLED_STATE) ||
             changes.test(Change::DISPLAY_INFO)) {
