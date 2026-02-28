@@ -183,14 +183,10 @@ void InputDevice::dump(std::string& dump, const std::string& eventHubDevStr) {
     if (!ranges.empty()) {
         dump += INDENT2 "Motion Ranges:\n";
         for (const auto& range : ranges) {
-            dump += INDENT3;
-            if (const char* label = InputEventLookup::getAxisLabel(range.axis); label != nullptr) {
-                dump += label;
-            } else {
-                dump += std::to_string(range.axis);
-            }
-            dump += StringPrintf(": source=%s, "
+            dump += StringPrintf(INDENT3
+                                 "%s: source=%s, "
                                  "min=%0.3f, max=%0.3f, flat=%0.3f, fuzz=%0.3f, resolution=%0.3f\n",
+                                 MotionEvent::getLabelOrCode(range.axis).c_str(),
                                  inputEventSourceToString(range.source).c_str(), range.min,
                                  range.max, range.flat, range.fuzz, range.resolution);
         }

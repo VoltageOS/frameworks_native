@@ -4512,7 +4512,7 @@ void InputDispatcher::notifyKey(const NotifyKeyArgs& args) {
             << ", source=" << inputEventSourceToString(args.source)
             << ", displayId=" << args.displayId.toString() << ", policyFlags=0x" << std::hex
             << args.policyFlags << ", action=" << KeyEvent::actionToString(args.action)
-            << ", flags=0x" << args.flags << ", keyCode=" << KeyEvent::getLabel(args.keyCode)
+            << ", flags=0x" << args.flags << ", keyCode=" << KeyEvent::getLabelOrCode(args.keyCode)
             << ", scanCode=0x" << args.scanCode << ", metaState=0x" << args.metaState
             << ", downTime=" << std::dec << args.downTime << "ns";
     Result<void> keyCheck = validateKeyEvent(args.action);

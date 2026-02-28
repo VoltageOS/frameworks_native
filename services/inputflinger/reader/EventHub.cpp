@@ -47,6 +47,7 @@
 #include <ftl/enum.h>
 #include <input/Input.h>
 #include <input/InputEventLabels.h>
+#include <input/KeyCode.h>
 #include <input/KeyCharacterMap.h>
 #include <input/KeyLayoutMap.h>
 #include <input/PrintTools.h>
@@ -1341,26 +1342,30 @@ void EventHub::setAxisRemapping(RawDeviceId deviceId,
     device->keyMap.keyLayoutMap->setAxisRemapping(axisRemapping);
 }
 
-status_t EventHub::mapKey(RawDeviceId deviceId, int32_t scanCode, int32_t usageCode,
-                          int32_t metaState, int32_t* outKeycode, int32_t* outMetaState,
-                          uint32_t* outFlags) const {
+std::optional<MappedKey> EventHub::mapKey(RawDeviceId deviceId, int32_t scanCode, int32_t usageCode,
+                                          int32_t metaState) const {
     std::scoped_lock _l(mLock);
     Device* device = getDeviceLocked(deviceId);
     status_t status = NAME_NOT_FOUND;
+
+    int32_t outKeycode = 0;
+    uint32_t outFlags = 0;
+    KeyCode outOriginalKeyCode = KeyCode::UNKNOWN;
+    int32_t outMetaState = metaState;
 
     if (device != nullptr) {
         // Check the key character map first.
         const std::shared_ptr<KeyCharacterMap> kcm = device->getKeyCharacterMap();
         if (kcm) {
-            if (!kcm->mapKey(scanCode, usageCode, outKeycode)) {
-                *outFlags = 0;
+            if (!kcm->mapKey(scanCode, usageCode, &outKeycode)) {
+                outFlags = 0;
                 status = NO_ERROR;
             }
         }
 
         // Check the key layout next.
         if (status != NO_ERROR && device->keyMap.haveKeyLayout()) {
-            if (!device->keyMap.keyLayoutMap->mapKey(scanCode, usageCode, outKeycode, outFlags)) {
+            if (!device->keyMap.keyLayoutMap->mapKey(scanCode, usageCode, &outKeycode, &outFlags)) {
                 status = NO_ERROR;
             }
         }
@@ -1369,24 +1374,27 @@ status_t EventHub::mapKey(RawDeviceId deviceId, int32_t scanCode, int32_t usageC
             if (kcm) {
                 // Remap keys based on user-defined key remappings and key behavior defined in the
                 // corresponding kcm file
-                *outKeycode = kcm->applyKeyRemapping(*outKeycode);
+                outOriginalKeyCode = static_cast<KeyCode>(outKeycode);
+                outKeycode = kcm->applyKeyRemapping(outKeycode);
 
                 // Remap keys based on Key behavior defined in KCM file
-                std::tie(*outKeycode, *outMetaState) =
-                        kcm->applyKeyBehavior(*outKeycode, metaState);
+                std::tie(outKeycode, outMetaState) = kcm->applyKeyBehavior(outKeycode, metaState);
             } else {
-                *outMetaState = metaState;
+                outMetaState = metaState;
             }
         }
     }
 
     if (status != NO_ERROR) {
-        *outKeycode = 0;
-        *outFlags = 0;
-        *outMetaState = metaState;
+        return std::nullopt;
     }
 
-    return status;
+    return MappedKey{
+            .keyCode = outKeycode,
+            .originalKeyCode = outOriginalKeyCode,
+            .metaState = outMetaState,
+            .flags = outFlags,
+    };
 }
 
 status_t EventHub::mapAxis(RawDeviceId deviceId, int32_t scanCode, AxisInfo* outAxisInfo) const {
