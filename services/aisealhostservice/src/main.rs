@@ -393,7 +393,7 @@ impl IAiSealInternalService for AiSealInternalService {
 
     fn onUserStopped(&self, user_id: i32) -> binder::Result<()> {
         info!("onUserStopped {user_id}");
-        Ok(())
+        self.get_guest_agent()?.userLocked(user_id)
     }
 
     fn onUserRemoved(&self, user_id: i32) -> binder::Result<()> {
