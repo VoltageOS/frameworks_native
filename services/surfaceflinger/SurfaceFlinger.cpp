@@ -6241,12 +6241,21 @@ SurfaceFlinger::setPhysicalDisplayPowerModeAsync(const sp<DisplayDevice>& displa
     if (currentMode == mode) {
         return {ftl::yield<status_t>(NO_ERROR), ftl::FinalizerStd()};
     }
-    mPowerModeChangeInProgress = true;
 
-    const bool isInternalDisplay = (ftl::FakeGuard(mStateLock),
-                                    mPhysicalDisplays.get(displayId)
-                                            .transform(&PhysicalDisplay::isInternal)
-                                            .value_or(false));
+    const auto physicalDisplayOpt = (ftl::FakeGuard(mStateLock), mPhysicalDisplays.get(displayId));
+
+    // SF::processHotplugDisconnect() does not immediately propagate the display removal to
+    // the Scheduler and CompositionEngine, but instead requires a call to
+    // processDisplayChangesLocked() to process the rest in the next commit. Check that the
+    // display still exists in SurfaceFlinger before setting the power mode.
+    if (!physicalDisplayOpt.has_value()) {
+        return {ftl::yield<status_t>(NO_ERROR), ftl::FinalizerStd()};
+    }
+
+    const bool isInternalDisplay =
+            physicalDisplayOpt.transform(&PhysicalDisplay::isInternal).value_or(false);
+
+    mPowerModeChangeInProgress = true;
 
     const bool couldRefresh = display->isRefreshable();
     display->setPowerMode(mode);
