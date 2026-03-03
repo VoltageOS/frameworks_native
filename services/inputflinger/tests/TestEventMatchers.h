@@ -21,11 +21,12 @@
 
 #include <android-base/stringprintf.h>
 #include <android/input.h>
+#include <ftl/enum.h>
 #include <ftl/flags.h>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <input/Input.h>
-#include <input/InputEventLabels.h>
+#include <input/MotionEventAxis.h>
 #include <input/PrintTools.h>
 #include <linux/input-event-codes.h>
 
@@ -860,6 +861,14 @@ private:
 
 inline WithAxesMatcher WithAxes(const std::map<int32_t, float>& axes) {
     return WithAxesMatcher(0, axes);
+}
+
+inline WithAxesMatcher WithAxes(const std::map<MotionEventAxis, float>& axes) {
+    std::map<int32_t, float> rawAxes;
+    for (const auto& [axis, value] : axes) {
+        rawAxes[ftl::to_underlying(axis)] = value;
+    }
+    return WithAxesMatcher(0, rawAxes);
 }
 
 inline WithRelativeMotionMatcher WithRelativeMotion(float relX, float relY) {
