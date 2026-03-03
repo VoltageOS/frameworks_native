@@ -148,8 +148,6 @@ public:
 
     std::array<uint8_t, 32> sign(const VerifiedInputEvent& event) const;
 
-    void displayRemoved(ui::LogicalDisplayId displayId) override;
-
     // Public because it's also used by tests to simulate the WindowInfosListener callback
     void onWindowInfosChanged(const gui::WindowInfosUpdate&);
 
@@ -292,6 +290,9 @@ private:
                 std::vector<sp<android::gui::WindowInfoHandle>>&& windowHandles);
 
         void setDisplayInfos(const std::vector<android::gui::DisplayInfo>& displayInfos);
+
+        std::set<ui::LogicalDisplayId> computeRemovedDisplays(
+                const std::vector<android::gui::DisplayInfo>& displayInfos) const;
 
         bool hasDisplay(ui::LogicalDisplayId displayId) const;
 
@@ -658,6 +659,8 @@ private:
         InputDispatcher& mDispatcher;
     };
     sp<gui::WindowInfosListener> mWindowInfoListener;
+
+    void displayRemovedLocked(ui::LogicalDisplayId displayId) REQUIRES(mLock);
 
     void setInputWindowsLocked(
             const std::vector<sp<android::gui::WindowInfoHandle>>& inputWindowHandles,
