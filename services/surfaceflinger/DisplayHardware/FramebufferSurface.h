@@ -40,13 +40,16 @@ class HWComposer;
 
 // ---------------------------------------------------------------------------
 
-class FramebufferSurface final : public compositionengine::DisplaySurface {
+class FramebufferSurface final : public compositionengine::DisplaySurface,
+                                 public BufferItemConsumer::BufferFreedListener {
 public:
     virtual status_t beginFrame(bool mustRecompose);
     virtual status_t prepareFrame(CompositionType compositionType);
     virtual status_t advanceFrame(float hdrSdrRatio);
     virtual void onFrameCommitted();
     virtual void dumpAsString(String8& result) const;
+
+    virtual void onFirstRef() override;
 
     virtual void resizeBuffers(const ui::Size&) override;
 
@@ -60,6 +63,10 @@ private:
 
     FramebufferSurface(HWComposer& hwc, PhysicalDisplayId displayId, const ui::Size& size,
                        const ui::Size& maxSize);
+
+    // BufferFreedListener interface
+    void onBufferFreed(const sp<GraphicBuffer>& graphicBuffer) override;
+    void onBufferFreedLocked(const sp<GraphicBuffer>& graphicBuffer) REQUIRES(mMutex);
 
     // Limits the width and height by the maximum width specified.
     ui::Size limitSize(const ui::Size&);
@@ -101,7 +108,7 @@ private:
     HWComposer& mHwc;
 
     // Slot tracker to map buffers to HWC slot IDs
-    HwcSlotTracker mHwcSlotTracker;
+    HwcSlotTracker mHwcSlotTracker GUARDED_BY(mMutex);
 };
 
 // ---------------------------------------------------------------------------
