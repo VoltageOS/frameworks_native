@@ -25,6 +25,7 @@
 #include <chrono>
 #include <mutex>
 #include <unordered_map>
+#include <vector>
 
 namespace android::renderengine::skia {
 
@@ -81,6 +82,19 @@ protected:
         const bool mFromPrecompile;
         const bool mFromWarmup;
     };
+
+    static constexpr uint32_t kMaxNumSerializedPipelineKeys = 512;
+    static constexpr uint32_t kMaxSerializedKeySizeInBytes = 1024;
+
+    struct SerializedKeyInfo {
+        uint32_t mLastUsageEpoch;
+        sk_sp<SkData> mSerializedKey;
+    };
+
+    static sk_sp<SkData> CreateBlob(const std::vector<const PipelineData*>& keys,
+                                    uint32_t epochOfSave);
+    static bool UnpackBlob(SkData* src, std::vector<SerializedKeyInfo>* keysOut,
+                           uint32_t* epochOfSave);
 
     // 'mLabel' will either point to: a temporary search label for find()
     //                                or PipelineData::mLabel for emplace()

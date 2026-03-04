@@ -16,11 +16,18 @@
 
 #include "PipelineCallbackHandler.h"
 
+#include <include/core/SkFourByteTag.h>
+
 #include <android-base/stringprintf.h>
 #include <common/trace.h>
+#include <log/log_main.h>
+#include <cstring>
+#include <vector>
 #include "Base64.h"
 
-#include <vector>
+#define SK_BEGIN_REQUIRE_DENSE \
+    _Pragma("clang diagnostic push") _Pragma("clang diagnostic error \"-Wpadded\"")
+#define SK_END_REQUIRE_DENSE _Pragma("clang diagnostic pop")
 
 namespace android::renderengine::skia {
 
@@ -82,8 +89,6 @@ void PipelineCallbackHandler::add(skgpu::graphite::ContextOptions::PipelineCache
         iter->second->mUses++;
         iter->second->mLastUsageEpoch = mCurrentEpoch;
     } else {
-        SkASSERT(op == skgpu::graphite::ContextOptions::PipelineCacheOp::kAddingPipeline);
-
         mPipelineAddedSinceLastSave = true;
 
         if (serializedKey) {
@@ -146,6 +151,195 @@ void PipelineCallbackHandler::report(const char* label, std::string& result) {
                             data->mLabel.c_str(), data->mLastUsageEpoch,
                             data->mSerializedKey ? data->mSerializedKey->size() : 0);
     }
+}
+
+namespace {
+
+static constexpr uint32_t kKeyCacheTag = SkSetFourByteTag('k', 'e', 'y', 's');
+static constexpr uint32_t kKeyCacheVersion = 1;
+
+SK_BEGIN_REQUIRE_DENSE
+struct HeaderInfo {
+    uint32_t fKeyCacheTag = kKeyCacheTag;
+    uint32_t fKeyCacheVersion = kKeyCacheVersion;
+    uint32_t fEpochOfSave;
+    uint32_t fNumPipelineKeys;
+};
+SK_END_REQUIRE_DENSE
+static constexpr uint32_t kHeaderSizeInBytes = sizeof(HeaderInfo);
+
+SkSpan<uint8_t> write_header(SkSpan<uint8_t> dst, const HeaderInfo& info) {
+    if (dst.size() < kHeaderSizeInBytes) {
+        return {};
+    }
+
+    std::memcpy(dst.data(), &info, kHeaderSizeInBytes);
+    return {dst.data() + kHeaderSizeInBytes, dst.size() - kHeaderSizeInBytes};
+}
+
+SkSpan<const uint8_t> read_header(SkSpan<const uint8_t> src, HeaderInfo* info) {
+    if (src.size() < kHeaderSizeInBytes) {
+        return {};
+    }
+
+    std::memcpy(info, src.data(), kHeaderSizeInBytes);
+    if (info->fKeyCacheTag != kKeyCacheTag || info->fKeyCacheVersion != kKeyCacheVersion) {
+        return {};
+    }
+
+    return {src.data() + kHeaderSizeInBytes, src.size() - kHeaderSizeInBytes};
+}
+
+SK_BEGIN_REQUIRE_DENSE
+struct KeyPrefix {
+    uint32_t fLastUseEpoch;
+    uint32_t fKeySizeInBytes;
+};
+SK_END_REQUIRE_DENSE
+static constexpr uint32_t kKeyPrefixSizeInBytes = sizeof(KeyPrefix);
+
+SkSpan<uint8_t> write_key_prefix(SkSpan<uint8_t> dst, const KeyPrefix& prefix) {
+    if (dst.size() < kKeyPrefixSizeInBytes) {
+        return {};
+    }
+
+    std::memcpy(dst.data(), &prefix, kKeyPrefixSizeInBytes);
+    return {dst.data() + kKeyPrefixSizeInBytes, dst.size() - kKeyPrefixSizeInBytes};
+}
+
+SkSpan<const uint8_t> read_key_prefix(SkSpan<const uint8_t> src, KeyPrefix* prefix) {
+    if (src.size() < kKeyPrefixSizeInBytes) {
+        return {};
+    }
+
+    std::memcpy(prefix, src.data(), kKeyPrefixSizeInBytes);
+    return {src.data() + kKeyPrefixSizeInBytes, src.size() - kKeyPrefixSizeInBytes};
+}
+
+SkSpan<uint8_t> write_key_data(SkSpan<uint8_t> dst, SkData* data) {
+    if (!data) {
+        return dst;
+    }
+
+    if (dst.size() < data->size()) {
+        return {};
+    }
+
+    std::memcpy(dst.data(), data->bytes(), data->size());
+    return {dst.data() + data->size(), dst.size() - data->size()};
+}
+
+SkSpan<const uint8_t> read_key_data(SkSpan<const uint8_t> src, SkData* data) {
+    if (!data) {
+        return src;
+    }
+
+    if (src.size() < data->size()) {
+        return {};
+    }
+
+    std::memcpy(data->writable_data(), src.data(), data->size());
+    return {src.data() + data->size(), src.size() - data->size()};
+}
+
+} // anonymous namespace
+
+// The structure of a cache blob is:
+//     // header
+//     uint32_t magic ID ("keys")
+//     uint32_t version number
+//     uint32_t epoch-of-the-save
+//     uint32_t num-pipelines-being-saved
+//     for (each pipeline being saved) {
+//         // key prefix
+//         uint32_t last use epoch
+//         uint32_t size-in-bytes
+//         // key data
+//         the-actual-bytes
+//     }
+sk_sp<SkData> PipelineCallbackHandler::CreateBlob(const std::vector<const PipelineData*>& keys,
+                                                  uint32_t epochOfSave) {
+    if (keys.size() > kMaxNumSerializedPipelineKeys) {
+        ALOGW("Failed max number of serialized keys limit");
+    }
+
+    uint32_t requiredBytes = kHeaderSizeInBytes + keys.size() * kKeyPrefixSizeInBytes;
+    for (const PipelineData* key : keys) {
+        uint32_t keySizeInBytes =
+                key->mSerializedKey ? static_cast<uint32_t>(key->mSerializedKey->size()) : 0;
+        if (keySizeInBytes > kMaxSerializedKeySizeInBytes) {
+            ALOGW("Failed max serialized key size limit");
+        }
+        requiredBytes += keySizeInBytes;
+    }
+
+    std::unique_ptr<uint8_t> base(static_cast<uint8_t*>(malloc(requiredBytes)));
+
+    HeaderInfo info;
+    info.fEpochOfSave = epochOfSave;
+    info.fNumPipelineKeys = keys.size();
+    SkSpan<uint8_t> bytes = write_header({base.get(), requiredBytes}, info);
+    if (!bytes.begin()) {
+        ALOGE("Failed to write serialized key blob header");
+        return nullptr;
+    }
+    for (const PipelineData* key : keys) {
+        uint32_t keySizeInBytes =
+                key->mSerializedKey ? static_cast<uint32_t>(key->mSerializedKey->size()) : 0;
+        bytes = write_key_prefix(bytes, {key->mLastUsageEpoch, keySizeInBytes});
+        if (!bytes.begin()) {
+            ALOGE("Failed to write serialized key blob key prefix");
+            return nullptr;
+        }
+        bytes = write_key_data(bytes, key->mSerializedKey.get());
+        if (!bytes.begin()) {
+            ALOGE("Failed to write serialized key blob key data");
+            return nullptr;
+        }
+    }
+
+    return SkData::MakeFromMalloc(base.release(), requiredBytes);
+}
+
+bool PipelineCallbackHandler::UnpackBlob(SkData* src, std::vector<SerializedKeyInfo>* keysOut,
+                                         uint32_t* epochOfSave) {
+    HeaderInfo info;
+    SkSpan<const uint8_t> bytes = read_header(src->byteSpan(), &info);
+    if (!bytes.begin()) {
+        ALOGE("Failed to read serialized key blob header");
+        return false;
+    }
+    if (info.fNumPipelineKeys > kMaxNumSerializedPipelineKeys) {
+        ALOGE("Failed max number of keys in blob invariant %u", info.fNumPipelineKeys);
+        return false;
+    }
+    *epochOfSave = info.fEpochOfSave;
+
+    keysOut->reserve(info.fNumPipelineKeys);
+    for (int i = 0; i < info.fNumPipelineKeys; ++i) {
+        KeyPrefix prefix;
+        bytes = read_key_prefix(bytes, &prefix);
+        if (!bytes.begin()) {
+            ALOGE("Failed to read serialized key blob key prefix");
+            return false;
+        }
+        if (prefix.fKeySizeInBytes > kMaxSerializedKeySizeInBytes) {
+            ALOGE("Failed max serialized key size invariant %u", prefix.fKeySizeInBytes);
+            return false;
+        }
+        sk_sp<SkData> key = prefix.fKeySizeInBytes
+                ? SkData::MakeUninitialized(prefix.fKeySizeInBytes)
+                : nullptr;
+        bytes = read_key_data(bytes, key.get());
+        if (!bytes.begin()) {
+            ALOGE("Failed to read serialized key blob key data");
+            return false;
+        }
+
+        keysOut->push_back({prefix.fLastUseEpoch, std::move(key)});
+    }
+
+    return true;
 }
 
 // This is a stub implementation - just enough to demonstrate its interaction with epochs and
