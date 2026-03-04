@@ -318,7 +318,7 @@ flag {
   name: "mrr_full_frame_rate_list"
   namespace: "core_graphics"
   description: "Enables all native refresh rates in the full frame rate list for MRR devices"
-  bug: "479468940"
+  bug: "453004817"
   metadata {
     purpose: PURPOSE_BUGFIX
   }
