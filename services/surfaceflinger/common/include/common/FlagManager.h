@@ -85,6 +85,7 @@ public:
     bool set_power_mode_async() const;
     bool use_content_priority_for_jank_classification() const;
     bool use_experimental_jank_classification() const;
+    bool use_last_vsync_predict() const;
     bool vd_aware_scheduler() const;
 
     /// Trunk stable readonly flags ///
