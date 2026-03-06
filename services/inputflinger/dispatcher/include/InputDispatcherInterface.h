@@ -222,7 +222,10 @@ public:
     /**
      * Called when a display has been removed from the system.
      */
-    virtual void displayRemoved(ui::LogicalDisplayId displayId) = 0;
+    void displayRemoved(ui::LogicalDisplayId displayId) {
+        // TODO(b/438569310) - remove this.
+        // No-op - this will be handled via the info from SurfaceFlinger instead.
+    }
 
     /*
      * Abort the current touch stream.
