@@ -571,8 +571,10 @@ const LayerSnapshot& LayerSnapshotBuilder::updateSnapshotsInHierarchy(
         const auto hierarchy = args.mergeableHierarchyManager->getOwnedHierarchy(layer->id);
         if (hierarchy) {
             auto mergedSnapshot = hierarchy->getSnapshotCopy();
-            updateSnapshot(*mergedSnapshot, args, *layer, parentSnapshot, traversalPath);
-            mMergedSnapshots.emplace_back(std::move(mergedSnapshot));
+            if (mergedSnapshot) {
+                updateSnapshot(*mergedSnapshot, args, *layer, parentSnapshot, traversalPath);
+                mMergedSnapshots.emplace_back(std::move(mergedSnapshot));
+            }
         }
 
         if (!args.mergeableHierarchyManager->isMemberOfAnyHierarchy(layer->id)) {
