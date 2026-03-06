@@ -188,6 +188,7 @@ void FlagManager::dump(std::string& result) const {
     DUMP_ACONFIG_FLAG(stable_edid_ids);
     DUMP_ACONFIG_FLAG(synced_resolution_switch);
     DUMP_ACONFIG_FLAG(true_hdr_screenshots);
+    DUMP_ACONFIG_FLAG(virtual_display_content_filtering);
     DUMP_ACONFIG_FLAG(vulkan_renderengine);
     DUMP_ACONFIG_FLAG(wb_framebuffersurface2);
     DUMP_ACONFIG_FLAG(wb_virtualdisplay2);
@@ -304,6 +305,7 @@ FLAG_MANAGER_ACONFIG_FLAG(skip_invisible_windows_in_input, "");
 FLAG_MANAGER_ACONFIG_FLAG(stable_edid_ids, "debug.sf.stable_edid_ids")
 FLAG_MANAGER_ACONFIG_FLAG(synced_resolution_switch, "");
 FLAG_MANAGER_ACONFIG_FLAG(true_hdr_screenshots, "debug.sf.true_hdr_screenshots");
+FLAG_MANAGER_ACONFIG_FLAG(virtual_display_content_filtering, "");
 FLAG_MANAGER_ACONFIG_FLAG(vulkan_renderengine, "debug.renderengine.vulkan")
 FLAG_MANAGER_ACONFIG_FLAG(wb_framebuffersurface2, "");
 FLAG_MANAGER_ACONFIG_FLAG(wb_virtualdisplay2, "");
