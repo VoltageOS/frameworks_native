@@ -86,6 +86,7 @@ public:
     bool use_content_priority_for_jank_classification() const;
     bool use_experimental_jank_classification() const;
     bool vd_aware_scheduler() const;
+    bool virtual_display_content_filtering() const;
 
     /// Trunk stable readonly flags ///
     /// IMPORTANT - please keep alphabetize to reduce merge conflicts

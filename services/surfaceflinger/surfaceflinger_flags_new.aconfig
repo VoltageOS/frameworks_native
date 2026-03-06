@@ -490,6 +490,13 @@ flag {
 } # vd_aware_scheduler
 
 flag {
+    name: "virtual_display_content_filtering"
+    namespace: "window_surfaces"
+    description: "Secure apps from unauthorized content capture"
+    bug: "293903721"
+} # virtual_display_content_filtering
+
+flag {
   name: "wb_framebuffersurface2"
   namespace: "core_graphics"
   description: "When enabled, use an updated FrameBufferSurface instead of the legacy one"
