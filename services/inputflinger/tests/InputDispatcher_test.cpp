@@ -54,7 +54,6 @@
 #include "perfetto/tracing/tracing.h"
 
 using android::base::StringPrintf;
-using android::gui::DisplayInfo;
 using android::gui::FocusRequest;
 using android::gui::TouchOcclusionMode;
 using android::gui::WindowInfo;
@@ -170,12 +169,6 @@ std::unique_ptr<KeyCharacterMap> loadKeyCharacterMap(const char* name) {
     }
 
     return *KeyCharacterMap::load(path, KeyCharacterMap::Format::BASE);
-}
-
-DisplayInfo makeDisplayInfo(ui::LogicalDisplayId displayId) {
-    DisplayInfo info;
-    info.displayId = displayId;
-    return info;
 }
 
 } // namespace
@@ -8753,13 +8746,12 @@ TEST_F(InputDispatcherTest, DisplayRemoved) {
 
     // window is granted focus.
     window->setFocusable(true);
-    mDispatcher->onWindowInfosChanged(
-            {{*window->getInfo()}, {makeDisplayInfo(ui::LogicalDisplayId::DEFAULT)}, 0, 0});
+    mDispatcher->onWindowInfosChanged({{*window->getInfo()}, {}, 0, 0});
     setFocusedWindow(window);
     window->consumeFocusEvent(true);
 
     // When a display is removed window loses focus.
-    mDispatcher->onWindowInfosChanged({{/* no windows!*/}, {/* no displays!*/}, 0, 0});
+    mDispatcher->displayRemoved(ui::LogicalDisplayId::DEFAULT);
     window->consumeFocusEvent(false);
 }
 
@@ -8773,8 +8765,7 @@ TEST_F(InputDispatcherTest, RemoveDisplayWhileGestureIsActive) {
     constexpr ui::LogicalDisplayId SECOND_DISPLAY{1};
     sp<FakeWindowHandle> window =
             sp<FakeWindowHandle>::make(application, mDispatcher, "window", SECOND_DISPLAY);
-    mDispatcher->onWindowInfosChanged(
-            {{*window->getInfo()}, {makeDisplayInfo(SECOND_DISPLAY)}, 0, 0});
+    mDispatcher->onWindowInfosChanged({{*window->getInfo()}, {}, 0, 0});
 
     // Start a gesture on the second display.
     mDispatcher->notifyMotion(MotionArgsBuilder(ACTION_DOWN, AINPUT_SOURCE_TOUCHSCREEN)
@@ -8784,7 +8775,7 @@ TEST_F(InputDispatcherTest, RemoveDisplayWhileGestureIsActive) {
     window->consumeMotionEvent(WithMotionAction(ACTION_DOWN));
 
     // Remove the second display.
-    mDispatcher->onWindowInfosChanged({{/* no windows!*/}, {/* no displays!*/}, 0, 0});
+    mDispatcher->displayRemoved(SECOND_DISPLAY);
 
     // Finish the gesture on the second display.
     mDispatcher->notifyMotion(MotionArgsBuilder(ACTION_UP, AINPUT_SOURCE_TOUCHSCREEN)

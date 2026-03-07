@@ -5348,20 +5348,6 @@ void InputDispatcher::DispatcherWindowInfo::setDisplayInfos(
     }
 }
 
-std::set<ui::LogicalDisplayId> InputDispatcher::DispatcherWindowInfo::computeRemovedDisplays(
-        const std::vector<android::gui::DisplayInfo>& displayInfos) const {
-    std::set<ui::LogicalDisplayId> removedDisplays;
-    // Add displays that were there before
-    for (const auto& [displayId, _] : mDisplayInfos) {
-        removedDisplays.insert(displayId);
-    }
-    // Remove displays that are still there now
-    for (const auto& displayInfo : displayInfos) {
-        removedDisplays.erase(displayInfo.displayId);
-    }
-    return removedDisplays;
-}
-
 void InputDispatcher::DispatcherWindowInfo::removeDisplay(ui::LogicalDisplayId displayId) {
     mWindowHandlesByDisplay.erase(displayId);
     mDisplayInfos.erase(displayId);
@@ -7320,27 +7306,33 @@ void InputDispatcher::clearPointerCaptureLocked() {
     }
 }
 
-void InputDispatcher::displayRemovedLocked(ui::LogicalDisplayId displayId) {
-    // Set an empty list to remove all handles from the specific display.
-    setInputWindowsLocked(/*windowInfoHandles=*/{}, displayId);
-    setFocusedApplicationLocked(displayId, nullptr);
-    // Call focus resolver to clean up stale requests. This must be called after input windows
-    // have been removed for the removed display.
-    mFocusResolver.displayRemoved(displayId);
-    // Reset pointer capture eligibility, regardless of previous state.
-    std::erase(mIneligibleDisplaysForPointerCapture, displayId);
-    // Remove the associated touch mode state.
-    mTouchModePerDisplay.erase(displayId);
-    if (auto it = mVerifiersByDisplay.find(displayId); it != mVerifiersByDisplay.end()) {
-        if (it->second.isEmpty()) {
-            mVerifiersByDisplay.erase(it);
-        } else {
-            LOG(INFO) << "Not erasing InputVerifier on display " << displayId
-                      << ", it still has active input";
+void InputDispatcher::displayRemoved(ui::LogicalDisplayId displayId) {
+    { // acquire lock
+        std::scoped_lock _l(mLock);
+        // Set an empty list to remove all handles from the specific display.
+        setInputWindowsLocked(/*windowInfoHandles=*/{}, displayId);
+        setFocusedApplicationLocked(displayId, nullptr);
+        // Call focus resolver to clean up stale requests. This must be called after input windows
+        // have been removed for the removed display.
+        mFocusResolver.displayRemoved(displayId);
+        // Reset pointer capture eligibility, regardless of previous state.
+        std::erase(mIneligibleDisplaysForPointerCapture, displayId);
+        // Remove the associated touch mode state.
+        mTouchModePerDisplay.erase(displayId);
+        if (auto it = mVerifiersByDisplay.find(displayId); it != mVerifiersByDisplay.end()) {
+            if (it->second.isEmpty()) {
+                mVerifiersByDisplay.erase(it);
+            } else {
+                LOG(INFO) << "Not erasing InputVerifier on display " << displayId
+                          << ", it still has active input";
+            }
         }
-    }
-    mInputFilterVerifiersByDisplay.erase(displayId);
-    mInteractionConnectionTokensByDisplay.erase(displayId);
+        mInputFilterVerifiersByDisplay.erase(displayId);
+        mInteractionConnectionTokensByDisplay.erase(displayId);
+    } // release lock
+
+    // Wake up poll loop since it may need to make new input dispatching choices.
+    mLooper->wake();
 }
 
 void InputDispatcher::onWindowInfosChanged(const gui::WindowInfosUpdate& update) {
@@ -7353,22 +7345,15 @@ void InputDispatcher::onWindowInfosChanged(const gui::WindowInfosUpdate& update)
         LOG_ALWAYS_FATAL("Incorrect WindowInfosUpdate provided: %s",
                          result.error().message().c_str());
     };
+    // The listener sends the windows as a flattened array. Separate the windows by display for
+    // more convenient parsing.
+    std::map<ui::LogicalDisplayId, std::vector<sp<WindowInfoHandle>>> handlesPerDisplay;
+    for (const auto& info : update.windowInfos) {
+        handlesPerDisplay[info.displayId].push_back(sp<WindowInfoHandle>::make(info));
+    }
+
     { // acquire lock
         std::scoped_lock _l(mLock);
-
-        // Check if any displays were removed.
-        std::set<ui::LogicalDisplayId> removedDisplays =
-                mWindowInfos.computeRemovedDisplays(update.displayInfos);
-        for (const auto& displayId : removedDisplays) {
-            displayRemovedLocked(displayId);
-        }
-
-        // The listener sends the windows as a flattened array. Separate the windows by display for
-        // more convenient parsing.
-        std::map<ui::LogicalDisplayId, std::vector<sp<WindowInfoHandle>>> handlesPerDisplay;
-        for (const auto& info : update.windowInfos) {
-            handlesPerDisplay[info.displayId].push_back(sp<WindowInfoHandle>::make(info));
-        }
 
         // Ensure that we have an entry created for all existing displays so that if a displayId has
         // no windows, we can tell that the windows were removed from the display.
