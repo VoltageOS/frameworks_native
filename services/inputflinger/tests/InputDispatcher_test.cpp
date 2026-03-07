@@ -10491,19 +10491,20 @@ class InputDispatcherMultiWindowSameTokenTests : public InputDispatcherTest {
 
         std::shared_ptr<FakeApplicationHandle> application =
                 std::make_shared<FakeApplicationHandle>();
-        mWindow1 = sp<FakeWindowHandle>::make(application, mDispatcher, "Fake Window 1",
-                                              ui::LogicalDisplayId::DEFAULT);
-        mWindow1->setFrame(Rect(0, 0, 100, 100));
+        mWindow = sp<FakeWindowHandle>::make(application, mDispatcher, "Fake Window",
+                                             ui::LogicalDisplayId::DEFAULT);
+        mWindow->setFrame(Rect(0, 0, 100, 100));
 
-        mWindow2 = mWindow1->clone(ui::LogicalDisplayId::DEFAULT);
-        mWindow2->setFrame(Rect(100, 100, 200, 200));
+        mWindowClone = mWindow->clone(ui::LogicalDisplayId::DEFAULT);
+        mWindowClone->setFrame(Rect(100, 100, 200, 200));
 
-        mDispatcher->onWindowInfosChanged({{*mWindow1->getInfo(), *mWindow2->getInfo()}, {}, 0, 0});
+        mDispatcher->onWindowInfosChanged(
+                {{*mWindow->getInfo(), *mWindowClone->getInfo()}, {}, 0, 0});
     }
 
 protected:
-    sp<FakeWindowHandle> mWindow1;
-    sp<FakeWindowHandle> mWindow2;
+    sp<FakeWindowHandle> mWindow;
+    sp<FakeWindowHandle> mWindowClone;
 
     // Helper function to convert the point from screen coordinates into the window's space
     static PointF getPointInWindow(const WindowInfo* windowInfo, const PointF& point) {
@@ -10532,7 +10533,7 @@ protected:
         }
     }
 
-    void touchAndAssertPositions(sp<FakeWindowHandle> touchedWindow, int32_t action,
+    void touchAndAssertPositions(const sp<FakeWindowHandle>& touchedWindow, int32_t action,
                                  const std::vector<PointF>& touchedPoints,
                                  std::vector<PointF> expectedPoints) {
         mDispatcher->notifyMotion(generateMotionArgs(action, AINPUT_SOURCE_TOUCHSCREEN,
@@ -10543,134 +10544,137 @@ protected:
 };
 
 TEST_F(InputDispatcherMultiWindowSameTokenTests, SingleTouchSameScale) {
-    // Touch Window 1
+    // Touch mWindow
     PointF touchedPoint = {10, 10};
-    PointF expectedPoint = getPointInWindow(mWindow1->getInfo(), touchedPoint);
-    touchAndAssertPositions(mWindow1, AMOTION_EVENT_ACTION_DOWN, {touchedPoint}, {expectedPoint});
+    PointF expectedPoint = getPointInWindow(mWindow->getInfo(), touchedPoint);
+    touchAndAssertPositions(mWindow, AMOTION_EVENT_ACTION_DOWN, {touchedPoint}, {expectedPoint});
 
-    // Release touch on Window 1
-    touchAndAssertPositions(mWindow1, AMOTION_EVENT_ACTION_UP, {touchedPoint}, {expectedPoint});
+    // Release touch on mWindow
+    touchAndAssertPositions(mWindow, AMOTION_EVENT_ACTION_UP, {touchedPoint}, {expectedPoint});
 
-    // Touch Window 2
+    // Touch mWindowClone
     touchedPoint = {150, 150};
-    expectedPoint = getPointInWindow(mWindow2->getInfo(), touchedPoint);
-    touchAndAssertPositions(mWindow2, AMOTION_EVENT_ACTION_DOWN, {touchedPoint}, {expectedPoint});
+    expectedPoint = getPointInWindow(mWindowClone->getInfo(), touchedPoint);
+    touchAndAssertPositions(mWindowClone, AMOTION_EVENT_ACTION_DOWN, {touchedPoint},
+                            {expectedPoint});
 }
 
 TEST_F(InputDispatcherMultiWindowSameTokenTests, SingleTouchDifferentTransform) {
-    // Set scale value for window2
-    mWindow2->setWindowScale(0.5f, 0.5f);
-    mDispatcher->onWindowInfosChanged({{*mWindow1->getInfo(), *mWindow2->getInfo()}, {}, 0, 0});
+    // Set scale value for cloned window
+    mWindowClone->setWindowScale(0.5f, 0.5f);
+    mDispatcher->onWindowInfosChanged({{*mWindow->getInfo(), *mWindowClone->getInfo()}, {}, 0, 0});
 
-    // Touch Window 1
+    // Touch Window
     PointF touchedPoint = {10, 10};
-    PointF expectedPoint = getPointInWindow(mWindow1->getInfo(), touchedPoint);
-    touchAndAssertPositions(mWindow1, AMOTION_EVENT_ACTION_DOWN, {touchedPoint}, {expectedPoint});
+    PointF expectedPoint = getPointInWindow(mWindow->getInfo(), touchedPoint);
+    touchAndAssertPositions(mWindow, AMOTION_EVENT_ACTION_DOWN, {touchedPoint}, {expectedPoint});
     // Release touch on Window 1
-    touchAndAssertPositions(mWindow1, AMOTION_EVENT_ACTION_UP, {touchedPoint}, {expectedPoint});
+    touchAndAssertPositions(mWindow, AMOTION_EVENT_ACTION_UP, {touchedPoint}, {expectedPoint});
 
-    // Touch Window 2
+    // Touch cloned Window
     touchedPoint = {150, 150};
-    expectedPoint = getPointInWindow(mWindow2->getInfo(), touchedPoint);
-    touchAndAssertPositions(mWindow2, AMOTION_EVENT_ACTION_DOWN, {touchedPoint}, {expectedPoint});
-    touchAndAssertPositions(mWindow2, AMOTION_EVENT_ACTION_UP, {touchedPoint}, {expectedPoint});
+    expectedPoint = getPointInWindow(mWindowClone->getInfo(), touchedPoint);
+    touchAndAssertPositions(mWindowClone, AMOTION_EVENT_ACTION_DOWN, {touchedPoint},
+                            {expectedPoint});
+    touchAndAssertPositions(mWindowClone, AMOTION_EVENT_ACTION_UP, {touchedPoint}, {expectedPoint});
 
     // Update the transform so rotation is set
-    mWindow2->setWindowTransform(0, -1, 1, 0);
-    mDispatcher->onWindowInfosChanged({{*mWindow1->getInfo(), *mWindow2->getInfo()}, {}, 0, 0});
-    expectedPoint = getPointInWindow(mWindow2->getInfo(), touchedPoint);
-    touchAndAssertPositions(mWindow2, AMOTION_EVENT_ACTION_DOWN, {touchedPoint}, {expectedPoint});
+    mWindowClone->setWindowTransform(0, -1, 1, 0);
+    mDispatcher->onWindowInfosChanged({{*mWindow->getInfo(), *mWindowClone->getInfo()}, {}, 0, 0});
+    expectedPoint = getPointInWindow(mWindowClone->getInfo(), touchedPoint);
+    touchAndAssertPositions(mWindowClone, AMOTION_EVENT_ACTION_DOWN, {touchedPoint},
+                            {expectedPoint});
 }
 
 TEST_F(InputDispatcherMultiWindowSameTokenTests, MultipleTouchDifferentTransform) {
-    mWindow2->setWindowScale(0.5f, 0.5f);
-    mDispatcher->onWindowInfosChanged({{*mWindow1->getInfo(), *mWindow2->getInfo()}, {}, 0, 0});
+    mWindowClone->setWindowScale(0.5f, 0.5f);
+    mDispatcher->onWindowInfosChanged({{*mWindow->getInfo(), *mWindowClone->getInfo()}, {}, 0, 0});
 
-    // Touch Window 1
+    // Touch mWindow
     std::vector<PointF> touchedPoints = {PointF{10, 10}};
-    std::vector<PointF> expectedPoints = {getPointInWindow(mWindow1->getInfo(), touchedPoints[0])};
-    touchAndAssertPositions(mWindow1, AMOTION_EVENT_ACTION_DOWN, touchedPoints, expectedPoints);
+    std::vector<PointF> expectedPoints = {getPointInWindow(mWindow->getInfo(), touchedPoints[0])};
+    touchAndAssertPositions(mWindow, AMOTION_EVENT_ACTION_DOWN, touchedPoints, expectedPoints);
 
-    // Touch Window 2
-    // Since this is part of the same touch gesture that has already been dispatched to Window 1,
-    // the touch stream from Window 2 will be merged with the stream in Window 1. The merged stream
-    // will continue to be dispatched through Window 1.
+    // Touch mWindowClone
+    // Since this is part of the same touch gesture that has already been dispatched to mWindow,
+    // the touch stream from mWindowClone will be merged with the stream in mWindow. The merged
+    // stream will continue to be dispatched through mWindow.
     touchedPoints.push_back(PointF{150, 150});
-    expectedPoints.push_back(getPointInWindow(mWindow2->getInfo(), touchedPoints[1]));
-    touchAndAssertPositions(mWindow1, POINTER_1_DOWN, touchedPoints, expectedPoints);
+    expectedPoints.push_back(getPointInWindow(mWindowClone->getInfo(), touchedPoints[1]));
+    touchAndAssertPositions(mWindow, POINTER_1_DOWN, touchedPoints, expectedPoints);
 
-    // Release Window 2
-    touchAndAssertPositions(mWindow1, POINTER_1_UP, touchedPoints, expectedPoints);
+    // Release mWindowClone
+    touchAndAssertPositions(mWindow, POINTER_1_UP, touchedPoints, expectedPoints);
     expectedPoints.pop_back();
 
-    // Update the transform so rotation is set for Window 2
-    mWindow2->setWindowTransform(0, -1, 1, 0);
-    mDispatcher->onWindowInfosChanged({{*mWindow1->getInfo(), *mWindow2->getInfo()}, {}, 0, 0});
-    expectedPoints.push_back(getPointInWindow(mWindow2->getInfo(), touchedPoints[1]));
-    touchAndAssertPositions(mWindow1, POINTER_1_DOWN, touchedPoints, expectedPoints);
+    // Update the transform so rotation is set for mWindowClone
+    mWindowClone->setWindowTransform(0, -1, 1, 0);
+    mDispatcher->onWindowInfosChanged({{*mWindow->getInfo(), *mWindowClone->getInfo()}, {}, 0, 0});
+    expectedPoints.push_back(getPointInWindow(mWindowClone->getInfo(), touchedPoints[1]));
+    touchAndAssertPositions(mWindow, POINTER_1_DOWN, touchedPoints, expectedPoints);
 }
 
 TEST_F(InputDispatcherMultiWindowSameTokenTests, MultipleTouchMoveDifferentTransform) {
-    mWindow2->setWindowScale(0.5f, 0.5f);
-    mDispatcher->onWindowInfosChanged({{*mWindow1->getInfo(), *mWindow2->getInfo()}, {}, 0, 0});
+    mWindowClone->setWindowScale(0.5f, 0.5f);
+    mDispatcher->onWindowInfosChanged({{*mWindow->getInfo(), *mWindowClone->getInfo()}, {}, 0, 0});
 
-    // Touch Window 1
+    // Touch mWindow
     std::vector<PointF> touchedPoints = {PointF{10, 10}};
-    std::vector<PointF> expectedPoints = {getPointInWindow(mWindow1->getInfo(), touchedPoints[0])};
-    touchAndAssertPositions(mWindow1, AMOTION_EVENT_ACTION_DOWN, touchedPoints, expectedPoints);
+    std::vector<PointF> expectedPoints = {getPointInWindow(mWindow->getInfo(), touchedPoints[0])};
+    touchAndAssertPositions(mWindow, AMOTION_EVENT_ACTION_DOWN, touchedPoints, expectedPoints);
 
-    // Touch Window 2
+    // Touch mWindowClone
     touchedPoints.push_back(PointF{150, 150});
-    expectedPoints.push_back(getPointInWindow(mWindow2->getInfo(), touchedPoints[1]));
+    expectedPoints.push_back(getPointInWindow(mWindowClone->getInfo(), touchedPoints[1]));
 
-    touchAndAssertPositions(mWindow1, POINTER_1_DOWN, touchedPoints, expectedPoints);
+    touchAndAssertPositions(mWindow, POINTER_1_DOWN, touchedPoints, expectedPoints);
 
     // Move both windows
     touchedPoints = {{20, 20}, {175, 175}};
-    expectedPoints = {getPointInWindow(mWindow1->getInfo(), touchedPoints[0]),
-                      getPointInWindow(mWindow2->getInfo(), touchedPoints[1])};
+    expectedPoints = {getPointInWindow(mWindow->getInfo(), touchedPoints[0]),
+                      getPointInWindow(mWindowClone->getInfo(), touchedPoints[1])};
 
-    touchAndAssertPositions(mWindow1, AMOTION_EVENT_ACTION_MOVE, touchedPoints, expectedPoints);
+    touchAndAssertPositions(mWindow, AMOTION_EVENT_ACTION_MOVE, touchedPoints, expectedPoints);
 
-    // Release Window 2
-    touchAndAssertPositions(mWindow1, POINTER_1_UP, touchedPoints, expectedPoints);
+    // Release mWindowClone
+    touchAndAssertPositions(mWindow, POINTER_1_UP, touchedPoints, expectedPoints);
     expectedPoints.pop_back();
 
-    // Touch Window 2
-    mWindow2->setWindowTransform(0, -1, 1, 0);
-    mDispatcher->onWindowInfosChanged({{*mWindow1->getInfo(), *mWindow2->getInfo()}, {}, 0, 0});
-    expectedPoints.push_back(getPointInWindow(mWindow2->getInfo(), touchedPoints[1]));
-    touchAndAssertPositions(mWindow1, POINTER_1_DOWN, touchedPoints, expectedPoints);
+    // Touch mWindowClone
+    mWindowClone->setWindowTransform(0, -1, 1, 0);
+    mDispatcher->onWindowInfosChanged({{*mWindow->getInfo(), *mWindowClone->getInfo()}, {}, 0, 0});
+    expectedPoints.push_back(getPointInWindow(mWindowClone->getInfo(), touchedPoints[1]));
+    touchAndAssertPositions(mWindow, POINTER_1_DOWN, touchedPoints, expectedPoints);
 
     // Move both windows
     touchedPoints = {{20, 20}, {175, 175}};
-    expectedPoints = {getPointInWindow(mWindow1->getInfo(), touchedPoints[0]),
-                      getPointInWindow(mWindow2->getInfo(), touchedPoints[1])};
+    expectedPoints = {getPointInWindow(mWindow->getInfo(), touchedPoints[0]),
+                      getPointInWindow(mWindowClone->getInfo(), touchedPoints[1])};
 
-    touchAndAssertPositions(mWindow1, AMOTION_EVENT_ACTION_MOVE, touchedPoints, expectedPoints);
+    touchAndAssertPositions(mWindow, AMOTION_EVENT_ACTION_MOVE, touchedPoints, expectedPoints);
 }
 
 TEST_F(InputDispatcherMultiWindowSameTokenTests, MultipleWindowsFirstTouchWithScale) {
-    mWindow1->setWindowScale(0.5f, 0.5f);
-    mDispatcher->onWindowInfosChanged({{*mWindow1->getInfo(), *mWindow2->getInfo()}, {}, 0, 0});
+    mWindow->setWindowScale(0.5f, 0.5f);
+    mDispatcher->onWindowInfosChanged({{*mWindow->getInfo(), *mWindowClone->getInfo()}, {}, 0, 0});
 
-    // Touch Window 1
+    // Touch mWindow
     std::vector<PointF> touchedPoints = {PointF{10, 10}};
-    std::vector<PointF> expectedPoints = {getPointInWindow(mWindow1->getInfo(), touchedPoints[0])};
-    touchAndAssertPositions(mWindow1, AMOTION_EVENT_ACTION_DOWN, touchedPoints, expectedPoints);
+    std::vector<PointF> expectedPoints = {getPointInWindow(mWindow->getInfo(), touchedPoints[0])};
+    touchAndAssertPositions(mWindow, AMOTION_EVENT_ACTION_DOWN, touchedPoints, expectedPoints);
 
-    // Touch Window 2
+    // Touch mWindowClone
     touchedPoints.push_back(PointF{150, 150});
-    expectedPoints.push_back(getPointInWindow(mWindow2->getInfo(), touchedPoints[1]));
+    expectedPoints.push_back(getPointInWindow(mWindowClone->getInfo(), touchedPoints[1]));
 
-    touchAndAssertPositions(mWindow1, POINTER_1_DOWN, touchedPoints, expectedPoints);
+    touchAndAssertPositions(mWindow, POINTER_1_DOWN, touchedPoints, expectedPoints);
 
     // Move both windows
     touchedPoints = {{20, 20}, {175, 175}};
-    expectedPoints = {getPointInWindow(mWindow1->getInfo(), touchedPoints[0]),
-                      getPointInWindow(mWindow2->getInfo(), touchedPoints[1])};
+    expectedPoints = {getPointInWindow(mWindow->getInfo(), touchedPoints[0]),
+                      getPointInWindow(mWindowClone->getInfo(), touchedPoints[1])};
 
-    touchAndAssertPositions(mWindow1, AMOTION_EVENT_ACTION_MOVE, touchedPoints, expectedPoints);
+    touchAndAssertPositions(mWindow, AMOTION_EVENT_ACTION_MOVE, touchedPoints, expectedPoints);
 }
 
 /**
@@ -10678,21 +10682,21 @@ TEST_F(InputDispatcherMultiWindowSameTokenTests, MultipleWindowsFirstTouchWithSc
  * same input channel.
  */
 TEST_F(InputDispatcherMultiWindowSameTokenTests, TouchDoesNotSlipEvenIfSlippery) {
-    mWindow1->setSlippery(true);
-    mDispatcher->onWindowInfosChanged({{*mWindow1->getInfo(), *mWindow2->getInfo()}, {}, 0, 0});
+    mWindow->setSlippery(true);
+    mDispatcher->onWindowInfosChanged({{*mWindow->getInfo(), *mWindowClone->getInfo()}, {}, 0, 0});
 
-    // Touch down in window 1
+    // Touch down in mWindow
     mDispatcher->notifyMotion(generateMotionArgs(ACTION_DOWN, AINPUT_SOURCE_TOUCHSCREEN,
                                                  ui::LogicalDisplayId::DEFAULT, {{50, 50}}));
-    consumeMotionEvent(mWindow1, ACTION_DOWN, {{50, 50}});
+    consumeMotionEvent(mWindow, ACTION_DOWN, {{50, 50}});
 
-    // Move touch to be above window 2. Even though window 1 is slippery, touch should not slip.
+    // Move touch to be above mWindowClone. Even though mWindow is slippery, touch should not slip.
     // That means the gesture should continue normally, without any ACTION_CANCEL or ACTION_DOWN
     // getting generated.
     mDispatcher->notifyMotion(generateMotionArgs(ACTION_MOVE, AINPUT_SOURCE_TOUCHSCREEN,
                                                  ui::LogicalDisplayId::DEFAULT, {{150, 150}}));
 
-    consumeMotionEvent(mWindow1, ACTION_MOVE, {{150, 150}});
+    consumeMotionEvent(mWindow, ACTION_MOVE, {{150, 150}});
 }
 
 /**
@@ -10701,21 +10705,21 @@ TEST_F(InputDispatcherMultiWindowSameTokenTests, TouchDoesNotSlipEvenIfSlippery)
  * that the pointer is hovering over may have a different transform.
  */
 TEST_F(InputDispatcherMultiWindowSameTokenTests, HoverIntoClone) {
-    mDispatcher->onWindowInfosChanged({{*mWindow1->getInfo(), *mWindow2->getInfo()}, {}, 0, 0});
+    mDispatcher->onWindowInfosChanged({{*mWindow->getInfo(), *mWindowClone->getInfo()}, {}, 0, 0});
 
-    // Start hover in window 1
+    // Start hover in mWindow
     mDispatcher->notifyMotion(MotionArgsBuilder(ACTION_HOVER_ENTER, AINPUT_SOURCE_TOUCHSCREEN)
                                       .pointer(PointerBuilder(0, ToolType::FINGER).x(50).y(50))
                                       .build());
-    consumeMotionEvent(mWindow1, ACTION_HOVER_ENTER,
-                       {getPointInWindow(mWindow1->getInfo(), PointF{50, 50})});
-    // Move hover to window 2.
+    consumeMotionEvent(mWindow, ACTION_HOVER_ENTER,
+                       {getPointInWindow(mWindow->getInfo(), PointF{50, 50})});
+    // Move hover to mWindowClone.
     mDispatcher->notifyMotion(MotionArgsBuilder(ACTION_HOVER_MOVE, AINPUT_SOURCE_TOUCHSCREEN)
                                       .pointer(PointerBuilder(0, ToolType::FINGER).x(150).y(150))
                                       .build());
-    consumeMotionEvent(mWindow1, ACTION_HOVER_EXIT, {{50, 50}});
-    consumeMotionEvent(mWindow2, ACTION_HOVER_ENTER,
-                       {getPointInWindow(mWindow2->getInfo(), PointF{150, 150})});
+    consumeMotionEvent(mWindow, ACTION_HOVER_EXIT, {{50, 50}});
+    consumeMotionEvent(mWindowClone, ACTION_HOVER_ENTER,
+                       {getPointInWindow(mWindowClone->getInfo(), PointF{150, 150})});
 }
 
 /**
@@ -10723,38 +10727,38 @@ TEST_F(InputDispatcherMultiWindowSameTokenTests, HoverIntoClone) {
  * through all 3 windows. Ensure that SPY and REGULAR window correctly receive the event. This test
  * reproduces a crash in InputDispatcher.
  *                                                     \/
- * SPY CLONE (mWindow2)                         ------------------------
+ * SPY CLONE (mWindowClone)                     ------------------------
  *
- * SPY (ORIGINAL) (mWindow1)                         -------------------
+ * SPY (ORIGINAL) (mWindow)                          -------------------
  *
  * REGULAR WINDOW                                    ------------------------------
  */
 TEST_F(InputDispatcherMultiWindowSameTokenTests, TapClonedSpyAndSpyWindow) {
-    // Make mWindow1 and mWindow2 SPY windows with overlapping touchable regions.
-    mWindow1->setSpy(true);
-    mWindow1->setTrustedOverlay(true);
-    mWindow1->setFrame(Rect(0, 0, 50, 50));
+    // Make mWindow and mWindowClone SPY windows with overlapping touchable regions.
+    mWindow->setSpy(true);
+    mWindow->setTrustedOverlay(true);
+    mWindow->setFrame(Rect(0, 0, 50, 50));
 
-    mWindow2->setSpy(true);
-    mWindow2->setTrustedOverlay(true);
-    mWindow2->setFrame(Rect(10, 10, 50, 50));
-    mDispatcher->onWindowInfosChanged({{*mWindow2->getInfo(), *mWindow1->getInfo()}, {}, 0, 0});
+    mWindowClone->setSpy(true);
+    mWindowClone->setTrustedOverlay(true);
+    mWindowClone->setFrame(Rect(10, 10, 50, 50));
+    mDispatcher->onWindowInfosChanged({{*mWindowClone->getInfo(), *mWindow->getInfo()}, {}, 0, 0});
 
     // Test tap on Spy window.
-    // Since mWindow1 and mWindow2 are clones, either one can be used to consume the event. However,
-    // due to input event tracing attribution checks, we must use the actual touched window
+    // Since mWindowClone is a clone of mWindow, either one can be used to consume the event.
+    // However, due to input event tracing attribution checks, we must use the actual touched window
     NotifyMotionArgs down1 = MotionArgsBuilder(ACTION_DOWN, AINPUT_SOURCE_TOUCHSCREEN)
                                      .pointer(PointerBuilder(0, ToolType::FINGER).x(20).y(20))
                                      .build();
 
     mDispatcher->notifyMotion(down1);
-    mWindow2->consumeMotionEvent(WithMotionAction(ACTION_DOWN));
+    mWindowClone->consumeMotionEvent(WithMotionAction(ACTION_DOWN));
 
     mDispatcher->notifyMotion(MotionArgsBuilder(ACTION_UP, AINPUT_SOURCE_TOUCHSCREEN)
                                       .pointer(PointerBuilder(0, ToolType::FINGER).x(20).y(20))
                                       .downTime(down1.downTime)
                                       .build());
-    mWindow2->consumeMotionEvent(WithMotionAction(ACTION_UP));
+    mWindowClone->consumeMotionEvent(WithMotionAction(ACTION_UP));
 
     // Add another, regular window underneath both SPY windows.
     std::shared_ptr<FakeApplicationHandle> application = std::make_shared<FakeApplicationHandle>();
@@ -10763,7 +10767,7 @@ TEST_F(InputDispatcherMultiWindowSameTokenTests, TapClonedSpyAndSpyWindow) {
     regular->setFrame(Rect(10, 10, 70, 70));
 
     mDispatcher->onWindowInfosChanged(
-            {{*mWindow2->getInfo(), *mWindow1->getInfo(), *regular->getInfo()}, {}, 0, 0});
+            {{*mWindowClone->getInfo(), *mWindow->getInfo(), *regular->getInfo()}, {}, 0, 0});
 
     // Test tap on Spy window and normal window.
     NotifyMotionArgs down2 = MotionArgsBuilder(ACTION_DOWN, AINPUT_SOURCE_TOUCHSCREEN)
@@ -10771,14 +10775,14 @@ TEST_F(InputDispatcherMultiWindowSameTokenTests, TapClonedSpyAndSpyWindow) {
                                      .build();
 
     mDispatcher->notifyMotion(down2);
-    mWindow2->consumeMotionEvent(WithMotionAction(ACTION_DOWN));
+    mWindowClone->consumeMotionEvent(WithMotionAction(ACTION_DOWN));
     regular->consumeMotionEvent(WithMotionAction(ACTION_DOWN));
 
     mDispatcher->notifyMotion(MotionArgsBuilder(ACTION_UP, AINPUT_SOURCE_TOUCHSCREEN)
                                       .pointer(PointerBuilder(0, ToolType::FINGER).x(30).y(30))
                                       .downTime(down2.downTime)
                                       .build());
-    mWindow2->consumeMotionEvent(WithMotionAction(ACTION_UP));
+    mWindowClone->consumeMotionEvent(WithMotionAction(ACTION_UP));
     regular->consumeMotionEvent(WithMotionAction(ACTION_UP));
 
     // Test tap on outside of Spy window.
@@ -10793,7 +10797,7 @@ TEST_F(InputDispatcherMultiWindowSameTokenTests, TapClonedSpyAndSpyWindow) {
                                       .pointer(PointerBuilder(0, ToolType::FINGER).x(60).y(60))
                                       .downTime(down3.downTime)
                                       .build());
-    mWindow2->assertNoEvents();
+    mWindowClone->assertNoEvents();
     regular->consumeMotionEvent(WithMotionAction(ACTION_UP));
 }
 
@@ -10803,21 +10807,21 @@ TEST_F(InputDispatcherMultiWindowSameTokenTests, TapClonedSpyAndSpyWindow) {
  * windows correctly receive the event. This test ensures that the InputDispatcher isn't treating
  * cloned SPY in a special manner.
  *                                      \/
- * SPY CLONE (mWindow2)               ------------------------
+ * SPY CLONE (mWindowClone)           ------------------------
  *
- * SPY (ORIGINAL) (mWindow1)                              -------------------
+ * SPY (ORIGINAL) (mWindow)                               -------------------
  *
  * REGULAR WINDOW              -------------------------------
  */
 TEST_F(InputDispatcherMultiWindowSameTokenTests, TapOnlyClonedSpyWindow) {
-    // Make mWindow1 and mWindow2 SPY windows with overlapping touchable regions.
-    mWindow1->setSpy(true);
-    mWindow1->setTrustedOverlay(true);
-    mWindow1->setFrame(Rect(40, 40, 80, 80));
+    // Make mWindow and mWindowClone SPY windows with overlapping touchable regions.
+    mWindow->setSpy(true);
+    mWindow->setTrustedOverlay(true);
+    mWindow->setFrame(Rect(40, 40, 80, 80));
 
-    mWindow2->setSpy(true);
-    mWindow2->setTrustedOverlay(true);
-    mWindow2->setFrame(Rect(10, 10, 50, 50));
+    mWindowClone->setSpy(true);
+    mWindowClone->setTrustedOverlay(true);
+    mWindowClone->setFrame(Rect(10, 10, 50, 50));
 
     // Add another, regular window underneath both SPY windows.
     std::shared_ptr<FakeApplicationHandle> application = std::make_shared<FakeApplicationHandle>();
@@ -10826,7 +10830,7 @@ TEST_F(InputDispatcherMultiWindowSameTokenTests, TapOnlyClonedSpyWindow) {
     regular->setFrame(Rect(0, 0, 50, 50));
 
     mDispatcher->onWindowInfosChanged(
-            {{*mWindow2->getInfo(), *mWindow1->getInfo(), *regular->getInfo()}, {}, 0, 0});
+            {{*mWindowClone->getInfo(), *mWindow->getInfo(), *regular->getInfo()}, {}, 0, 0});
 
     // Test tap on Spy window and normal window.
     NotifyMotionArgs down = MotionArgsBuilder(ACTION_DOWN, AINPUT_SOURCE_TOUCHSCREEN)
@@ -10834,14 +10838,14 @@ TEST_F(InputDispatcherMultiWindowSameTokenTests, TapOnlyClonedSpyWindow) {
                                     .build();
 
     mDispatcher->notifyMotion(down);
-    mWindow2->consumeMotionEvent(WithMotionAction(ACTION_DOWN));
+    mWindowClone->consumeMotionEvent(WithMotionAction(ACTION_DOWN));
     regular->consumeMotionEvent(WithMotionAction(ACTION_DOWN));
 
     mDispatcher->notifyMotion(MotionArgsBuilder(ACTION_UP, AINPUT_SOURCE_TOUCHSCREEN)
                                       .pointer(PointerBuilder(0, ToolType::FINGER).x(15).y(15))
                                       .downTime(down.downTime)
                                       .build());
-    mWindow2->consumeMotionEvent(WithMotionAction(ACTION_UP));
+    mWindowClone->consumeMotionEvent(WithMotionAction(ACTION_UP));
     regular->consumeMotionEvent(WithMotionAction(ACTION_UP));
 }
 
