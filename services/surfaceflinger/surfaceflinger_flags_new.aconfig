@@ -476,6 +476,13 @@ flag {
 } # use_experimental_jank_classification
 
 flag {
+    name: "use_last_vsync_predict"
+    namespace: "core_graphics"
+    description: "Use the latest VSYNC timestamp for prediction on ARR devices with stable VSYNC signals."
+    bug: "362803698"
+} # use_last_vsync_predict
+
+flag {
   name: "vd_aware_scheduler"
   namespace: "core_graphics"
   description: "Extend scheduler with support for virtual displays"
