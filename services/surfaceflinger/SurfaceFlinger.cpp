@@ -9496,6 +9496,7 @@ std::vector<std::pair<Layer*, LayerFE*>> SurfaceFlinger::copyMergedSnapshots(
                 }
 
                 auto it = mLegacyLayers.find(snapshot.sequence);
+
                 LLOG_ALWAYS_FATAL_WITH_TRACE_IF(it == mLegacyLayers.end(),
                                                 "Couldnt find layer object for %s",
                                                 snapshot.getDebugString().c_str());
