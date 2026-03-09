@@ -1818,8 +1818,9 @@ void FrameTimeline::DisplayFrame::addSkippedFrame(pid_t surfaceFlingerPid, nsecs
             static_cast<float>(surfaceFrame->getPredictions().presentTime) >=
                     (static_cast<float>(previousPredictionPresentTime) +
                      kThresh * static_cast<float>(mRenderRate.getPeriodNsecs())) &&
-            // sf skipped frame is not considered if app is self janked
-            surfaceFrame->getJankType() != JankType::None && !surfaceFrame->isSelfJanky()) {
+            // sf skipped frame is not considered if app is self janked or display is not on
+            surfaceFrame->getJankType() != JankType::None && !surfaceFrame->isSelfJanky() &&
+            mDisplayState.poweredOn) {
             skippedFrameStartTime = surfaceFrame->getPredictions().endTime;
             skippedFramePresentTime = surfaceFrame->getPredictions().presentTime;
             break;
