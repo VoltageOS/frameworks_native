@@ -655,7 +655,7 @@ private:
 
     void removeActivePictureListener(const sp<gui::IActivePictureListener>& listener);
 
-    bool registerShader(const sp<IBinder>& shaderToken, const std::string& debugName,
+    bool registerShader(const sp<IBinder>& shaderToken, const std::string& uniqueShaderName,
                         const std::string& shaderString);
     void unregisterShader(const sp<IBinder>& shaderToken);
 
@@ -1920,7 +1920,8 @@ public:
     binder::Status removeActivePictureListener(const sp<gui::IActivePictureListener>& listener);
     binder::Status forcePacesetter(int64_t displayId) override;
     binder::Status resetForcedPacesetter() override;
-    binder::Status registerShader(const sp<IBinder>& shaderToken, const std::string& debugName,
+    binder::Status registerShader(const sp<IBinder>& shaderToken,
+                                  const std::string& uniqueShaderName,
                                   const std::string& shaderString) override;
     binder::Status unregisterShader(const sp<IBinder>& shader) override;
 

@@ -3378,14 +3378,14 @@ status_t SurfaceComposerClient::removeActivePictureListener(
     return statusTFromBinderStatus(status);
 }
 
-sp<IBinder> SurfaceComposerClient::registerShader(const std::string& debugName,
+sp<IBinder> SurfaceComposerClient::registerShader(const std::string& uniqueShaderName,
                                                   const std::string& shaderString) {
     if (!com_android_graphics_libgui_flags_composition_shaders()) {
         return nullptr;
     }
     sp<IBinder> token = sp<BBinder>::make();
     binder::Status status =
-            ComposerServiceAIDL::getComposerService()->registerShader(token, debugName,
+            ComposerServiceAIDL::getComposerService()->registerShader(token, uniqueShaderName,
                                                                       shaderString);
     return status.isOk() ? token : nullptr;
 }
