@@ -6119,6 +6119,7 @@ status_t SurfaceFlinger::createLayer(LayerCreationArgs& args, gui::CreateSurface
         args.addToRoot = false;
     }
 
+    args.debugCookie = reinterpret_cast<uintptr_t>(outResult.handle.get());
     addClientLayer(args, layer);
 
     outResult.transformHint = mFrontInternalDisplayTransformHint;
