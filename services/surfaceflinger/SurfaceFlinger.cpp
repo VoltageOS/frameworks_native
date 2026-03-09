@@ -5913,7 +5913,8 @@ uint32_t SurfaceFlinger::updateLayerCallbacksAndStats(const FrameTimelineInfo& f
         // TODO(b/485971052): It seems like we also want to add the layer
         // to mLayersWithQueuedFrames in order to ensure onCompositionPresented
         // is invoked, but currently that is highly coupled to mBufferInfo
-        layer->setRenderCommandBufferFrameId(s.renderCommandBufferFrameId, postTime,
+        layer->setRenderCommandBufferFrameId(s.renderCommandBufferFrameId,
+                                             s.renderCommandBufferFrameIdQueueTime, postTime,
                                              desiredPresentTime, isAutoTimestamp,
                                              frameTimelineInfo, gameMode, systemContentPriority);
     }

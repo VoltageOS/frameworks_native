@@ -2583,6 +2583,7 @@ SurfaceComposerClient::Transaction::setRenderCommandBufferFrameId(const sp<Surfa
     }
     s->what |= layer_state_t::eRenderCommandBufferFrameIdChanged;
     s->renderCommandBufferFrameId = frameId;
+    s->renderCommandBufferFrameIdQueueTime = systemTime();
     return *this;
 }
 

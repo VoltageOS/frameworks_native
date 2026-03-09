@@ -890,17 +890,19 @@ void Layer::resetDrawingStateBufferInfo() {
     mDrawingState.releaseBufferEndpoint = nullptr;
 }
 
-bool Layer::setRenderCommandBufferFrameId(uint64_t frameId, nsecs_t postTime,
-                                          nsecs_t desiredPresentTime,
-                                          bool isAutoTimestamp,
-                                          const FrameTimelineInfo& info,
-                                          gui::GameMode gameMode,
-                                          int32_t systemContentPriority) REQUIRES(mFlinger->mStateLock) {
+bool Layer::setRenderCommandBufferFrameId(uint64_t frameId,
+                                          nsecs_t renderCommandBufferFrameIdQueueTime,
+                                          nsecs_t postTime, nsecs_t desiredPresentTime,
+                                          bool isAutoTimestamp, const FrameTimelineInfo& info,
+                                          gui::GameMode gameMode, int32_t systemContentPriority)
+        REQUIRES(mFlinger->mStateLock) {
     mDrawingState.desiredPresentTime = desiredPresentTime;
     mDrawingState.isAutoTimestamp = isAutoTimestamp;
     mDrawingState.latchedVsyncId = info.vsyncId;
     mDrawingState.useVsyncIdForRefreshRateSelection = info.useForRefreshRateSelection;
     mDrawingState.frameNumber = frameId;
+    mDrawingState.renderCommandBufferFrameId = frameId;
+    mDrawingState.renderCommandBufferFrameIdQueueTime = renderCommandBufferFrameIdQueueTime;
     mDrawingState.hasRenderCommandBufferFrameId = true;
 
     const int32_t layerId = getSequence();
@@ -1276,7 +1278,7 @@ void Layer::latchBufferStatsAndHandles(nsecs_t latchTime, nsecs_t expectedPresen
         // bufferSurfaceFrame could be seen here if a pending state was applied successfully and we
         // are processing the next state.
         addSurfaceFramePresentedForBuffer(bufferSurfaceFrame,
-                                          getAcquireSignalTime(latchTime),
+                                          getAcquireSignalTime(),
                                           latchTime, expectedPresentTime);
         mDrawingState.bufferSurfaceFrameTX.reset();
     }
@@ -1672,13 +1674,9 @@ uint64_t Layer::getPendingBufferId() {
     return 0;
 }
 
-nsecs_t Layer::getAcquireSignalTime(nsecs_t latchTime) {
+nsecs_t Layer::getAcquireSignalTime() {
   if (mDrawingState.hasRenderCommandBufferFrameId) {
-      // TODO: b/(485971052)
-      // As a first guess, latchTime is probably likely to work better than
-      // SIGNAL_TIME_INVALID. In fact the correct value is whenever the
-      // transaction was prepared.
-      return latchTime;
+      return mDrawingState.renderCommandBufferFrameIdQueueTime;
   } else if (mDrawingState.acquireFenceTime) {
       return mDrawingState.acquireFenceTime->getSignalTime();
   }
