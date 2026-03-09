@@ -5904,12 +5904,18 @@ uint32_t SurfaceFlinger::updateLayerCallbacksAndStats(const FrameTimelineInfo& f
         }
     }
     if (what & layer_state_t::eRenderCommandBufferFrameIdChanged) {
+        std::optional<gui::CornerRadii> cornerRadii = std::nullopt;
+        if (snapshot) {
+            cornerRadii =
+                    std::make_optional<gui::CornerRadii>(snapshot->roundedCorner.reportedRadii);
+        }
+        layer->setCornerRadii(cornerRadii);
         // TODO(b/485971052): It seems like we also want to add the layer
         // to mLayersWithQueuedFrames in order to ensure onCompositionPresented
         // is invoked, but currently that is highly coupled to mBufferInfo
         layer->setRenderCommandBufferFrameId(s.renderCommandBufferFrameId, postTime,
                                              desiredPresentTime, isAutoTimestamp,
-                                             frameTimelineInfo, gameMode);
+                                             frameTimelineInfo, gameMode, systemContentPriority);
     }
     if (what & layer_state_t::eBufferChanged) {
         std::optional<ui::Transform::RotationFlags> transformHint = std::nullopt;
@@ -5934,7 +5940,7 @@ uint32_t SurfaceFlinger::updateLayerCallbacksAndStats(const FrameTimelineInfo& f
                                                              systemContentPriority);
     }
 
-    if (!(what & layer_state_t::eBufferChanged)) {
+    if (!(what & layer_state_t::eBufferChanged) && !(what & layer_state_t::eRenderCommandBufferFrameIdChanged)) {
         layer->setDesiredPresentTime(desiredPresentTime, isAutoTimestamp);
     }
 
