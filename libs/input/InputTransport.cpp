@@ -537,8 +537,8 @@ sp<IBinder> InputChannel::getConnectionToken() const {
 
 // --- InputPublisher ---
 
-InputPublisher::InputPublisher(const std::shared_ptr<InputChannel>& channel)
-      : mChannel(channel), mInputVerifier(mChannel->getName()) {}
+InputPublisher::InputPublisher(std::unique_ptr<InputChannel> channel)
+      : mChannel(std::move(channel)), mInputVerifier(mChannel->getName()) {}
 
 InputPublisher::~InputPublisher() {
 }
