@@ -394,7 +394,7 @@ bool delayMatchVsyncCadence(nsecs_t presentDelay, Fps refreshRate, nsecs_t prese
 // Formula explained in go/refined-jank-metric
 std::pair<float, JankSeverityType> calculateJankSeverity(int32_t jankType,
                                                          nsecs_t expectedPresentDelta,
-                                                         nsecs_t actualPresentDelta) {
+                                                         nsecs_t actualPresentDelta, Fps interval) {
     if (expectedPresentDelta <= 0) return {0.0f, JankSeverityType::Unknown};
 
     const int32_t jankBitmask = JankType::DisplayHAL | JankType::SurfaceFlingerCpuDeadlineMissed |
@@ -415,10 +415,10 @@ std::pair<float, JankSeverityType> calculateJankSeverity(int32_t jankType,
     }
 
     const auto absDelay = std::abs(expectedPresentDelta - actualPresentDelta);
-    const float ratio = static_cast<float>(absDelay + expectedPresentDelta) /
-            static_cast<float>(expectedPresentDelta);
+    const float ratio = static_cast<float>(absDelay + interval.getPeriodNsecs()) /
+            static_cast<float>(interval.getPeriodNsecs());
     const float w_s = std::log2(ratio);
-    const float w_f = std::sqrt(static_cast<float>(expectedPresentDelta) /
+    const float w_f = std::sqrt(static_cast<float>(interval.getPeriodNsecs()) /
                                 static_cast<float>((120_Hz).getPeriodNsecs()));
     const float score = w_s * w_f;
 
@@ -1063,7 +1063,8 @@ void SurfaceFrame::onPresent(nsecs_t presentTime, int32_t displayFrameJankTypeLe
     classifyJankLocked(displayFrameJankTypeLegacy, displayFrameJankTypeExperimental, refreshRate,
                        displayFrameRenderRate, &deadlineDelta, &presentDelay);
     const auto [score, severity] =
-            calculateJankSeverity(mJankType.value(), mExpectedPresentDelta, mActualPresentDelta);
+            calculateJankSeverity(mJankType.value(), mExpectedPresentDelta, mActualPresentDelta,
+                                  mRenderRate ? *mRenderRate : mDisplayFrameRenderRate);
     mJankSeverity = severity;
     mJankScore = score;
 
@@ -1731,8 +1732,8 @@ void FrameTimeline::DisplayFrame::onPresent(nsecs_t signalTime,
     nsecs_t displayPresentJitter = 0;
     classifyJank(deadlineDelta, displayPresentJitter, previousPredictedPresentTime,
                  previousActualPresentTime);
-    const auto [score, severity] =
-            calculateJankSeverity(mJankType.value(), mExpectedPresentDelta, mActualPresentDelta);
+    const auto [score, severity] = calculateJankSeverity(mJankType.value(), mExpectedPresentDelta,
+                                                         mActualPresentDelta, mRenderRate);
     mJankSeverity = severity;
     mJankScore = score;
 
