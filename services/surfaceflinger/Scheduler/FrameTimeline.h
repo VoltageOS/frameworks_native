@@ -392,6 +392,8 @@ private:
     float mJankDebugMetadata GUARDED_BY(mMutex) = 0.0f;
     nsecs_t mExpectedPresentDelta GUARDED_BY(mMutex) = 0;
     nsecs_t mActualPresentDelta GUARDED_BY(mMutex) = 0;
+    JankSeverityType mJankSeverity GUARDED_BY(mMutex) = JankSeverityType::None;
+    float mJankScore GUARDED_BY(mMutex) = 0.0f;
 };
 
 struct FrameTimelineDisplayState {
@@ -617,6 +619,8 @@ public:
         FrameTimelineDisplayState mDisplayState = {};
         nsecs_t mExpectedPresentDelta = 0;
         nsecs_t mActualPresentDelta = 0;
+        JankSeverityType mJankSeverity = JankSeverityType::None;
+        float mJankScore = 0.0f;
     };
 
     FrameTimeline(std::shared_ptr<TimeStats> timeStats, pid_t surfaceFlingerPid,
