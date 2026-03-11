@@ -28,8 +28,15 @@ namespace {
 // This derived class splits open the PipelineCallbackHandler for testing
 class PipelineCallbackHandlerTest : public skia::PipelineCallbackHandler {
 public:
+    using skia::PipelineCallbackHandler::kMaxNumSerializedPipelineKeys;
+    using skia::PipelineCallbackHandler::kMaxSerializedKeySizeInBytes;
     using skia::PipelineCallbackHandler::kNumEpochsBetweenNewPipelineSaves;
     using skia::PipelineCallbackHandler::kNumEpochsBetweenUsesSaves;
+
+    using skia::PipelineCallbackHandler::CreateBlob;
+    using skia::PipelineCallbackHandler::PipelineData;
+    using skia::PipelineCallbackHandler::SerializedKeyInfo;
+    using skia::PipelineCallbackHandler::UnpackBlob;
 
     PipelineCallbackHandlerTest()
           : skia::PipelineCallbackHandler(/* isProtected= */ false,
@@ -436,6 +443,149 @@ TEST(PipelineCallbackHandlerTest, checkLastSaveEpochUses) {
     };
 
     run_test(kActions);
+}
+
+namespace {
+
+void create_keys(std::vector<const PipelineCallbackHandlerTest::PipelineData*>* keys,
+                 uint32_t numKeys) {
+    using PipelineData = PipelineCallbackHandlerTest::PipelineData;
+    constexpr std::chrono::milliseconds kCreationTimeMS{0};
+
+    for (uint32_t i = 0; i < numKeys; ++i) {
+        sk_sp<SkData> data = SkData::MakeWithCopy(&i, sizeof(i));
+        // Only 'data' and 'creationEpoch' are going to be serialized
+        PipelineData* tmp = new PipelineData(std::to_string(i), kCreationTimeMS, std::move(data),
+                                             /* creationEpoch= */ i, false, false);
+        keys->push_back(tmp);
+    }
+}
+
+void check_keys(const std::vector<const PipelineCallbackHandlerTest::PipelineData*>& orig,
+                const std::vector<PipelineCallbackHandlerTest::SerializedKeyInfo>& readBack) {
+    if (orig.size() != readBack.size()) {
+        return;
+    }
+
+    for (size_t i = 0; i < orig.size(); ++i) {
+        ASSERT_EQ(orig[i]->mLastUsageEpoch, readBack[i].mLastUsageEpoch);
+        ASSERT_EQ(*orig[i]->mSerializedKey, *readBack[i].mSerializedKey);
+    }
+}
+
+void run_serialize_keys_test(
+        sk_sp<SkData> blob,
+        const std::vector<const PipelineCallbackHandlerTest::PipelineData*>& orig,
+        bool expectedToSucceed, uint32_t expectedEpoch) {
+    using SerializedKeyInfo = PipelineCallbackHandlerTest::SerializedKeyInfo;
+
+    // Usually the test creates the blob from 'orig'. When testing blob truncation however
+    // a munged blob is passed in.
+    if (!blob) {
+        blob = PipelineCallbackHandlerTest::CreateBlob(orig, expectedEpoch);
+        EXPECT_TRUE(blob != nullptr);
+    }
+
+    std::vector<SerializedKeyInfo> readBack;
+    uint32_t readBackEpochOfSave = 0;
+    bool result =
+            PipelineCallbackHandlerTest::UnpackBlob(blob.get(), &readBack, &readBackEpochOfSave);
+    ASSERT_EQ(result, expectedToSucceed);
+
+    if (!expectedToSucceed) {
+        return;
+    }
+
+    ASSERT_EQ(expectedEpoch, readBackEpochOfSave);
+    ASSERT_EQ(orig.size(), readBack.size());
+    check_keys(orig, readBack);
+}
+
+} // anonymous namespace
+
+// Basic test to ensure data round trips through serialization
+TEST(PipelineCallbackHandlerTest, blobCreation1) {
+    std::vector<const PipelineCallbackHandlerTest::PipelineData*> orig;
+    constexpr uint32_t kEpochOfSave = 77;
+
+    create_keys(&orig, 7);
+    ASSERT_EQ(orig.size(), 7ul);
+
+    run_serialize_keys_test(nullptr, orig, /* expectedToSucceed= */ true, kEpochOfSave);
+}
+
+// Test out handling of a missing serializedKey. Even though such Pipelines should be
+// filtered out during the gathering stage the blob serialization can deal with them.
+TEST(PipelineCallbackHandlerTest, blobCreation2) {
+    std::vector<const PipelineCallbackHandlerTest::PipelineData*> orig;
+    constexpr uint32_t kEpochOfSave = 77;
+
+    create_keys(&orig, 3);
+    ASSERT_EQ(orig.size(), 3ul);
+
+    // Remove the serialized key from the second pipeline
+    const_cast<sk_sp<SkData>*>(&orig[1]->mSerializedKey)->reset();
+
+    run_serialize_keys_test(nullptr, orig, /* expectedToSucceed= */ true, kEpochOfSave);
+}
+
+// Test out handling of too large of a serialized key. In this case we suspect some sort
+// of corruption of the file since the gathering phase should eliminate such keys.
+TEST(PipelineCallbackHandlerTest, blobCreation3) {
+    std::vector<const PipelineCallbackHandlerTest::PipelineData*> orig;
+    constexpr uint32_t kEpochOfSave = 77;
+
+    create_keys(&orig, 3);
+    ASSERT_EQ(orig.size(), 3ul);
+
+    // Overwrite the second serialized key with an invalidly large one
+    sk_sp<SkData> tooBig = SkData::MakeZeroInitialized(
+            2 * PipelineCallbackHandlerTest::kMaxSerializedKeySizeInBytes);
+    const_cast<sk_sp<SkData>*>(&orig[1]->mSerializedKey)->swap(tooBig);
+
+    run_serialize_keys_test(nullptr, orig, /* expectedToSucceed= */ false, kEpochOfSave);
+}
+
+// Test out handling of too many keys. In this case we suspect some sort
+// of corruption of the file since the gathering phase should limit the number of keys.
+TEST(PipelineCallbackHandlerTest, blobCreation4) {
+    std::vector<const PipelineCallbackHandlerTest::PipelineData*> orig;
+    constexpr uint32_t kEpochOfSave = 77;
+
+    create_keys(&orig, PipelineCallbackHandlerTest::kMaxNumSerializedPipelineKeys + 1);
+    ASSERT_EQ(orig.size(), PipelineCallbackHandlerTest::kMaxNumSerializedPipelineKeys + 1);
+
+    run_serialize_keys_test(nullptr, orig, /* expectedToSucceed= */ false, kEpochOfSave);
+}
+
+// Test out creating a blob with no keys. This should never happen but shouldn't crash.
+TEST(PipelineCallbackHandlerTest, blobCreation5) {
+    std::vector<const PipelineCallbackHandlerTest::PipelineData*> orig;
+    constexpr uint32_t kEpochOfSave = 77;
+
+    ASSERT_EQ(orig.size(), 0ul);
+
+    run_serialize_keys_test(nullptr, orig, /* expectedToSucceed= */ true, kEpochOfSave);
+}
+
+// Test out truncated blobs. These should all be detected and fail unpacking since
+// we suspect corruption of the file.
+TEST(PipelineCallbackHandlerTest, blobCreation6) {
+    std::vector<const PipelineCallbackHandlerTest::PipelineData*> orig;
+    constexpr uint32_t kEpochOfSave = 77;
+
+    create_keys(&orig, 1);
+    ASSERT_EQ(orig.size(), 1ul);
+
+    sk_sp<SkData> blob = PipelineCallbackHandlerTest::CreateBlob(orig, kEpochOfSave);
+    EXPECT_TRUE(blob != nullptr);
+
+    size_t numSlices = blob->size() / sizeof(uint32_t);
+
+    for (size_t i = 0; i < numSlices; i++) {
+        sk_sp<SkData> tmp = blob->shareSubset(0, i * sizeof(uint32_t));
+        run_serialize_keys_test(std::move(tmp), orig, /* expectedToSucceed= */ false, kEpochOfSave);
+    }
 }
 
 } // namespace android::renderengine
