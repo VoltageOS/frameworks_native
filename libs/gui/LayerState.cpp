@@ -258,6 +258,7 @@ status_t layer_state_t::write(Parcel& output) const
         SAFE_PARCEL(output.writeStrongBinder, renderResourceToken);
 
         SAFE_PARCEL(output.writeUint64, renderCommandBufferFrameId);
+        SAFE_PARCEL(output.writeInt64, renderCommandBufferFrameIdQueueTime);
     }
 
     SAFE_PARCEL(output.writeUint32, compositionFilterFlag);
@@ -470,6 +471,7 @@ status_t layer_state_t::read(const Parcel& input)
 
         SAFE_PARCEL(input.readNullableStrongBinder, &renderResourceToken);
         SAFE_PARCEL(input.readUint64, &renderCommandBufferFrameId);
+        SAFE_PARCEL(input.readInt64, &renderCommandBufferFrameIdQueueTime);
     }
     SAFE_PARCEL(input.readUint32, &compositionFilterFlag);
 
@@ -926,6 +928,7 @@ void layer_state_t::merge(const layer_state_t& other) {
         if (other.what & eRenderCommandBufferFrameIdChanged) {
             what |= eRenderCommandBufferFrameIdChanged;
             renderCommandBufferFrameId = other.renderCommandBufferFrameId;
+            renderCommandBufferFrameIdQueueTime = other.renderCommandBufferFrameIdQueueTime;
         }
         if (other.what & eRenderResourceTokenChanged) {
             what |= eRenderResourceTokenChanged;

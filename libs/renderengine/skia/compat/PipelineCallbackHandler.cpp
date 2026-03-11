@@ -44,7 +44,10 @@ void traceSerializedKey(sk_sp<SkData> data) {
 PipelineCallbackHandler::PipelineCallbackHandler(bool isProtected, bool storeSerializedKeys)
       : mStartTime(std::chrono::steady_clock::now()),
         mIsProtected(isProtected),
-        mStoreSerializedKeys(storeSerializedKeys) {}
+        mStoreSerializedKeys(storeSerializedKeys) {
+    mLastEpochUpdateTime = mStartTime;
+    // TODO(482036727): initialize 'mCurrentEpoch' and 'mEpochOfLastSave' from the cache file
+}
 
 void PipelineCallbackHandler::beginWarmup() {
     std::lock_guard<std::mutex> guard(mMutex);
@@ -55,17 +58,33 @@ void PipelineCallbackHandler::endWarmup() {
     mInWarmup = false;
 }
 
+void PipelineCallbackHandler::updateEpoch() {
+    std::chrono::time_point<std::chrono::steady_clock> curTime = std::chrono::steady_clock::now();
+
+    std::chrono::seconds deltaSeconds =
+            std::chrono::duration_cast<std::chrono::seconds>(curTime - mLastEpochUpdateTime);
+    uint32_t tensOfSeconds = static_cast<uint32_t>(deltaSeconds.count() / 10);
+
+    mCurrentEpoch += tensOfSeconds;
+    mLastEpochUpdateTime = curTime;
+}
+
 void PipelineCallbackHandler::add(skgpu::graphite::ContextOptions::PipelineCacheOp op,
                                   const std::string& label, uint32_t uniqueKeyHash,
                                   bool fromPrecompile, sk_sp<SkData> serializedKey) {
     std::lock_guard<std::mutex> guard(mMutex);
 
+    this->updateEpoch();
+
     auto iter = mMap.find(PipelineKey(&label, uniqueKeyHash));
     if (iter != mMap.end()) {
         // Pre-existing Pipeline - just update its usage(s)
         iter->second->mUses++;
+        iter->second->mLastUsageEpoch = mCurrentEpoch;
     } else {
         SkASSERT(op == skgpu::graphite::ContextOptions::PipelineCacheOp::kAddingPipeline);
+
+        mPipelineAddedSinceLastSave = true;
 
         if (serializedKey) {
             traceSerializedKey(serializedKey);
@@ -80,11 +99,13 @@ void PipelineCallbackHandler::add(skgpu::graphite::ContextOptions::PipelineCache
 
         std::unique_ptr<PipelineData> newData =
                 std::make_unique<PipelineData>(label, creationTime, std::move(serializedKey),
-                                               fromPrecompile, mInWarmup);
+                                               mCurrentEpoch, fromPrecompile, mInWarmup);
 
         mMap.emplace(
                 std::make_pair(PipelineKey(&newData->mLabel, uniqueKeyHash), std::move(newData)));
     }
+
+    this->maybeSaveCache();
 }
 
 void PipelineCallbackHandler::report(const char* label, std::string& result) {
@@ -119,12 +140,33 @@ void PipelineCallbackHandler::report(const char* label, std::string& result) {
                         tmp.size(), label, warmupCount, normalCount, precompileCount);
 
     for (const PipelineData* data : tmp) {
-        base::StringAppendF(&result, "%c %d %.3fs %s %zuB\n",
+        base::StringAppendF(&result, "%c %d %.3fs %s %u %zuB\n",
                             data->mFromPrecompile ? 'P' : (data->mFromWarmup ? 'W' : 'N'),
                             data->mUses, data->mCreationTime.count() / 1000.0f,
-                            data->mLabel.c_str(),
+                            data->mLabel.c_str(), data->mLastUsageEpoch,
                             data->mSerializedKey ? data->mSerializedKey->size() : 0);
     }
+}
+
+// This is a stub implementation - just enough to demonstrate its interaction with epochs and
+// saving.
+bool PipelineCallbackHandler::maybeSaveCache() {
+    uint32_t epochDelta = mCurrentEpoch - mEpochOfLastSave;
+
+    // TODO: we also need to ensure that no save occur during warmup and or precompile.
+    bool saveForNew = mPipelineAddedSinceLastSave && epochDelta > kNumEpochsBetweenNewPipelineSaves;
+    bool saveForUses = epochDelta > kNumEpochsBetweenUsesSaves;
+
+    if (!saveForNew && !saveForUses) {
+        // In this case we don't need to create the blob.
+        return false;
+    }
+
+    mPipelineAddedSinceLastSave = false;
+    mEpochOfLastSave = mCurrentEpoch;
+
+    // TODO(482036727): add actual creation of the data blob
+    return true;
 }
 
 } // namespace android::renderengine::skia

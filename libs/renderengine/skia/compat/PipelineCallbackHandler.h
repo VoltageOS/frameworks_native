@@ -56,20 +56,27 @@ public:
 protected:
     std::mutex mMutex;
 
+    void updateEpoch() EXCLUSIVE_LOCKS_REQUIRED(mMutex);
+
+    bool maybeSaveCache() EXCLUSIVE_LOCKS_REQUIRED(mMutex);
+
     // This is held as a unique_ptr in 'mMap' to simplify sorting in report() and to provide
     // a stable std::string* for the PipelineKey to use.
     struct PipelineData {
         explicit PipelineData(const std::string& label, std::chrono::milliseconds creationTime,
-                              sk_sp<SkData> serializedKey, bool fromPrecompile, bool fromWarmup)
+                              sk_sp<SkData> serializedKey, uint32_t creationEpoch,
+                              bool fromPrecompile, bool fromWarmup)
               : mLabel(label),
                 mCreationTime(creationTime),
                 mSerializedKey(std::move(serializedKey)),
+                mLastUsageEpoch(creationEpoch),
                 mUses(fromPrecompile ? 0 : (fromWarmup ? 0 : 1)),
                 mFromPrecompile(fromPrecompile),
                 mFromWarmup(fromWarmup) {}
         const std::string mLabel;
         const std::chrono::milliseconds mCreationTime;
         const sk_sp<SkData> mSerializedKey;
+        uint32_t mLastUsageEpoch = 0;
         uint32_t mUses;
         const bool mFromPrecompile;
         const bool mFromWarmup;
@@ -101,6 +108,20 @@ protected:
     // still extra work in this object that can be avoided if the serialized keys will
     // never be saved.
     const bool mStoreSerializedKeys;
+
+    bool mPipelineAddedSinceLastSave GUARDED_BY(mMutex) = false;
+    // Each epoch is a roughly 10s block of accumulated uptime since the cache file was created.
+    // Storing it in a uint32_t yields ~1362 years until it would overflow.
+    uint32_t mCurrentEpoch GUARDED_BY(mMutex) = 0;
+    uint32_t mEpochOfLastSave GUARDED_BY(mMutex) = 0;
+    std::chrono::time_point<std::chrono::steady_clock> mLastEpochUpdateTime GUARDED_BY(mMutex);
+
+    // Even when 'mPipelineAddedSinceLastSave' is true the next constant will be used to space out
+    // saves to reduce disk thrashing.
+    static constexpr uint32_t kNumEpochsBetweenNewPipelineSaves = 2; // 20s
+    // Regardless of whether a new pipeline has been added, the file will be saved after the
+    // following number of epochs. This serves to update the usage counts.
+    static constexpr uint32_t kNumEpochsBetweenUsesSaves = 42; // 7 minutes
 };
 
 } // namespace android::renderengine::skia

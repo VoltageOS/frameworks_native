@@ -492,7 +492,7 @@ interface ISurfaceComposer {
      * Associates the given IBinder token with the AGSL shaderString. After registration the
      * IBinder token can be used to apply shader effects to layers.
      */
-    void registerShader(IBinder token, @utf8InCpp String debugName, @utf8InCpp String shaderString);
+    void registerShader(IBinder token, @utf8InCpp String uniqueShaderName, @utf8InCpp String shaderString);
 
     /**
      * Removes the association between the given IBinder token and the AGSL shaderString.

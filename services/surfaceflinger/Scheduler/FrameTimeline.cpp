@@ -595,8 +595,7 @@ std::optional<float> SurfaceFrame::getJankSeverityScore() const {
         // Frame hasn't been presented yet.
         return std::nullopt;
     }
-    return calculateJankSeverity(mJankType.value(), mExpectedPresentDelta, mActualPresentDelta)
-            .first;
+    return mJankScore;
 }
 
 nsecs_t SurfaceFrame::getBaseTime() const {
@@ -1063,6 +1062,10 @@ void SurfaceFrame::onPresent(nsecs_t presentTime, int32_t displayFrameJankTypeLe
 
     classifyJankLocked(displayFrameJankTypeLegacy, displayFrameJankTypeExperimental, refreshRate,
                        displayFrameRenderRate, &deadlineDelta, &presentDelay);
+    const auto [score, severity] =
+            calculateJankSeverity(mJankType.value(), mExpectedPresentDelta, mActualPresentDelta);
+    mJankSeverity = severity;
+    mJankScore = score;
 
     if (mPredictionState != PredictionState::None) {
         // Only update janky frames if the app used vsync predictions
@@ -1077,9 +1080,7 @@ void SurfaceFrame::onPresent(nsecs_t presentTime, int32_t displayFrameJankTypeLe
         jd.frameIntervalNs =
                 (mRenderRate ? *mRenderRate : mDisplayFrameRenderRate).getPeriodNsecs();
         jd.presentDelayNs = presentDelay;
-        jd.jankScore = calculateJankSeverity(mJankType.experimental(), mExpectedPresentDelta,
-                                             mActualPresentDelta)
-                               .first;
+        jd.jankScore = mJankScore;
 
         if (mPredictionState == PredictionState::Valid) {
             jd.scheduledAppFrameTimeNs = mPredictions.endTime - mPredictions.startTime;
@@ -1240,10 +1241,8 @@ void SurfaceFrame::traceActuals(int64_t displayFrameToken, nsecs_t monoBootOffse
                 jankTypeBitmaskToProto(mJankType.altValue()));
         actualSurfaceFrameStartEvent->set_jank_debug_metadata(mJankDebugMetadata);
         actualSurfaceFrameStartEvent->set_vsync_resynced_jitter_millis(mVsyncResyncedJitter / 1e6f);
-        const auto [score, type] = calculateJankSeverity(mJankType.value(), mExpectedPresentDelta,
-                                                         mActualPresentDelta);
-        actualSurfaceFrameStartEvent->set_jank_severity_score(score);
-        actualSurfaceFrameStartEvent->set_jank_severity_type(toProto(type));
+        actualSurfaceFrameStartEvent->set_jank_severity_score(mJankScore);
+        actualSurfaceFrameStartEvent->set_jank_severity_type(toProto(mJankSeverity));
     });
 
     if (traced) {
@@ -1732,6 +1731,10 @@ void FrameTimeline::DisplayFrame::onPresent(nsecs_t signalTime,
     nsecs_t displayPresentJitter = 0;
     classifyJank(deadlineDelta, displayPresentJitter, previousPredictedPresentTime,
                  previousActualPresentTime);
+    const auto [score, severity] =
+            calculateJankSeverity(mJankType.value(), mExpectedPresentDelta, mActualPresentDelta);
+    mJankSeverity = severity;
+    mJankScore = score;
 
     for (auto& surfaceFrame : mSurfaceFrames) {
         surfaceFrame->onPresent(signalTime, mJankType.legacy(), mJankType.experimental(),
@@ -1815,8 +1818,9 @@ void FrameTimeline::DisplayFrame::addSkippedFrame(pid_t surfaceFlingerPid, nsecs
             static_cast<float>(surfaceFrame->getPredictions().presentTime) >=
                     (static_cast<float>(previousPredictionPresentTime) +
                      kThresh * static_cast<float>(mRenderRate.getPeriodNsecs())) &&
-            // sf skipped frame is not considered if app is self janked
-            surfaceFrame->getJankType() != JankType::None && !surfaceFrame->isSelfJanky()) {
+            // sf skipped frame is not considered if app is self janked or display is not on
+            surfaceFrame->getJankType() != JankType::None && !surfaceFrame->isSelfJanky() &&
+            mDisplayState.poweredOn) {
             skippedFrameStartTime = surfaceFrame->getPredictions().endTime;
             skippedFramePresentTime = surfaceFrame->getPredictions().presentTime;
             break;
@@ -1930,11 +1934,8 @@ void FrameTimeline::DisplayFrame::traceActuals(pid_t surfaceFlingerPid, nsecs_t 
                 jankTypeBitmaskToProto(mJankType.altValue()));
         actualDisplayFrameStartEvent->set_present_delay_millis(mPresentDelay / 1e6f);
         actualDisplayFrameStartEvent->set_jank_debug_metadata(mJankDebugMetadata);
-
-        const auto [score, type] = calculateJankSeverity(mJankType.value(), mExpectedPresentDelta,
-                                                         mActualPresentDelta);
-        actualDisplayFrameStartEvent->set_jank_severity_score(score);
-        actualDisplayFrameStartEvent->set_jank_severity_type(toProto(type));
+        actualDisplayFrameStartEvent->set_jank_severity_score(mJankScore);
+        actualDisplayFrameStartEvent->set_jank_severity_type(toProto(mJankSeverity));
     });
 
     if (traced) {
