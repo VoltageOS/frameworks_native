@@ -666,6 +666,12 @@ void layer_state_t::sanitize(int32_t permissions) {
             }
         }
     }
+    if (what & layer_state_t::eCompositionFilterFlagChanged) {
+        if (!(permissions & Permission::ACCESS_SURFACE_FLINGER)) {
+            what &= ~eCompositionFilterFlagChanged;
+            ALOGE("Stripped attempt to set eCompositionFilterFlagChanged in sanitize");
+        }
+    }
 }
 
 void layer_state_t::merge(const layer_state_t& other) {
