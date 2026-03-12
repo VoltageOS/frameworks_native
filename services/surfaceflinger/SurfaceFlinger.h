@@ -543,8 +543,6 @@ private:
     void bootFinished();
     status_t getSupportedFrameTimestamps(std::vector<FrameEvent>* outSupported) const;
     sp<IDisplayEventConnection> createDisplayEventConnection(
-            gui::ISurfaceComposer::VsyncSource vsyncSource =
-                    gui::ISurfaceComposer::VsyncSource::eVsyncSourceApp,
             EventRegistrationFlags eventRegistration = {},
             const sp<IBinder>& layerHandle = nullptr);
 
@@ -1783,8 +1781,7 @@ public:
 
     binder::Status bootFinished() override;
     binder::Status createDisplayEventConnection(
-            VsyncSource vsyncSource, EventRegistration eventRegistration,
-            const sp<IBinder>& layerHandle,
+            EventRegistration eventRegistration, const sp<IBinder>& layerHandle,
             sp<gui::IDisplayEventConnection>* outConnection) override;
     binder::Status createConnection(sp<gui::ISurfaceComposerClient>* outClient) override;
     binder::Status createVirtualDisplay(
