@@ -217,7 +217,7 @@ static int toRawFd(const std::variant<unique_fd, borrowed_fd>& v) {
     return std::visit([](const auto& fd) { return fd.get(); }, v);
 }
 
-Parcel::RpcFields::RpcFields(const sp<RpcSession>& session) : mSession(session) {
+Parcel::RpcFields::RpcFields(sp<RpcSession>&& session) : mSession(std::move(session)) {
     LOG_ALWAYS_FATAL_IF(mSession == nullptr);
 }
 
@@ -1068,11 +1068,11 @@ void Parcel::markForBinder(const sp<IBinder>& binder) {
     }
 }
 
-void Parcel::markForRpc(const sp<RpcSession>& session) {
+void Parcel::markForRpc(sp<RpcSession> session) {
     LOG_ALWAYS_FATAL_IF(mData != nullptr && mOwner == nullptr,
                         "format must be set before data is written OR on IPC data");
 
-    mVariantFields.emplace<RpcFields>(session);
+    mVariantFields.emplace<RpcFields>(std::move(session));
 }
 
 bool Parcel::isForRpc() const {
@@ -2981,7 +2981,7 @@ void Parcel::makeDangerousViewOf(Parcel* p) {
             }
         }
         status_t result =
-                rpcSetDataReference(rf->mSession, p->mData, p->mDataSize,
+                rpcSetDataReference(*rf->mSession, p->mData, p->mDataSize,
                                     rf->mObjectPositions.data(), rf->mObjectPositions.size(),
                                     std::move(fds), do_nothing_release_func);
         LOG_ALWAYS_FATAL_IF(result != OK, "Failed: %s", statusToString(result).c_str());
@@ -3082,13 +3082,11 @@ void Parcel::rpcSend() const {
 }
 
 status_t Parcel::rpcSetDataReference(
-        const sp<RpcSession>& session, const uint8_t* data, size_t dataSize,
-        const uint32_t* objectTable, size_t objectTableSize,
-        std::vector<std::variant<unique_fd, borrowed_fd>>&& ancillaryFds, release_func relFunc) {
+        RpcSession& session, const uint8_t* data, size_t dataSize, const uint32_t* objectTable,
+        size_t objectTableSize, std::vector<std::variant<unique_fd, borrowed_fd>>&& ancillaryFds,
+        release_func relFunc) {
     // this code uses 'mOwner == nullptr' to understand whether it owns memory
     LOG_ALWAYS_FATAL_IF(relFunc == nullptr, "must provide cleanup function");
-
-    LOG_ALWAYS_FATAL_IF(session == nullptr);
 
     for (size_t i = 0; i < objectTableSize; i++) {
         uint32_t minObjectEnd;
@@ -3101,13 +3099,13 @@ status_t Parcel::rpcSetDataReference(
                   " (parcel size is %zu). Terminating.",
                   objectTable[i], dataSize);
             relFunc(data, dataSize, nullptr, 0);
-            (void)session->shutdownAndWait(false);
+            (void)session.shutdownAndWait(false);
             return BAD_VALUE;
         }
     }
 
     freeData();
-    markForRpc(session);
+    markForRpc(sp<RpcSession>::fromExisting(&session));
 
     auto* rpcFields = maybeRpcFields();
     LOG_ALWAYS_FATAL_IF(rpcFields == nullptr); // guaranteed by markForRpc.
@@ -3131,7 +3129,7 @@ status_t Parcel::rpcSetDataReference(
     }
 
     // acquire and validate all objects
-    bool bindersInObjectPositions = session->getProtocolVersion() >=
+    bool bindersInObjectPositions = session.getProtocolVersion() >=
             RPC_WIRE_PROTOCOL_VERSION_RPC_HEADER_INCLUDES_BINDER_POSITIONS;
     size_t numFds = 0;
     for (uint32_t pos : rpcFields->mObjectPositions) {
@@ -3140,7 +3138,7 @@ status_t Parcel::rpcSetDataReference(
         if (status_t status = readRpcObjectType(&objectType); status != OK) {
             ALOGE("Failed to read object type: %s, pos: %" PRIu32 ". Terminating.",
                   statusToString(status).c_str(), pos);
-            (void)session->shutdownAndWait(false);
+            (void)session.shutdownAndWait(false);
             return status;
         }
 
@@ -3149,19 +3147,19 @@ status_t Parcel::rpcSetDataReference(
         } else if (objectType == RpcFields::TYPE_BINDER) {
             if (!bindersInObjectPositions) {
                 ALOGE("Binder objects should only be in object positions starting at protocol V2");
-                (void)session->shutdownAndWait(false);
+                (void)session.shutdownAndWait(false);
                 return BAD_VALUE;
             }
             mDataPos = pos;
             sp<IBinder> binder; // also held by mAcquiredEnteringBinders
             if (status_t status = readStrongBinder(&binder); status != OK) {
                 ALOGE("Failed to acquire binder: %s. Terminating.", statusToString(status).c_str());
-                (void)session->shutdownAndWait(false);
+                (void)session.shutdownAndWait(false);
                 return status;
             }
         } else {
             ALOGE("Unrecognized object type: %" PRId32 ". Terminating.", objectType);
-            (void)session->shutdownAndWait(false);
+            (void)session.shutdownAndWait(false);
             return BAD_VALUE;
         }
     }
@@ -3392,7 +3390,9 @@ status_t Parcel::restartWrite(size_t desired)
         kernelFields->mHasFds = false;
         kernelFields->mFdsKnown = true;
     } else if (auto* rpcFields = maybeRpcFields()) {
-        *rpcFields = RpcFields(rpcFields->mSession);
+        rpcFields->mObjectPositions.clear();
+        rpcFields->mImpl.reset();
+        rpcFields->mSendState = RpcFields::RpcSendState::NOT_SENT;
     }
     mAllowFds = true;
 

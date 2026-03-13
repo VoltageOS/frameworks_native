@@ -863,8 +863,8 @@ status_t RpcState::waitForReply(RpcSession::RpcConnection& connection, RpcSessio
     }
 
     data.release();
-    return reply->rpcSetDataReference(sp<RpcSession>::fromExisting(&session), parcelSpan.data,
-                                      parcelSpan.size, objectTableSpan.data, objectTableSpan.size,
+    return reply->rpcSetDataReference(session, parcelSpan.data, parcelSpan.size,
+                                      objectTableSpan.data, objectTableSpan.size,
                                       std::move(ancillaryFds), cleanup_reply_data);
 }
 
@@ -1173,10 +1173,9 @@ processTransactInternalTailCall:
         // deleted before the 'transactionData' object.
 
         replyStatus =
-                data.rpcSetDataReference(sp<RpcSession>::fromExisting(&session), parcelSpan.data,
-                                         parcelSpan.size, objectTableSpan.data,
-                                         objectTableSpan.size, std::move(ancillaryFds),
-                                         do_nothing_to_transact_data);
+                data.rpcSetDataReference(session, parcelSpan.data, parcelSpan.size,
+                                         objectTableSpan.data, objectTableSpan.size,
+                                         std::move(ancillaryFds), do_nothing_to_transact_data);
         // Reset to avoid spurious use-after-move warning from clang-tidy.
         ancillaryFds = std::remove_reference<decltype(ancillaryFds)>::type();
 
