@@ -1006,7 +1006,11 @@ std::optional<hal::HWConfigId> HWComposer::getPreferredBootDisplayMode(
     const auto error =
             mDisplayData[displayId].hwcDisplay->getPreferredBootDisplayConfig(&displayModeId);
     if (error != hal::Error::NONE) {
-        LOG_DISPLAY_ERROR(displayId, to_string(error).c_str());
+        if (error == hal::Error::UNSUPPORTED) {
+            ALOGW("%s is UNSUPPORTED for display %s", __func__, to_string(displayId).c_str());
+        } else {
+            LOG_DISPLAY_ERROR(displayId, to_string(error).c_str());
+        }
         return std::nullopt;
     }
     return displayModeId;
@@ -1118,6 +1122,10 @@ int32_t HWComposer::getMaxLayerPictureProfiles(PhysicalDisplayId displayId) {
     int32_t maxProfiles = 0;
     RETURN_IF_INVALID_DISPLAY(displayId, 0);
     const auto error = mDisplayData[displayId].hwcDisplay->getMaxLayerPictureProfiles(&maxProfiles);
+    if (error == hal::Error::UNSUPPORTED) {
+        ALOGW("%s is UNSUPPORTED for display %s", __func__, to_string(displayId).c_str());
+        return 0;
+    }
     RETURN_IF_HWC_ERROR(error, displayId, 0);
     return maxProfiles;
 }
@@ -1197,7 +1205,7 @@ std::optional<composer3::VsyncSample> HWComposer::getDisplayKnownVsyncSample(
     if (error != hal::Error::NONE) {
         if (error == hal::Error::UNSUPPORTED) {
             displayData.getDisplayKnownVsyncSampleSupported = false;
-            ALOGD("%s: getDisplayKnownVsyncSample is UNSUPPORTED for display %s", __func__,
+            ALOGW("%s: getDisplayKnownVsyncSample is UNSUPPORTED for display %s", __func__,
                   to_string(displayId).c_str());
         } else {
             LOG_HWC_ERROR("getDisplayKnownVsyncSample", error, displayId);
@@ -1422,7 +1430,11 @@ void HWComposer::loadOverlayProperties() {
 void HWComposer::loadHdrConversionCapabilities() {
     const auto error = mComposer->getHdrConversionCapabilities(&mHdrConversionCapabilities);
     if (error != hal::Error::NONE) {
-        ALOGE("Error in fetching HDR conversion capabilities %s", to_string(error).c_str());
+        if (error == hal::Error::UNSUPPORTED) {
+            ALOGW("%s is UNSUPPORTED", __func__);
+        } else {
+            ALOGE("Error in fetching HDR conversion capabilities %s", to_string(error).c_str());
+        }
         mHdrConversionCapabilities = {};
     }
 }
