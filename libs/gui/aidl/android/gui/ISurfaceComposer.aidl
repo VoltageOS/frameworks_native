@@ -60,11 +60,6 @@ import android.gui.WindowInfosListenerInfo;
 /** @hide */
 interface ISurfaceComposer {
 
-    enum VsyncSource {
-        eVsyncSourceApp = 0,
-        eVsyncSourceSurfaceFlinger = 1
-    }
-
     enum EventRegistration {
         modeChanged = 1 << 0,
         frameRateOverride = 1 << 1,
@@ -91,7 +86,7 @@ interface ISurfaceComposer {
      *     surface creation, see ISurfaceComposerClient::createSurface. Set to null if no layer
      *     association should be made.
      */
-    @nullable IDisplayEventConnection createDisplayEventConnection(VsyncSource vsyncSource,
+    @nullable IDisplayEventConnection createDisplayEventConnection(
             EventRegistration eventRegistration, @nullable IBinder layerHandle);
 
     /**
