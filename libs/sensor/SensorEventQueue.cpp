@@ -84,7 +84,7 @@ ssize_t SensorEventQueue::read(ASensorEvent* events, size_t numEvents) {
         libsensor_flags::sensor_event_queue_report_sensor_usage_in_tracing()) {
         for (size_t i = 0; i < count; i++) {
             std::optional<std::string_view> sensorName =
-                    mSensorManager.getSensorNameByHandle(events->sensor);
+                    mSensorManager.getSensorNameByHandle(events[i].sensor);
             if (sensorName.has_value()) {
                 char buffer[UINT8_MAX];
                 IPCThreadState* thread = IPCThreadState::self();
