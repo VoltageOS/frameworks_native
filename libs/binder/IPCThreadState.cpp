@@ -1634,17 +1634,16 @@ status_t IPCThreadState::executeCommand(int32_t cmd)
 
     case BR_FROZEN_BINDER:
         {
-            const struct binder_frozen_state_info* data =
-                    reinterpret_cast<const struct binder_frozen_state_info*>(
-                            mIn.readInplace(sizeof(struct binder_frozen_state_info)));
-            if (data == nullptr) {
+            struct binder_frozen_state_info info;
+            if (mIn.read(&info, sizeof(struct binder_frozen_state_info)) != NO_ERROR) {
                 result = UNKNOWN_ERROR;
                 break;
             }
-            BpBinder* proxy = (BpBinder*)data->cookie;
-            proxy->getPrivateAccessor().onFrozenStateChanged(data->is_frozen);
+            BpBinder* proxy = (BpBinder*)info.cookie;
+            proxy->getPrivateAccessor().onFrozenStateChanged(info.is_frozen);
+
             mOut.writeInt32(BC_FREEZE_NOTIFICATION_DONE);
-            mOut.writePointer(data->cookie);
+            mOut.writePointer(info.cookie);
         }
         break;
 
