@@ -75,6 +75,7 @@ cc_test {
         "GLTest.cpp",
         "IGraphicBufferProducer_test.cpp",
         "LibGuiMain.cpp", // Custom gtest entrypoint
+        "MagicRingBuffer_test.cpp",
         "Malicious.cpp",
         "MultiTextureConsumer_test.cpp",
         "RegionSampling_test.cpp",
