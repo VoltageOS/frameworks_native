@@ -973,6 +973,7 @@ void SurfaceFlinger::init() FTL_FAKE_GUARD(kMainThreadContext) {
     mHWComposer = getFactory().createHWComposer(mHwcServiceName);
     mCompositionEngine->setHwComposer(mHWComposer.get());
     mOffloadedCompositionEngine->setHwComposer(mHWComposer.get());
+    mOffloadedCompositionEngine->setPowerHintSessionEnabled(false);
     auto& composer = mCompositionEngine->getHwComposer();
     composer.setCallback(*this);
     mDisplayModeController.setHwComposer(&composer);
