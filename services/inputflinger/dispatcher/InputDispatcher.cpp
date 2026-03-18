@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include "android/keycodes.h"
 #define LOG_TAG "InputDispatcher"
 #define ATRACE_TAG ATRACE_TAG_INPUT
 
@@ -881,6 +882,19 @@ std::string dumpWindowForTouchOcclusion(const WindowInfo& info, bool isTouchedWi
 }
 
 } // namespace
+
+ui::LogicalDisplayId InputDispatcher::calculateIntendedDisplayIdLocked(
+        const NotifyKeyArgs& args) const {
+    const bool isPowerKeyCode = args.keyCode == AKEYCODE_SLEEP || args.keyCode == AKEYCODE_POWER ||
+            args.keyCode == AKEYCODE_WAKEUP;
+    if (isPowerKeyCode) {
+        return args.displayId;
+    }
+    else if (args.displayId == ui::LogicalDisplayId::INVALID) {
+        return mFocusedDisplayId;
+    }
+    return args.displayId;
+}
 
 // --- InputDispatcher ---
 
@@ -4580,9 +4594,18 @@ void InputDispatcher::notifyKey(const NotifyKeyArgs& args) {
 
     int32_t keyCode = args.keyCode;
     KeyEvent event;
-    event.initialize(args.id, args.deviceId, args.source, args.displayId, INVALID_HMAC, args.action,
-                     flags, keyCode, args.scanCode, metaState, repeatCount, args.downTime,
-                     args.eventTime);
+
+    // Figure out the intended display to send the event to.
+    // If the event is not targeted to a specific display, send it to the focused display.
+    ui::LogicalDisplayId intendedDisplayId = ui::LogicalDisplayId::INVALID;
+    {
+        std::scoped_lock _l(mLock);
+        intendedDisplayId = calculateIntendedDisplayIdLocked(args);
+    }
+
+    event.initialize(args.id, args.deviceId, args.source, intendedDisplayId, INVALID_HMAC,
+                     args.action, flags, keyCode, args.scanCode, metaState, repeatCount,
+                     args.downTime, args.eventTime);
 
     android::base::Timer t;
     mPolicy.interceptKeyBeforeQueueing(event, /*byref*/ policyFlags);
