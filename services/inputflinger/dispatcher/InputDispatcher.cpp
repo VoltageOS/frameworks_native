@@ -1224,25 +1224,20 @@ void InputDispatcher::dispatchOnceInnerLocked(nsecs_t& nextWakeupTime) {
     // If we don't already have a pending event, go grab one.
     if (!mPendingEvent) {
         if (mInboundQueue.empty()) {
-            // Synthesize a key repeat if appropriate.
-            if (mKeyRepeatState.lastKeyEntry) {
-                if (currentTime >= mKeyRepeatState.nextRepeatTime) {
-                    mPendingEvent = synthesizeKeyRepeatLocked(currentTime);
-                } else {
-                    nextWakeupTime = std::min(nextWakeupTime, mKeyRepeatState.nextRepeatTime);
-                }
-            }
-
-            // Nothing to do if there is no pending event.
-            if (!mPendingEvent) {
-                return;
-            }
-        } else {
-            // Inbound queue has at least one entry.
-            mPendingEvent = mInboundQueue.front();
-            mInboundQueue.pop_front();
-            traceInboundQueueLengthLocked();
+            // Legacy behaviour: only synthesize repeats if the queue is completely empty.
+            // It's not clear whether that's intentional.
+            // TODO(b/493759313): add a unit test for this and figure out why it is so.
+            nextWakeupTime = std::min(nextWakeupTime, processKeyRepeatLocked(currentTime));
         }
+        if (mInboundQueue.empty()) {
+            // No pending event, and nothing in the inbound queue. Therefore, nothing to do here.
+            return;
+        }
+
+        // Inbound queue has at least one entry.
+        mPendingEvent = mInboundQueue.front();
+        mInboundQueue.pop_front();
+        traceInboundQueueLengthLocked();
 
         // Poke user activity for this event.
         if (mPendingEvent->policyFlags & POLICY_FLAG_PASS_TO_USER) {
@@ -1724,6 +1719,24 @@ void InputDispatcher::resetKeyRepeatLocked() {
     if (mKeyRepeatState.lastKeyEntry) {
         mKeyRepeatState.lastKeyEntry = nullptr;
     }
+}
+
+nsecs_t InputDispatcher::processKeyRepeatLocked(nsecs_t currentTime) {
+    if (!mKeyRepeatState.lastKeyEntry) {
+        // There is no key currently being repeated.
+        return LLONG_MAX;
+    }
+
+    if (currentTime >= mKeyRepeatState.nextRepeatTime) {
+        // The repeat timeout has expired. Synthesize a new key repeat event and push it to the
+        // inbound queue. Request an immediate wake up to process the newly queued event.
+        mInboundQueue.push_back(synthesizeKeyRepeatLocked(currentTime));
+        return LLONG_MIN;
+    }
+
+    // The key is being repeated, but the timeout has not yet expired.
+    // Return the time at which the next repeat should occur.
+    return mKeyRepeatState.nextRepeatTime;
 }
 
 std::shared_ptr<KeyEntry> InputDispatcher::synthesizeKeyRepeatLocked(nsecs_t currentTime) {
