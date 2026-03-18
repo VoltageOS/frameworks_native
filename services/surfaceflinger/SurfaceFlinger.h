@@ -647,8 +647,6 @@ private:
     status_t getStalledTransactionInfo(
             int pid, std::optional<TransactionHandler::StalledTransactionInfo>& result);
 
-    void updateHdcpLevels(hal::HWDisplayId hwcDisplayId, int32_t connectedLevel, int32_t maxLevel);
-
     void addActivePictureListener(const sp<gui::IActivePictureListener>& listener);
 
     void removeActivePictureListener(const sp<gui::IActivePictureListener>& listener);
