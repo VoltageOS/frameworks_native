@@ -461,8 +461,7 @@ void Display::setExpensiveRenderingExpected(bool enabled) {
 }
 
 bool Display::isPowerHintSessionEnabled() {
-    return getCompositionEngine().isPowerHintSessionEnabled() && mPowerAdvisor != nullptr &&
-            mPowerAdvisor->usePowerHintSession();
+    return mPowerAdvisor != nullptr && mPowerAdvisor->usePowerHintSession();
 }
 
 bool Display::isPowerHintSessionGpuReportingEnabled() {

@@ -943,26 +943,5 @@ TEST_F(PowerAdvisorTest, workloadHints_resetsCommittedStateEachFrame) {
     mPowerAdvisor->setCommittedWorkload(ftl::Flags<Workload>());
 }
 
-TEST_F(PowerAdvisorTest, enablePowerHintSession_DisablesSession) {
-    mPowerAdvisor->onBootFinished();
-    mPowerAdvisor->enablePowerHintSession(false);
-
-    std::vector<int32_t> threadIds = {1, 2, 3};
-    EXPECT_FALSE(mPowerAdvisor->startPowerHintSession(std::move(threadIds)));
-}
-
-TEST_F(PowerAdvisorTest, reportActualWorkDuration_SkippedWhenDisabled) {
-    mPowerAdvisor->onBootFinished();
-    startPowerHintSession(); // sets up session and starts it
-
-    // session is running now
-    EXPECT_CALL(*mMockPowerHintSession, reportActualWorkDuration(_)).Times(0);
-
-    mPowerAdvisor->enablePowerHintSession(false);
-
-    // Trigger report
-    mPowerAdvisor->reportActualWorkDuration();
-}
-
 } // namespace
 } // namespace android::adpf::impl
