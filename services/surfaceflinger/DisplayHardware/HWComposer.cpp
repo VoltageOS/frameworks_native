@@ -182,6 +182,9 @@ std::optional<PhysicalDisplayId> HWComposer::onVsync(hal::HWDisplayId hwcDisplay
                 displayData.vsyncTraceToggle);
     displayData.vsyncTraceToggle = !displayData.vsyncTraceToggle;
 
+    SFTRACE_INT64(ftl::Concat("HW_VSYNC_OFFSET_", displayIdOpt->value).c_str(),
+                  systemTime() - timestamp);
+
     return displayIdOpt;
 }
 
