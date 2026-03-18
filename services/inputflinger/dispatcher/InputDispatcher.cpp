@@ -1992,8 +1992,7 @@ bool InputDispatcher::dispatchKeyLocked(nsecs_t currentTime, std::shared_ptr<con
         mReporter->reportDroppedKey(entry->id);
         // Poke user activity for consumed keys, as it may have not been reported due to
         // the focused window requesting user activity to be disabled
-        if (*dropReason == DropReason::POLICY &&
-            mPendingEvent->policyFlags & POLICY_FLAG_PASS_TO_USER) {
+        if (*dropReason == DropReason::POLICY && (entry->policyFlags & POLICY_FLAG_PASS_TO_USER)) {
             pokeUserActivityLocked(*entry);
         }
         return true;
