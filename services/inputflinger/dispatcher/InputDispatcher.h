@@ -184,6 +184,9 @@ private:
     InputDispatcherPolicyInterface& mPolicy;
     android::InputDispatcherConfiguration mConfig GUARDED_BY(mLock);
 
+    ui::LogicalDisplayId calculateIntendedDisplayIdLocked(const NotifyKeyArgs& args) const
+            REQUIRES(mLock);
+
     mutable std::mutex mLock;
 
     std::condition_variable mDispatcherIsAlive;
