@@ -317,14 +317,19 @@ bool renderCommandBufferToCanvas(IPCServerResourceCache* cache, RenderCommandBuf
         ALOGE("Rendering command buffer");
     }
 
-    for (IPCRenderBufferOp* op = buffer->mRegion->mUploadsHead.get(); op; op = op->next) {
+    while (auto* baseOp = buffer->mRegion->mUploadBuf.peek()) {
+        auto* op = static_cast<IPCRenderBufferUploadOp*>(baseOp);
         if (op->type == TYPE_UPLOADBITMAP) {
-            UploadBitmap* uo = (UploadBitmap*)op;
+            UploadBitmap* uo = static_cast<UploadBitmap*>(op);
             if (cache) uo->execute(*cache);
         } else if (op->type == TYPE_UPLOADTYPEFACE) {
-            UploadTypeface* uo = (UploadTypeface*)op;
+            UploadTypeface* uo = static_cast<UploadTypeface*>(op);
             if (cache) uo->execute(*cache);
+        } else if (op->type == TYPE_FREEBITMAP) {
+            FreeBitmap* fo = static_cast<FreeBitmap*>(op);
+            if (cache) fo->execute(*cache);
         }
+        buffer->mRegion->mUploadBuf.pop();
     }
 
     SkMatrix rootMatrix = canvas->getTotalMatrix();
@@ -407,16 +412,6 @@ bool renderCommandBufferToCanvas(IPCServerResourceCache* cache, RenderCommandBuf
         ALOGE("Done rendering command buffer");
     }
 
-    for (IPCRenderBufferOp* op = buffer->mRegion->mUploadsHead.get(); op; op = op->next) {
-        if (op->type == TYPE_FREEBITMAP) {
-            FreeBitmap* fo = (FreeBitmap*)op;
-            if (cache) fo->execute(*cache);
-        }
-    }
-
-    buffer->mRegion->mUploadsHead = nullptr;
-    buffer->mRegion->mUploadsTail = nullptr;
-    buffer->mRegion->mArena.resetArena();
     return true;
 }
 
@@ -1208,7 +1203,7 @@ std::string EndRenderTargetOp::toString() const {
 
 UploadBitmap* UploadBitmap::Create(IpcRenderRegion* region, uint64_t imageId,
                                    const SkBitmap& bitmap) {
-    UploadBitmap* op = region->allocAligned<UploadBitmap>();
+    UploadBitmap* op = region->mUploadBuf.reserve<UploadBitmap>();
     OP_REQUIRE(op);
     op->type = TYPE_UPLOADBITMAP;
     op->imageId = imageId;
@@ -1221,7 +1216,7 @@ UploadBitmap* UploadBitmap::Create(IpcRenderRegion* region, uint64_t imageId,
     size_t pixelSize = bitmap.computeByteSize();
     OP_REQUIRE(SetRSpan(op->pixels, region, (const uint8_t*)bitmap.getPixels(), pixelSize));
 
-    region->pushUploadCmd(op);
+    region->mUploadBuf.commit();
     return op;
 }
 
@@ -1250,11 +1245,11 @@ std::string UploadBitmap::toString() const {
 }
 
 FreeBitmap* FreeBitmap::Create(IpcRenderRegion* region, uint64_t imageId) {
-    FreeBitmap* op = region->allocAligned<FreeBitmap>();
+    FreeBitmap* op = region->mUploadBuf.reserve<FreeBitmap>();
     OP_REQUIRE(op);
     op->type = TYPE_FREEBITMAP;
     op->imageId = imageId;
-    region->pushUploadCmd(op);
+    region->mUploadBuf.commit();
     return op;
 }
 
@@ -1268,12 +1263,12 @@ std::string FreeBitmap::toString() const {
 
 UploadTypeface* UploadTypeface::Create(IpcRenderRegion* region, uint32_t fontId,
                                        const SkData* data) {
-    UploadTypeface* op = region->allocAligned<UploadTypeface>();
+    UploadTypeface* op = region->mUploadBuf.reserve<UploadTypeface>();
     OP_REQUIRE(op);
     op->type = TYPE_UPLOADTYPEFACE;
     op->fontId = fontId;
     OP_REQUIRE(SetRSpan(op->data, region, (const uint8_t*)data->data(), data->size()));
-    region->pushUploadCmd(op);
+    region->mUploadBuf.commit();
     return op;
 }
 
