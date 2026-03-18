@@ -38,6 +38,8 @@ public:
     void assertNotifyInputDevicesChangedWasCalled(
             NotifyInputDevicesChangedArgs* outEventArgs = nullptr);
 
+    void assertNotifyWindowInfosWasCalled();
+
     void clearNotifyDeviceResetCalls();
 
     void assertNotifyDeviceResetWasCalled(const ::testing::Matcher<NotifyDeviceResetArgs>& matcher);
@@ -80,6 +82,8 @@ private:
 
     virtual void notifyInputDevicesChanged(const NotifyInputDevicesChangedArgs& args) override;
 
+    virtual void notifyWindowInfos(const NotifyWindowInfosArgs& args) override;
+
     virtual void notifyDeviceReset(const NotifyDeviceResetArgs& args) override;
 
     virtual void notifyKey(const NotifyKeyArgs& args) override;
@@ -100,6 +104,7 @@ private:
     const std::chrono::milliseconds mEventDidNotHappenTimeout;
 
     std::tuple<std::vector<NotifyInputDevicesChangedArgs>,   //
+               std::vector<NotifyWindowInfosArgs>,           //
                std::vector<NotifyDeviceResetArgs>,           //
                std::vector<NotifyKeyArgs>,                   //
                std::vector<NotifyMotionArgs>,                //
