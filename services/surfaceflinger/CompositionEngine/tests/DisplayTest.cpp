@@ -48,14 +48,6 @@ using aidl::android::hardware::graphics::composer3::Composition;
 using aidl::android::hardware::graphics::composer3::DimmingStage;
 
 namespace android::compositionengine {
-
-class DisplayTestAccessor {
-public:
-    static bool isPowerHintSessionEnabled(impl::Display* display) {
-        return display->isPowerHintSessionEnabled();
-    }
-};
-
 namespace {
 
 namespace hal = android::hardware::graphics::composer::hal;
@@ -939,19 +931,6 @@ TEST_F(DisplaySetExpensiveRenderingExpectedTest, forwardsToPowerAdvisor) {
 
     EXPECT_CALL(mPowerAdvisor, setExpensiveRenderingExpected(DEFAULT_DISPLAY_ID, false)).Times(1);
     mDisplay->setExpensiveRenderingExpected(false);
-}
-
-/*
- * Display::isPowerHintSessionEnabled()
- */
-using DisplayPowerHintSessionTest = PartialMockDisplayTestCommon;
-
-TEST_F(DisplayPowerHintSessionTest, isPowerHintSessionEnabled) {
-    EXPECT_CALL(mCompositionEngine, isPowerHintSessionEnabled()).WillOnce(Return(true));
-    EXPECT_TRUE(DisplayTestAccessor::isPowerHintSessionEnabled(mDisplay.get()));
-
-    EXPECT_CALL(mCompositionEngine, isPowerHintSessionEnabled()).WillOnce(Return(false));
-    EXPECT_FALSE(DisplayTestAccessor::isPowerHintSessionEnabled(mDisplay.get()));
 }
 
 /*
