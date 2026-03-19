@@ -508,7 +508,7 @@ struct EndRenderTargetOp final : IPCRenderBufferOp {
 
 // Structs are defined in RenderCommandBuffer.h in libgui.
 
-struct UploadBitmap final : IPCRenderBufferOp {
+struct UploadBitmap final : IPCRenderBufferUploadOp {
     static const auto kType = TYPE_UPLOADBITMAP;
     uint64_t imageId;
     int32_t width;
@@ -523,7 +523,7 @@ struct UploadBitmap final : IPCRenderBufferOp {
     std::string toString() const;
 };
 
-struct FreeBitmap final : IPCRenderBufferOp {
+struct FreeBitmap final : IPCRenderBufferUploadOp {
     static const auto kType = TYPE_FREEBITMAP;
     uint64_t imageId;
 
@@ -532,7 +532,7 @@ struct FreeBitmap final : IPCRenderBufferOp {
     std::string toString() const;
 };
 
-struct UploadTypeface final : IPCRenderBufferOp {
+struct UploadTypeface final : IPCRenderBufferUploadOp {
     static const auto kType = TYPE_UPLOADTYPEFACE;
     uint32_t fontId;
     RSpan<uint8_t> data;

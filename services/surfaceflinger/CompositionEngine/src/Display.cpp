@@ -74,7 +74,7 @@ bool Display::hasSecureLayers() const {
     const auto layers = getOutputLayersOrderedByZ();
     return std::any_of(layers.begin(), layers.end(), [](const auto& layer) {
         const auto* state = layer->getLayerFE().getCompositionState();
-        return state && state->isSecure;
+        return state && (state->isSecure || state->hasProtectedContent);
     });
 }
 
