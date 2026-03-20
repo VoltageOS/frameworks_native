@@ -2747,6 +2747,9 @@ bool SurfaceFlinger::updateLayerSnapshots(VsyncId vsyncId, nsecs_t frameTimeNs,
     frontend::LayerSnapshotBuilder::Args
             args{.root = mLayerHierarchyBuilder.getHierarchy(),
                  .layerLifecycleManager = mLayerLifecycleManager,
+                 .forceUpdate = FlagManager::getInstance().frontend_caching_v0()
+                         ? frontend::LayerSnapshotBuilder::ForceUpdateFlags::ALL
+                         : frontend::LayerSnapshotBuilder::ForceUpdateFlags::NONE,
                  .includeMetadata = mCompositionEngine->getFeatureFlags().test(
                          compositionengine::Feature::kSnapshotLayerMetadata),
                  .displays = mFrontEndDisplayInfos,
@@ -2776,8 +2779,9 @@ bool SurfaceFlinger::updateLayerSnapshots(VsyncId vsyncId, nsecs_t frameTimeNs,
                     mFactory.createCompositionEngine();
             compositionEngine->setRenderEngine(mRenderEngine.get());
             compositionEngine->setHwComposer(mHWComposer.get());
+
             mMergeableHierarchyManager.constructSnapshots(mLayerSnapshotBuilder, args,
-                                                          *compositionEngine);
+                                                          *compositionEngine, mLegacyLayers);
         }
     }
     {
@@ -2790,7 +2794,8 @@ bool SurfaceFlinger::updateLayerSnapshots(VsyncId vsyncId, nsecs_t frameTimeNs,
         mUpdateInputInfo = true;
     }
     if (mLayerLifecycleManager.getGlobalChanges().any(Changes::VisibleRegion | Changes::Hierarchy |
-                                                      Changes::Visibility | Changes::Geometry)) {
+                                                      Changes::Visibility | Changes::Geometry) ||
+        FlagManager::getInstance().frontend_caching_v0()) {
         mVisibleRegionsDirty = true;
     }
     if (mLayerLifecycleManager.getGlobalChanges().any(Changes::Hierarchy | Changes::FrameRate)) {
@@ -3289,8 +3294,6 @@ CompositeResultsPerDisplay SurfaceFlinger::composite(
     const auto layers = mLayerSnapshotBuilder.hasMergedSnapshots()
             ? copyMergedSnapshots(refreshArgs)
             : addLayerSnapshotsToCompositionArgs(refreshArgs, kCursorOnly);
-    // setVisibleRegionDirtyIfNeeded(refreshArgs);
-
     prepareLayersForComposition(refreshArgs, kCursorOnly, layers);
 
     for (auto& [layer, layerFE] : layers) {

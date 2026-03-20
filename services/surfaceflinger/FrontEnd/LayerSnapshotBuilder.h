@@ -139,7 +139,8 @@ private:
             const LayerHierarchy::TraversalPath& traversalPath, const LayerSnapshot& parentSnapshot,
             int depth);
     void updateSnapshot(LayerSnapshot&, const Args&, const RequestedLayerState&,
-                        const LayerSnapshot& parentSnapshot, const LayerHierarchy::TraversalPath&);
+                        const LayerSnapshot& parentSnapshot, const LayerHierarchy::TraversalPath&,
+                        bool forMergedSnapshot = false);
     static void updateRelativeState(LayerSnapshot& snapshot, const LayerSnapshot& parentSnapshot,
                                     bool parentIsRelative, const Args& args);
     static void resetRelativeState(LayerSnapshot& snapshot);
@@ -166,7 +167,7 @@ private:
                               const ShadowSettings& globalShadowSettings);
     void updateInput(LayerSnapshot& snapshot, const RequestedLayerState& requested,
                      const LayerSnapshot& parentSnapshot, const LayerHierarchy::TraversalPath& path,
-                     const Args& args);
+                     const Args& args, bool forMergedSnapshot = false);
     // Return true if there are unreachable snapshots
     bool sortSnapshotsByZ(const Args& args);
     LayerSnapshot* createSnapshot(const LayerHierarchy::TraversalPath& id,
