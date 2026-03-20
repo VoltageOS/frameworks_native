@@ -3115,9 +3115,6 @@ VkResult GetSwapchainTimingPropertiesEXT(
         return result;
     }
 
-    pSwapchainTimingProperties->sType =
-        VK_STRUCTURE_TYPE_SWAPCHAIN_TIMING_PROPERTIES_EXT;
-    pSwapchainTimingProperties->pNext = nullptr;
     pSwapchainTimingProperties->refreshDuration = refresh_duration;
     pSwapchainTimingProperties->refreshInterval = refresh_duration;
 
@@ -3156,9 +3153,6 @@ VkResult GetSwapchainTimeDomainPropertiesEXT(
     pSwapchainTimeDomainProperties->pTimeDomainIds[0] =
         (uint64_t)LibvulkanTimeDomain::kStageLocal;
     pSwapchainTimeDomainProperties->timeDomainCount = 1;
-    pSwapchainTimeDomainProperties->sType =
-        VK_STRUCTURE_TYPE_SWAPCHAIN_TIME_DOMAIN_PROPERTIES_EXT;
-    pSwapchainTimeDomainProperties->pNext = nullptr;
 
     return VK_SUCCESS;
 }
@@ -3238,8 +3232,6 @@ VkResult GetPastPresentationTimingEXT(
         VkPastPresentationTimingEXT* current_result =
             &pPastPresentationTimingProperties
                  ->pPresentationTimings[timings_copied];
-        current_result->sType = VK_STRUCTURE_TYPE_PAST_PRESENTATION_TIMING_EXT;
-        current_result->pNext = nullptr;
         current_result->reportComplete = VK_TRUE;
         current_result->presentId = ti.present_id_;
         current_result->timeDomain = VK_TIME_DOMAIN_PRESENT_STAGE_LOCAL_EXT;
