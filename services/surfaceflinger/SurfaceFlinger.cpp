@@ -5993,6 +5993,7 @@ uint32_t SurfaceFlinger::addInputWindowCommands(const InputWindowCommands& input
 status_t SurfaceFlinger::mirrorLayer(const LayerCreationArgs& args,
                                      const sp<IBinder>& mirrorFromHandle,
                                      const sp<IBinder>& stopAtHandle,
+                                     const sp<IBinder>& cropByHandle,
                                      gui::CreateSurfaceResult& outResult) {
     if (!mirrorFromHandle) {
         return NAME_NOT_FOUND;
@@ -6017,6 +6018,9 @@ status_t SurfaceFlinger::mirrorLayer(const LayerCreationArgs& args,
                 return NAME_NOT_FOUND;
             }
             mirrorArgs.stopLayerId = stopLayerId;
+        }
+        if (cropByHandle) {
+            mirrorArgs.croppedByLayerId = LayerHandle::getLayerId(cropByHandle);
         }
         status_t result = createLayer(mirrorArgs, &outResult.handle, &mirrorLayer);
         if (result != NO_ERROR) {

@@ -304,6 +304,13 @@ flag {
 } # mirror_uid_filtering
 
 flag {
+  name: "mirror_with_crop"
+  namespace: "window_surfaces"
+  description: "Enables mirroring a layer with cropping"
+  bug: "474153029"
+} # mirror_with_crop
+
+flag {
   name: "modeset_multi_display"
   namespace: "core_graphics"
   description: "Allows multiple display to be modeset at the same time."

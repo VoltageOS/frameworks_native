@@ -140,6 +140,7 @@ void FlagManager::dump(std::string& result) const {
     DUMP_ACONFIG_FLAG(luts_api);
     DUMP_ACONFIG_FLAG(md_degrade_hdr);
     DUMP_ACONFIG_FLAG(mirror_uid_filtering);
+    DUMP_ACONFIG_FLAG(mirror_with_crop);
     DUMP_ACONFIG_FLAG(monitor_buffer_fences);
     DUMP_ACONFIG_FLAG(mrr_full_frame_rate_list);
     DUMP_ACONFIG_FLAG(offload_gpu_composition);
@@ -328,6 +329,7 @@ FLAG_MANAGER_ACONFIG_FLAG(graphite_renderengine_preview2_rollout, "");
 FLAG_MANAGER_ACONFIG_FLAG(graphite_renderengine_desktop_rollout, "");
 FLAG_MANAGER_ACONFIG_FLAG(md_degrade_hdr, "");
 FLAG_MANAGER_ACONFIG_FLAG(mirror_uid_filtering, "");
+FLAG_MANAGER_ACONFIG_FLAG(mirror_with_crop, "");
 FLAG_MANAGER_ACONFIG_FLAG(monitor_buffer_fences, "");
 FLAG_MANAGER_ACONFIG_FLAG(mrr_full_frame_rate_list, "");
 FLAG_MANAGER_ACONFIG_FLAG(offload_gpu_composition, "");
