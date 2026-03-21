@@ -101,6 +101,12 @@ enum class LibvulkanTimeDomain {
     kStageLocal = 1,  // VK_TIME_DOMAIN_PRESENT_STAGE_LOCAL_EXT
 };
 
+enum class LibvulkanTimeDomainCounter {
+    // We don't ever update the timingPropertiesCounter or timeDomainsCounter
+    // counts as these domains or properties don't change in our implementation
+    kDefault = 1,
+};
+
 static uint64_t convertGralloc1ToBufferUsage(uint64_t producerUsage,
                                              uint64_t consumerUsage) {
     static_assert(uint64_t(GRALLOC1_CONSUMER_USAGE_CPU_READ_OFTEN) ==
@@ -3196,6 +3202,12 @@ VkResult GetPastPresentationTimingEXT(
     std::lock_guard<std::mutex> lock(swapchain.timing_mutex);
     ANativeWindow* window = swapchain.surface.window.get();
     VkResult result = VK_SUCCESS;
+
+    // We always set these counters to 1 as the domain/properties don't change
+    pPastPresentationTimingProperties->timingPropertiesCounter =
+        (uint64_t)LibvulkanTimeDomainCounter::kDefault;
+    pPastPresentationTimingProperties->timeDomainsCounter =
+        (uint64_t)LibvulkanTimeDomainCounter::kDefault;
 
     if (!swapchain.frame_timestamps_enabled) {
         ALOGV("Calling native_window_enable_frame_timestamps(true)");
