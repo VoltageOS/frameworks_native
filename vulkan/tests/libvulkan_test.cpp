@@ -1968,6 +1968,176 @@ TEST_F(AImageReaderVulkanSwapchainTest,
 
 }  // namespace
 
+TEST_F(AImageReaderVulkanSwapchainTest,
+       GetPastPresentationTimingEXT_IncompleteQueryTest) {
+    // verify that returning VK_INCOMPLETE does not erase all ready timings
+    std::vector<const char*> instanceLayers = {};
+    std::vector<const char*> deviceLayers = {};
+    std::vector<const char*> deviceExtensions = {
+        VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+        VK_EXT_PRESENT_TIMING_EXTENSION_NAME,
+        VK_KHR_PRESENT_ID_2_EXTENSION_NAME,
+    };
+
+    createVulkanInstance(instanceLayers);
+    createAImageReader(640, 480, AIMAGE_FORMAT_PRIVATE, 4);
+    getANativeWindowFromReader();
+
+    int result = mWindow->perform(
+        mWindow, NATIVE_WINDOW_SET_PERFORM_INTERCEPTOR,
+        Hook_ANativeWindow_Perform_FakeTimestamps, nullptr /* data */);
+    ASSERT_EQ(result, 0);
+
+    createVulkanSurface();
+    pickPhysicalDeviceAndQueueFamily();
+
+    uint32_t extensionCount = 0;
+    vkEnumerateDeviceExtensionProperties(mPhysicalDev, nullptr, &extensionCount,
+                                         nullptr);
+    std::vector<VkExtensionProperties> availableExtensions(extensionCount);
+    vkEnumerateDeviceExtensionProperties(mPhysicalDev, nullptr, &extensionCount,
+                                         availableExtensions.data());
+
+    VkPhysicalDevicePresentId2FeaturesKHR presentId2Features = {};
+    presentId2Features.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PRESENT_ID_2_FEATURES_KHR;
+    presentId2Features.presentId2 = VK_TRUE;
+    presentId2Features.pNext = nullptr;
+
+    VkPhysicalDevicePresentTimingFeaturesEXT presentTimingFeatures = {};
+    presentTimingFeatures.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PRESENT_TIMING_FEATURES_EXT;
+    presentTimingFeatures.presentTiming = VK_TRUE;
+    presentTimingFeatures.presentAtAbsoluteTime = VK_TRUE;
+    presentTimingFeatures.pNext = &presentId2Features;
+
+    createDeviceAndGetQueue(deviceLayers, deviceExtensions,
+                            &presentTimingFeatures);
+
+    VkSurfaceCapabilitiesKHR surfaceCaps{};
+    VK_CHECK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(mPhysicalDev, mSurface,
+                                                       &surfaceCaps));
+
+    uint32_t imageCount = surfaceCaps.minImageCount + 1;
+    if (surfaceCaps.maxImageCount > 0 &&
+        imageCount > surfaceCaps.maxImageCount) {
+        imageCount = surfaceCaps.maxImageCount;
+    }
+
+    VkSwapchainCreateInfoKHR swapchainInfo{};
+    swapchainInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+    swapchainInfo.surface = mSurface;
+    swapchainInfo.minImageCount = imageCount;
+    swapchainInfo.imageFormat = VK_FORMAT_R8G8B8A8_UNORM;
+    swapchainInfo.imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+    swapchainInfo.imageExtent = surfaceCaps.currentExtent;
+    swapchainInfo.imageArrayLayers = 1;
+    swapchainInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    swapchainInfo.preTransform = surfaceCaps.currentTransform;
+    swapchainInfo.compositeAlpha = VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR;
+    swapchainInfo.presentMode = VK_PRESENT_MODE_FIFO_KHR;
+    swapchainInfo.clipped = VK_TRUE;
+
+    VkResult res =
+        vkCreateSwapchainKHR(mDevice, &swapchainInfo, nullptr, &mSwapchain);
+    VK_CHECK(res);
+    ASSERT_NE(mSwapchain, (VkSwapchainKHR)VK_NULL_HANDLE);
+
+    typedef VkResult(VKAPI_PTR * PFN_vkGetPastPresentationTimingEXT_Local)(
+        VkDevice, const VkPastPresentationTimingInfoEXT*,
+        VkPastPresentationTimingPropertiesEXT*);
+    auto pfnGetPastPresentationTimingEXT =
+        reinterpret_cast<PFN_vkGetPastPresentationTimingEXT_Local>(
+            vkGetDeviceProcAddr(mDevice, "vkGetPastPresentationTimingEXT"));
+    ASSERT_NE(pfnGetPastPresentationTimingEXT, nullptr);
+
+    // Queue 2 presents
+    for (uint64_t i = 1; i <= 2; ++i) {
+        uint32_t imageIndex;
+        res =
+            vkAcquireNextImageKHR(mDevice, mSwapchain, UINT64_MAX,
+                                  VK_NULL_HANDLE, VK_NULL_HANDLE, &imageIndex);
+        VK_CHECK(res);
+
+        VkPresentTimingInfoEXT presentTimingInfo = {};
+        presentTimingInfo.presentStageQueries =
+            VK_PRESENT_STAGE_QUEUE_OPERATIONS_END_BIT_EXT |
+            VK_PRESENT_STAGE_REQUEST_DEQUEUED_BIT_EXT;
+        presentTimingInfo.targetTime = 1000 * i;
+
+        VkPresentTimingsInfoEXT presentTimingsInfo = {};
+        presentTimingsInfo.sType = VK_STRUCTURE_TYPE_PRESENT_TIMINGS_INFO_EXT;
+        presentTimingsInfo.swapchainCount = 1;
+        presentTimingsInfo.pTimingInfos = &presentTimingInfo;
+
+        VkPresentId2KHR presentIdInfo = {};
+        presentIdInfo.sType = VK_STRUCTURE_TYPE_PRESENT_ID_2_KHR;
+        presentIdInfo.swapchainCount = 1;
+        presentIdInfo.pPresentIds = &i;
+        presentIdInfo.pNext = &presentTimingsInfo;
+
+        VkPresentInfoKHR presentInfo = {};
+        presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+        presentInfo.pNext = &presentIdInfo;
+        presentInfo.swapchainCount = 1;
+        presentInfo.pSwapchains = &mSwapchain;
+        presentInfo.pImageIndices = &imageIndex;
+
+        res = vkQueuePresentKHR(mPresentQueue, &presentInfo);
+        VK_CHECK(res);
+    }
+
+    // Now query with count = 1
+    VkPastPresentationTimingInfoEXT pastInfo = {};
+    pastInfo.sType = VK_STRUCTURE_TYPE_PAST_PRESENTATION_TIMING_INFO_EXT;
+    pastInfo.swapchain = mSwapchain;
+
+    VkPastPresentationTimingPropertiesEXT pastProps = {};
+    pastProps.sType = VK_STRUCTURE_TYPE_PAST_PRESENTATION_TIMING_PROPERTIES_EXT;
+
+    // First query just the count
+    res = pfnGetPastPresentationTimingEXT(mDevice, &pastInfo, &pastProps);
+    VK_CHECK(res);
+    ASSERT_EQ(pastProps.presentationTimingCount, 2);
+
+    // Now query with 1 element array
+    VkPastPresentationTimingEXT timing1[1] = {};
+    timing1[0].sType = VK_STRUCTURE_TYPE_PAST_PRESENTATION_TIMING_EXT;
+
+    VkPresentStageTimeEXT stages1[2] = {};
+    timing1[0].pPresentStages = stages1;
+
+    pastProps.presentationTimingCount = 1;
+    pastProps.pPresentationTimings = timing1;
+
+    res = pfnGetPastPresentationTimingEXT(mDevice, &pastInfo, &pastProps);
+    ASSERT_EQ(res, VK_INCOMPLETE);
+    ASSERT_EQ(pastProps.presentationTimingCount, 1);
+    EXPECT_EQ(timing1[0].presentId, 1);
+
+    // Query remaining elements
+    pastProps.pPresentationTimings = nullptr;
+    res = pfnGetPastPresentationTimingEXT(mDevice, &pastInfo, &pastProps);
+    VK_CHECK(res);
+    ASSERT_EQ(pastProps.presentationTimingCount, 1);
+
+    VkPastPresentationTimingEXT timing2[1] = {};
+    timing2[0].sType = VK_STRUCTURE_TYPE_PAST_PRESENTATION_TIMING_EXT;
+
+    VkPresentStageTimeEXT stages2[2] = {};
+    timing2[0].pPresentStages = stages2;
+
+    pastProps.presentationTimingCount = 1;
+    pastProps.pPresentationTimings = timing2;
+
+    res = pfnGetPastPresentationTimingEXT(mDevice, &pastInfo, &pastProps);
+    VK_CHECK(res);
+    ASSERT_EQ(pastProps.presentationTimingCount, 1);
+    EXPECT_EQ(timing2[0].presentId, 2);
+
+    cleanUpSwapchainForTest();
+}
+
 }  // namespace libvulkantest
 
 }  // namespace android
