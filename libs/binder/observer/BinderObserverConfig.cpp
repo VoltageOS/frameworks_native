@@ -70,11 +70,11 @@ BinderObserverConfig::ShardingConfig BinderObserverConfig::Environment::getSyste
 
     return kUseDroidfoodConfig
             ? ShardingConfig{.processMod = 1,
-                             .spamMod = 5,
+                             .spamMod = 10,
                              .callMod = 10,
                              .cpuSamplingMod = kBinderObserverV2Enabled ? 10 : 0}
             : ShardingConfig{.processMod = 10,
-                             .spamMod = 50,
+                             .spamMod = 100,
                              .callMod = 100,
                              .cpuSamplingMod = kBinderObserverV2Enabled ? 100 : 0};
 }
@@ -83,11 +83,11 @@ BinderObserverConfig::ShardingConfig
 BinderObserverConfig::Environment::getOtherProcessesSharding() {
     return kUseDroidfoodConfig
             ? ShardingConfig{.processMod = 5,
-                             .spamMod = 1,
+                             .spamMod = 2,
                              .callMod = 2,
                              .cpuSamplingMod = kBinderObserverV2Enabled ? 10 : 0}
             : ShardingConfig{.processMod = 50,
-                             .spamMod = 10,
+                             .spamMod = 20,
                              .callMod = 20,
                              .cpuSamplingMod = kBinderObserverV2Enabled ? 100 : 0};
 }
