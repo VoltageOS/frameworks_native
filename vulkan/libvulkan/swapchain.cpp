@@ -3299,9 +3299,8 @@ VkResult GetPastPresentationTimingEXT(
     }
 
     if (timings_copied > 0) {
-        swapchain.timing.erase(
-            swapchain.timing.begin(),
-            swapchain.timing.begin() + timings_to_report_count);
+        swapchain.timing.erase(swapchain.timing.begin(),
+                               swapchain.timing.begin() + timings_copied);
     }
 
     pPastPresentationTimingProperties->presentationTimingCount = timings_copied;
