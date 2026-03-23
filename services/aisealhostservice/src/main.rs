@@ -142,7 +142,7 @@ fn try_main() -> Result<()> {
         debugLevel: if aiseal_config.debuggable { DebugLevel::FULL } else { DebugLevel::NONE },
         protectedVm: aiseal_config.protected_vm,
         memoryMib: aiseal_config.memory_mib,
-        cpuOptions: CpuOptions { cpuTopology: CpuTopology::MatchHost(true) },
+        cpuOptions: CpuOptions { cpuTopology: CpuTopology::CpuCount(1) },
         customConfig: custom_config,
         ..Default::default()
     });
