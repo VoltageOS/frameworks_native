@@ -62,7 +62,7 @@ use std::time::Duration;
 use vmclient::{DeathReason, ErrorCode, VmInstance, VmWaitError};
 
 const LOG_TAG: &str = "AiSealHostService";
-const AISEAL_VM_START_TIMEOUT: Duration = Duration::from_secs(61);
+const AISEAL_VM_START_TIMEOUT: Duration = Duration::from_secs(244);
 
 fn handle_vm_death(
     reason: DeathReason,
