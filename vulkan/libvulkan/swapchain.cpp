@@ -566,8 +566,9 @@ uint32_t get_num_ready_timings(Swapchain& swapchain,
             &actual_present_time,
             nullptr,  //&dequeue_ready_time,
             nullptr /*&reads_done_time*/);
-
-        if (err != android::OK) {
+        bool is_swapchain_out_of_date = swapchain.surface.swapchain_handle !=
+                                        HandleFromSwapchain(&swapchain);
+        if (err != android::OK || is_swapchain_out_of_date) {
             // For VK_EXT_present_timing Returning all 0's signals that no data
             // will be given for this frame
             if (!isGoogleDisplayTimings) {
@@ -3298,9 +3299,8 @@ VkResult GetPastPresentationTimingEXT(
     }
 
     if (timings_copied > 0) {
-        swapchain.timing.erase(
-            swapchain.timing.begin(),
-            swapchain.timing.begin() + timings_to_report_count);
+        swapchain.timing.erase(swapchain.timing.begin(),
+                               swapchain.timing.begin() + timings_copied);
     }
 
     pPastPresentationTimingProperties->presentationTimingCount = timings_copied;

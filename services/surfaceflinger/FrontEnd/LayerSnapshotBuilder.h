@@ -178,6 +178,7 @@ private:
                                           const RequestedLayerState& requestedCHildState,
                                           const Args& args, bool* outChildHasValidFrameRate);
     void updateTouchableRegionCrop(const Args& args);
+    bool updateMirrorLayerCrops(const Args& args);
 
     void applyStopLayers(const LayerHierarchy&, const LayerHierarchy::TraversalPath&);
     void applyStopLayersInternal(const LayerHierarchy&, const LayerHierarchy::TraversalPath&,
@@ -196,6 +197,8 @@ private:
     std::vector<std::unique_ptr<LayerSnapshot>> mMergedSnapshots;
     bool mResortSnapshots = false;
     int mNumInterestingSnapshots = 0;
+    bool mHasMirrorRequests = false;
+    bool mSnapshotsHaveMirrorCrop = false;
 };
 
 } // namespace android::surfaceflinger::frontend
