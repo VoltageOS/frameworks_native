@@ -145,7 +145,6 @@ private:
     static constexpr size_t kMaxInternedStrings = 1024;
     static constexpr size_t kMaxInternedMessages = 512;
 
-    uint64_t next_message_id = 1;
     uint64_t next_string_id = 1;
 
     LruCache<std::string, uint64_t, StringHash, std::equal_to<>> string_intern_table{
