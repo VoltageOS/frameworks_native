@@ -159,6 +159,12 @@ void InitDataSource(uint32_t backends) {
     });
 }
 
+InternResult IncrementalState::internGroup(std::string_view group) {
+    uint64_t hash = fnv1a_64(group); // Use the same FNV-1a helper
+    auto [id, is_new] = group_intern_table.getOrEmplace(group, hash);
+    return {id, is_new};
+}
+
 InternResult IncrementalState::internMessage(ProtoLogLevel level, std::string_view group,
                                              std::string_view format) {
     uint64_t hash = fnv1a_64(group);
