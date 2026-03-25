@@ -359,7 +359,6 @@ impl IAiSealHostService for AiSealHostService {
 }
 
 /// Implementation of the `IAiSealInternalService` AIDL interface.
-#[allow(dead_code)]
 struct AiSealInternalService {
     instance: Arc<VmInstance>,
 }
