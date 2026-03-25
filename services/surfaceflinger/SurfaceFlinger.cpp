@@ -2900,16 +2900,18 @@ bool SurfaceFlinger::commit(PhysicalDisplayId pacesetterId,
 
     // SF::processHotplugDisconnect() does not immediately propagate the display removal to the
     // Scheduler and CompositionEngine, but instead requires a call to processDisplayChangesLocked()
-    // to process the rest in the next commit. We should retry the commit with the new pacesetter
-    // after display transactions have been propagated.
+    // to process the rest in the next commit. We should retry the commit with the new set of
+    // displays after display transactions have been propagated.
     {
-        const bool hasPacesetterDisplay =
-                FTL_FAKE_GUARD(mStateLock, mPhysicalDisplays.contains(pacesetterId));
-        if (!hasPacesetterDisplay) {
-            MODE_TRANSITION_LOCK();
-            processDisplayChangesLocked();
-            mScheduler->scheduleFrame();
-            return false;
+        for (const auto [displayId, _] : frameTargets) {
+            const bool hasDisplay =
+                    FTL_FAKE_GUARD(mStateLock, mPhysicalDisplays.contains(displayId));
+            if (!hasDisplay) {
+                MODE_TRANSITION_LOCK();
+                processDisplayChangesLocked();
+                mScheduler->scheduleFrame();
+                return false;
+            }
         }
     }
 
