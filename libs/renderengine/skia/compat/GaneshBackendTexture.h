@@ -35,12 +35,15 @@ public:
 
     ~GaneshBackendTexture() override;
 
-    sk_sp<SkImage> makeImage(SkAlphaType alphaType, ui::Dataspace dataspace,
-                             TextureReleaseProc releaseImageProc,
-                             ReleaseContext releaseContext) override;
+    sk_sp<SkImage> makeImage(
+            SkAlphaType alphaType, ui::Dataspace dataspace, TextureReleaseProc releaseImageProc,
+            ReleaseContext releaseContext,
+            ftl::Flags<ColorSpaceOptions> options = ColorSpaceOptions::None) override;
 
-    sk_sp<SkSurface> makeSurface(ui::Dataspace dataspace, TextureReleaseProc releaseSurfaceProc,
-                                 ReleaseContext releaseContext) override;
+    sk_sp<SkSurface> makeSurface(
+            ui::Dataspace dataspace, TextureReleaseProc releaseSurfaceProc,
+            ReleaseContext releaseContext,
+            ftl::Flags<ColorSpaceOptions> options = ColorSpaceOptions::None) override;
 
 private:
     DISALLOW_COPY_AND_ASSIGN(GaneshBackendTexture);

@@ -84,7 +84,8 @@ GaneshBackendTexture::~GaneshBackendTexture() {
 
 sk_sp<SkImage> GaneshBackendTexture::makeImage(SkAlphaType alphaType, ui::Dataspace dataspace,
                                                TextureReleaseProc releaseImageProc,
-                                               ReleaseContext releaseContext) {
+                                               ReleaseContext releaseContext,
+                                               ftl::Flags<ColorSpaceOptions> options) {
     if (mBackendTexture.isValid()) {
         mUpdateProc(mImageCtx, mGrContext.get());
     }
@@ -92,7 +93,7 @@ sk_sp<SkImage> GaneshBackendTexture::makeImage(SkAlphaType alphaType, ui::Datasp
     const SkColorType colorType = colorTypeForImage(alphaType);
     sk_sp<SkImage> image =
             SkImages::BorrowTextureFrom(mGrContext.get(), mBackendTexture, kTopLeft_GrSurfaceOrigin,
-                                        colorType, alphaType, toSkColorSpace(dataspace),
+                                        colorType, alphaType, toSkColorSpace(dataspace, options),
                                         releaseImageProc, releaseContext);
     if (!image) {
         logFatalTexture("Unable to generate SkImage.", dataspace, colorType);
@@ -102,13 +103,14 @@ sk_sp<SkImage> GaneshBackendTexture::makeImage(SkAlphaType alphaType, ui::Datasp
 
 sk_sp<SkSurface> GaneshBackendTexture::makeSurface(ui::Dataspace dataspace,
                                                    TextureReleaseProc releaseSurfaceProc,
-                                                   ReleaseContext releaseContext) {
+                                                   ReleaseContext releaseContext,
+                                                   ftl::Flags<ColorSpaceOptions> options) {
     const SkColorType colorType = internalColorType();
     sk_sp<SkSurface> surface =
             SkSurfaces::WrapBackendTexture(mGrContext.get(), mBackendTexture,
                                            kTopLeft_GrSurfaceOrigin, 0, colorType,
-                                           toSkColorSpace(dataspace), nullptr, releaseSurfaceProc,
-                                           releaseContext);
+                                           toSkColorSpace(dataspace, options), nullptr,
+                                           releaseSurfaceProc, releaseContext);
     if (!surface) {
         logFatalTexture("Unable to generate SkSurface.", dataspace, colorType);
     }

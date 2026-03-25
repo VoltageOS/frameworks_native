@@ -647,23 +647,16 @@ sk_sp<SkShader> SkiaRenderEngine::createRuntimeEffectShader(
         if (parameters.layer.luts) {
             shader = mLutShader.lutShader(shader, parameters.layer.luts,
                                           parameters.layer.sourceDataspace);
-        } else {
-            std::optional<std::vector<uint8_t>> smpte2094_50;
-            status_t err = graphicBuffer->getSmpte2094_50(&smpte2094_50);
-
-            if (err == OK && smpte2094_50) {
-                auto smpte2094_50Data =
-                        SkData::MakeWithoutCopy(smpte2094_50->data(), smpte2094_50->size());
-                skhdr::AdaptiveGlobalToneMap agtm;
-                if (agtm.parse(smpte2094_50Data.get())) {
-                    SFTRACE_NAME("AGTM");
-                    skhdr::Metadata metadata = skhdr::Metadata::MakeEmpty();
-                    metadata.setAdaptiveGlobalToneMap(agtm);
-                    shader = shader->makeWithColorFilter(metadata.makeToneMapColorFilter(
-                            std::log2(parameters.display.targetHdrSdrRatio)));
-                    usedAgtm = true;
-                }
-            }
+        } else if (parameters.agtm) {
+            SFTRACE_NAME("AGTM");
+            skhdr::Metadata metadata = skhdr::Metadata::MakeEmpty();
+            metadata.setAdaptiveGlobalToneMap(*parameters.agtm);
+            auto inputCS =
+                    toSkColorSpace(parameters.layer.sourceDataspace, parameters.colorSpaceOptions);
+            shader = shader->makeWithColorFilter(
+                    metadata.makeToneMapColorFilter(std::log2(parameters.display.targetHdrSdrRatio),
+                                                    inputCS.get()));
+            usedAgtm = true;
         }
     }
 
@@ -728,7 +721,8 @@ sk_sp<SkShader> SkiaRenderEngine::createRuntimeEffectShader(
                                                                 parameters.layer.source.buffer
                                                                         .maxLuminanceNits,
                                                                 hardwareBuffer,
-                                                                parameters.display.renderIntent);
+                                                                parameters.display.renderIntent,
+                                                                parameters.colorSpaceOptions);
     }
     if (parameters.layer.postProcessEffect &&
         parameters.layer.postProcessTarget == LayerSettings::SampleTarget::Self) {
@@ -1329,6 +1323,24 @@ void SkiaRenderEngine::drawLayersInternal(
 
         const ui::Dataspace layerDataspace = layer.sourceDataspace;
 
+        std::optional<skhdr::AdaptiveGlobalToneMap> agtm;
+        if (layer.source.buffer.buffer) {
+            std::optional<std::vector<uint8_t>> smpte2094_50;
+            if (layer.source.buffer.buffer->getBuffer()->getSmpte2094_50(&smpte2094_50) == OK &&
+                smpte2094_50) {
+                auto smpte2094_50Data =
+                        SkData::MakeWithoutCopy(smpte2094_50->data(), smpte2094_50->size());
+                skhdr::AdaptiveGlobalToneMap parsedAgtm;
+                if (parsedAgtm.parse(smpte2094_50Data.get())) {
+                    agtm = parsedAgtm;
+                }
+            }
+        }
+
+        const ftl::Flags<ColorSpaceOptions> colorSpaceOptions = (agtm.has_value() && !layer.luts)
+                ? ColorSpaceOptions::USE_HLG_OOTF
+                : ColorSpaceOptions::None;
+
         SkPaint paint;
         if (layer.source.buffer.buffer) {
             SFTRACE_NAME("DrawImage");
@@ -1363,7 +1375,8 @@ void SkiaRenderEngine::drawLayersInternal(
                     : item.isOpaque                      ? kOpaque_SkAlphaType
                     : item.usePremultipliedAlpha         ? kPremul_SkAlphaType
                                                          : kUnpremul_SkAlphaType;
-            sk_sp<SkImage> image = imageTextureRef->makeImage(layerDataspace, alphaType);
+            sk_sp<SkImage> image =
+                    imageTextureRef->makeImage(layerDataspace, alphaType, colorSpaceOptions);
 
             auto texMatrix = getSkM44(item.textureTransform).asM33();
             // textureTansform was intended to be passed directly into a shader, so when
@@ -1395,7 +1408,8 @@ void SkiaRenderEngine::drawLayersInternal(
             if (useIsOpaqueWorkaround) {
                 shader = SkShaders::Blend(SkBlendMode::kPlus, shader,
                                           SkShaders::Color(SkColors::kBlack,
-                                                           toSkColorSpace(layerDataspace)));
+                                                           toSkColorSpace(layerDataspace,
+                                                                          colorSpaceOptions)));
             }
 
             SkRect imageBounds;
@@ -1411,6 +1425,8 @@ void SkiaRenderEngine::drawLayersInternal(
                     .outputDataSpace = display.outputDataspace,
                     .fakeOutputDataspace = fakeDataspace,
                     .imageBounds = imageBounds,
+                    .agtm = agtm,
+                    .colorSpaceOptions = colorSpaceOptions,
             }));
 
             // Turn on dithering when dimming beyond this (arbitrary) threshold...
@@ -1468,11 +1484,12 @@ void SkiaRenderEngine::drawLayersInternal(
         } else {
             SFTRACE_NAME("DrawColor");
             const auto color = layer.source.solidColor;
-            sk_sp<SkShader> shader = SkShaders::Color(SkColor4f{.fR = color.r,
-                                                                .fG = color.g,
-                                                                .fB = color.b,
-                                                                .fA = layer.alpha},
-                                                      toSkColorSpace(layerDataspace));
+            sk_sp<SkShader> shader =
+                    SkShaders::Color(SkColor4f{.fR = color.r,
+                                               .fG = color.g,
+                                               .fB = color.b,
+                                               .fA = layer.alpha},
+                                     toSkColorSpace(layerDataspace, colorSpaceOptions));
             paint.setShader(createRuntimeEffectShader(
                     RuntimeEffectShaderParameters{.shader = shader,
                                                   .layer = layer,
@@ -1482,7 +1499,9 @@ void SkiaRenderEngine::drawLayersInternal(
                                                   .layerDimmingRatio = layerDimmingRatio,
                                                   .outputDataSpace = display.outputDataspace,
                                                   .fakeOutputDataspace = fakeDataspace,
-                                                  .imageBounds = SkRect::MakeEmpty()}));
+                                                  .imageBounds = SkRect::MakeEmpty(),
+                                                  .agtm = agtm,
+                                                  .colorSpaceOptions = colorSpaceOptions}));
         }
 
         if (layer.disableBlending) {
