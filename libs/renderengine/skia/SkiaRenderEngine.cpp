@@ -57,6 +57,8 @@
 #include <common/Panopticon.h>
 #include <common/ThreadStateCrashLogger.h>
 #include <common/trace.h>
+#include <ftl/small_map.h>
+#include <ftl/small_vector.h>
 #include <gui/FenceMonitor.h>
 #include <include/gpu/ganesh/GrBackendSemaphore.h>
 #include <include/gpu/ganesh/GrContextOptions.h>
@@ -1084,8 +1086,6 @@ void SkiaRenderEngine::drawLayersInternal(
                 getBoundsAndClip(layer.geometry.boundaries, layer.geometry.roundedCornersCrop,
                                  layer.geometry.roundedCornersRadii);
         if (mBlurFilter && layerSamplesBehind(layer, ctModifiesAlpha)) {
-            std::unordered_map<uint32_t, sk_sp<SkImage>> cachedBlurs;
-
             // rect to be blurred in the coordinate space of blurInput
             SkRect blurRect = canvas->getTotalMatrix().mapRect(bounds.rect());
 
@@ -1136,33 +1136,72 @@ void SkiaRenderEngine::drawLayersInternal(
                     }
                 }
 
+                sk_sp<SkImage> temporaryBlurredImage = nullptr; // Might be reused by blur regions.
                 if (layer.backgroundBlurRadius > 0) {
                     SFTRACE_NAME("BackgroundBlur");
-                    auto blurredImage = mBlurFilter->generate(context, display,
-                                                              layer.backgroundBlurRadius,
-                                                              blurInput, blurRect);
-
-                    cachedBlurs[layer.backgroundBlurRadius] = blurredImage;
+                    // Result is only valid until the next call to generateTemporaryImage (for a
+                    // given BlurFilter). Safe to invalidate after all desired drawBlurRegion
+                    // invocations have been made for a particular blurred SkImage.
+                    temporaryBlurredImage =
+                            mBlurFilter->generateTemporaryImage(context, display,
+                                                                layer.backgroundBlurRadius,
+                                                                blurInput, blurRect);
 
                     mBlurFilter->drawBlurRegion(canvas, bounds, layer.backgroundBlurRadius,
-                                                layer.backgroundBlurScale, 1.0f,
-                                                blurRect, blurredImage, blurInput);
+                                                layer.backgroundBlurScale, 1.0f, blurRect,
+                                                temporaryBlurredImage, blurInput);
                 }
 
                 if (layer.blurRegions.size()) {
                     SkAutoCanvasRestore acr(canvas, true);
                     canvas->concat(getSkM44(layer.blurRegionTransform).asM33());
-                    for (auto region : layer.blurRegions) {
-                        if (cachedBlurs[region.blurRadius] == nullptr) {
-                            SFTRACE_NAME("BlurRegion");
-                            cachedBlurs[region.blurRadius] =
-                                    mBlurFilter->generate(context, display, region.blurRadius,
-                                                          blurInput, blurRect);
-                        }
 
-                        mBlurFilter->drawBlurRegion(canvas, getBlurRRect(region), region.blurRadius,
-                                                    1.0f, region.alpha, blurRect,
-                                                    cachedBlurs[region.blurRadius], blurInput);
+                    // Clustering regions by blur radius allows regions with a shared blur radius to
+                    // reuse the same result from generateTemporaryImage(...). The exact order does
+                    // not matter. Initial sizes for ftl stack-first collections were chosen
+                    // semi-arbitrarily.
+                    using BlurRegionList = ftl::SmallVector<BlurRegion, 4>;
+                    ftl::SmallMap<uint32_t, BlurRegionList, 2> regionsPerRadius;
+                    for (const BlurRegion& region : layer.blurRegions) {
+                        if (region.blurRadius > 0) {
+                            const auto& [entry, _] = regionsPerRadius.try_emplace(region.blurRadius,
+                                                                                  BlurRegionList());
+                            entry->second.push_back(region);
+                        }
+                    }
+
+                    const auto drawRegion =
+                            [this, canvas, &blurRect,
+                             &blurInput](const sk_sp<SkImage>& temporaryBlurredImage,
+                                         const BlurRegion& region) {
+                                mBlurFilter->drawBlurRegion(canvas, getBlurRRect(region),
+                                                            region.blurRadius, 1.0f, region.alpha,
+                                                            blurRect, temporaryBlurredImage,
+                                                            blurInput);
+                            };
+
+                    // Reuse existing temporaryBlurredImage from background blur for any regions
+                    // with the same blur radius.
+                    if (temporaryBlurredImage != nullptr &&
+                        regionsPerRadius.contains(layer.backgroundBlurRadius)) {
+                        for (const BlurRegion& region :
+                             regionsPerRadius.get(layer.backgroundBlurRadius)->get()) {
+                            drawRegion(temporaryBlurredImage, region);
+                        }
+                        regionsPerRadius.erase(layer.backgroundBlurRadius);
+                    }
+
+                    // Draw remaining regions for each blur radius.
+                    for (const auto& [radius, regions] : regionsPerRadius) {
+                        {
+                            SFTRACE_NAME("BlurRegion");
+                            temporaryBlurredImage =
+                                    mBlurFilter->generateTemporaryImage(context, display, radius,
+                                                                        blurInput, blurRect);
+                        }
+                        for (const BlurRegion& region : regions) {
+                            drawRegion(temporaryBlurredImage, region);
+                        }
                     }
                 }
 

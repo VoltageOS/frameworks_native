@@ -50,9 +50,9 @@ public:
     virtual ~KawaseBlurDualFilterV2() {}
 
     // Execute blur, saving it to a texture
-    sk_sp<SkImage> generate(SkiaGpuContext* context, const DisplaySettings& display,
-                            const uint32_t radius, const sk_sp<SkImage> blurInput,
-                            const SkRect& blurRect) const override;
+    sk_sp<SkImage> generateTemporaryImage(SkiaGpuContext* context, const DisplaySettings& display,
+                                          const uint32_t radius, const sk_sp<SkImage> blurInput,
+                                          const SkRect& blurRect) const override;
 
     void preallocateBuffer(SkiaGpuContext* protectedContext, ui::Size size) override;
     bool isBufferPreallocated(ui::Size displaySize) const override {
@@ -80,11 +80,14 @@ private:
     ui::Size mPreallocatedDisplaySize;
 
     void blurInto(const sk_sp<SkSurface>& drawSurface, const int destWidth,
-                  const sk_sp<SkImage>& readImage, const float radius, const float alpha,
+                  const sk_sp<SkImage>& readImage, const SkIRect& srcRect,
+                  const bool inputEdgesNeedClamp, const float radius, const float alpha,
                   const sk_sp<SkRuntimeEffect>&) const;
 
     void blurInto(const sk_sp<SkSurface>& drawSurface, const sk_sp<SkShader> input,
-                  const float radius, const float alpha, const sk_sp<SkRuntimeEffect>&) const;
+                  const SkIRect& srcRect, const SkMatrix& srcRectToInputMatrix,
+                  const bool inputEdgesNeedClamp, const float radius, const float alpha,
+                  const sk_sp<SkRuntimeEffect>&) const;
 };
 
 } // namespace skia
