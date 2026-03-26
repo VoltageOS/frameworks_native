@@ -1001,15 +1001,17 @@ void SkiaRenderEngine::drawLayersInternal(
                 break;
             }
         }
-        if (FlagManager::getInstance().window_blur_kawase2_preallocate_buffers() &&
-            hasBlur && mInProtectedContext && !display.physicalDisplay.isEmpty() &&
-            !mBlurFilter->isBufferPreallocated(display.physicalDisplay.getSize())) {
-            ALOGE("Allocating protected blur surfaces during draw! Preallocation failed, or "
-                  "destination size (%dx%d) is bigger than the preallocated size from the last"
-                  "active display size change",
+        if (FlagManager::getInstance().window_blur_kawase2_preallocate_buffers() && hasBlur &&
+            !display.physicalDisplay.isEmpty() &&
+            !mBlurFilter->areBuffersPreallocated(getActiveContext(),
+                                                 display.physicalDisplay.getSize())) {
+            ALOGE("Allocating %s blur surfaces during draw! Preallocation failed, or destination "
+                  "size (%dx%d) is bigger than the preallocated size from the last active display "
+                  "size change",
+                  isProtected() ? "protected" : "unprotected",
                   display.physicalDisplay.getSize().width,
                   display.physicalDisplay.getSize().height);
-            mBlurFilter->preallocateBuffer(getActiveContext(), display.physicalDisplay.getSize());
+            mBlurFilter->preallocateBuffers(getActiveContext(), display.physicalDisplay.getSize());
         }
     }
 
@@ -1744,22 +1746,25 @@ void SkiaRenderEngine::onActiveDisplaySizeChanged(ui::Size size) {
     const int skiaCacheLimit = size.width * size.height * surfaceSizeCacheMultiplier;
     if (FlagManager::getInstance().re_powered_off_displays_inform_cache_budgets()) {
         LOG_ALWAYS_FATAL_IF(skiaCacheLimit <= 0,
-                            "Invalid skiaCacheLimit (size: %dx%d, bytesPerPixel(%d): %" PRIu32 ")",
+                            "Invalid skiaCacheLimit (size: %dx%d, bytesPerPixel(%d): %" PRIu32
+                            ")%s",
                             size.getWidth(), size.getHeight(),
                             static_cast<int>(mDefaultPixelFormat),
-                            bytesPerPixel(mDefaultPixelFormat));
+                            bytesPerPixel(mDefaultPixelFormat),
+                            size.isEmpty()
+                                    ? ". Did SurfaceFlinger fail to find the largest display?"
+                                    : "");
     }
 
     // Start by resizing the current context's cache
     getActiveContext()->setResourceCacheLimit(skiaCacheLimit);
 
-    const bool shouldPreallocateProtectedBlurBuffers =
+    const bool shouldPreallocateBlurBuffers =
             FlagManager::getInstance().window_blur_kawase2_preallocate_buffers() &&
-            supportsProtectedContent() && mBlurFilter != nullptr &&
-            !mBlurFilter->isBufferPreallocated(size);
-    // Maybe preallocate blur buffers for the protected context
-    if (mInProtectedContext && shouldPreallocateProtectedBlurBuffers) {
-        mBlurFilter->preallocateBuffer(getActiveContext(), size);
+            mBlurFilter != nullptr &&
+            !mBlurFilter->areBuffersPreallocated(getActiveContext(), size);
+    if (shouldPreallocateBlurBuffers) {
+        mBlurFilter->preallocateBuffers(getActiveContext(), size);
     }
 
     // If it is possible to switch contexts then we will repeat the same operations there
@@ -1768,9 +1773,8 @@ void SkiaRenderEngine::onActiveDisplaySizeChanged(ui::Size size) {
     if (mInProtectedContext != originalProtectedState) {
         getActiveContext()->setResourceCacheLimit(skiaCacheLimit);
 
-        // Second opportunity to preallocate blur buffers for the protected context
-        if (mInProtectedContext && shouldPreallocateProtectedBlurBuffers) {
-            mBlurFilter->preallocateBuffer(getActiveContext(), size);
+        if (shouldPreallocateBlurBuffers) {
+            mBlurFilter->preallocateBuffers(getActiveContext(), size);
         }
 
         // Reset back to the initial context that was active when this method was called

@@ -102,6 +102,10 @@ bool GaneshGpuContext::isAbandonedOrDeviceLost() {
     return mGrContext->abandoned();
 }
 
+bool GaneshGpuContext::supportsProtectedContent() const {
+    return mGrContext->supportsProtectedContent();
+}
+
 void GaneshGpuContext::setResourceCacheLimit(size_t maxResourceBytes) {
     mGrContext->setResourceCacheLimit(maxResourceBytes);
 }
