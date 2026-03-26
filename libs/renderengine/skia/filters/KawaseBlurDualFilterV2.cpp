@@ -231,21 +231,22 @@ sk_sp<SkImage> KawaseBlurDualFilterV2::generateTemporaryImage(SkiaGpuContext* co
         return input->imageInfo().makeWH(newW, newH);
     };
 
-    bool usesPreallocatedBuffer =
-            FlagManager::getInstance().window_blur_kawase2_preallocate_buffers() &&
-            input->isProtected();
+    bool usesPreallocatedTextures =
+            FlagManager::getInstance().window_blur_kawase2_preallocate_buffers();
+    auto& preallocatedTexturesRef =
+            context->supportsProtectedContent() ? mProtectedTextures : mUnprotectedTextures;
 
     // Render into surfaces downscaled by 1x, 2x, 4x and 8x from the initial downscale.
     sk_sp<SkSurface> surfaces[kMaxSurfaces];
     SkImageInfo imageInfos[kMaxSurfaces];
-    if (!usesPreallocatedBuffer) {
+    if (!usesPreallocatedTextures) {
         for (int i = 0; i < kMaxSurfaces; i++) {
             surfaces[i] = filterPasses >= i ? makeSurface(kScales[i]) : nullptr;
             imageInfos[i] = surfaces[i] != nullptr ? surfaces[i]->imageInfo() : SkImageInfo();
         }
     } else {
         for (int i = 0; i < kMaxSurfaces; i++) {
-            surfaces[i] = mProtectedTextures[i]->getOrCreateSurface(display.outputDataspace);
+            surfaces[i] = preallocatedTexturesRef[i]->getOrCreateSurface(display.outputDataspace);
             imageInfos[i] = makeImageInfo(kScales[i]);
         }
     }
@@ -274,7 +275,7 @@ sk_sp<SkImage> KawaseBlurDualFilterV2::generateTemporaryImage(SkiaGpuContext* co
                 input->makeShader(SkTileMode::kClamp, SkTileMode::kClamp,
                                   SkSamplingOptions(SkFilterMode::kLinear, SkMipmapMode::kNone));
         blurInto(surfaces[0], std::move(sourceShader), targetBlurRect, blurMatrix,
-                 usesPreallocatedBuffer,
+                 usesPreallocatedTextures,
                  0, // unused blur radius. The blur effect hardcodes the radius.
                  1.0f, mQuarterResDownSampleBlurEffect);
     }
@@ -282,54 +283,56 @@ sk_sp<SkImage> KawaseBlurDualFilterV2::generateTemporaryImage(SkiaGpuContext* co
     // Next the remaining downscale blur passes.
     for (int i = 0; i < filterPasses; i++) {
         blurInto(surfaces[i + 1], imageInfos[i + 1].width(), surfaces[i]->makeTemporaryImage(),
-                 imageInfos[i].bounds(), usesPreallocatedBuffer,
+                 imageInfos[i].bounds(), usesPreallocatedTextures,
                  0, // unused blur radius. The blur effect hardcodes the radius.
                  1.0f, mHalfResDownSampleBlurEffect);
     }
     // Finally blur+upscale back to our original size.
     for (int i = filterPasses - 1; i >= 0; i--) {
         blurInto(surfaces[i], imageInfos[i].width(), surfaces[i + 1]->makeTemporaryImage(),
-                 imageInfos[i + 1].bounds(), usesPreallocatedBuffer, step,
+                 imageInfos[i + 1].bounds(), usesPreallocatedTextures, step,
                  std::min(1.0f, filterDepth - i), mUpSampleBlurEffect);
     }
 
     return surfaces[0]->makeTemporaryImage();
 }
 
-void KawaseBlurDualFilterV2::preallocateBuffer(SkiaGpuContext* protectedContext, ui::Size size) {
+void KawaseBlurDualFilterV2::preallocateBuffers(SkiaGpuContext* context, ui::Size size) {
     SFTRACE_CALL();
     std::lock_guard<std::mutex> lock(mRenderingMutex);
 
+    const bool isProtected = context->supportsProtectedContent();
+    auto& texturesRef = isProtected ? mProtectedTextures : mUnprotectedTextures;
+    ui::Size& displaySizeRef = isProtected ? mProtectedDisplaySize : mUnprotectedDisplaySize;
+    const uint64_t usageFlags = isProtected ? kProtectedUsageFlags : kUnprotectedUsageFlags;
     // Use the longer side as the ref size for the preallocated square, so that it can handle
     // both portrait and landscape cases.
     // TODO(b/486256401): use transform to handle screen rotation better.
-    int32_t side = std::max(size.width, size.height);
-    mPreallocatedDisplaySize = ui::Size(side, side);
+    const int32_t side = std::max(size.width, size.height);
+    displaySizeRef = ui::Size(side, side);
     size_t totalBytes = 0;
     for (int i = 0; i < kMaxSurfaces; i++) {
-        const int newW =
-                std::max(1, static_cast<int>(static_cast<float>(side) / kScales[i]));
-        const int newH =
-                std::max(1, static_cast<int>(static_cast<float>(side) / kScales[i]));
+        const int newW = std::max(1, static_cast<int>(static_cast<float>(side) / kScales[i]));
+        const int newH = std::max(1, static_cast<int>(static_cast<float>(side) / kScales[i]));
 
-        sp<GraphicBuffer> buffer =
-                sp<GraphicBuffer>::make(newW, newH, PIXEL_FORMAT_RGBA_8888, 1, kProtectedUsageFlags,
-                                        "KawaseBlurDualFilterV2");
+        sp<GraphicBuffer> buffer = sp<GraphicBuffer>::make(newW, newH, PIXEL_FORMAT_RGBA_8888, 1,
+                                                           usageFlags, "KawaseBlurDualFilterV2");
         LOG_THREAD_STATE_AND_CRASH_IF(buffer->initCheck() != OK,
-                                      "Failed to preallocate GraphicBuffer for intermediate blur "
-                                      "surface: %s. Is protected memory supported? (i:%d, %dx%x, "
-                                      "RGBA_8888, usage:0x%" PRIx64 ")",
-                                      statusToString(buffer->initCheck()).c_str(), i, newW, newH,
-                                      kProtectedUsageFlags);
+                                      "Failed to preallocate %s GraphicBuffer for intermediate "
+                                      "blur surface: %s. %s(i:%d, %dx%x, RGBA_8888, "
+                                      "usage:0x%" PRIx64 ")",
+                                      isProtected ? "protected" : "unprotected",
+                                      statusToString(buffer->initCheck()).c_str(),
+                                      isProtected ? "Is protected memory supported? " : "", i, newW,
+                                      newH, kUnprotectedUsageFlags);
         std::unique_ptr<SkiaBackendTexture> backendTexture =
-                protectedContext->makeBackendTexture(buffer->toAHardwareBuffer(), true);
-        mProtectedTextures[i] = std::make_shared<AutoBackendTexture::LocalRef>(
-                std::move(backendTexture), mTextureCleanupMgr);
+                context->makeBackendTexture(buffer->toAHardwareBuffer(), true);
+        texturesRef[i] = std::make_shared<AutoBackendTexture::LocalRef>(std::move(backendTexture),
+                                                                        mTextureCleanupMgr);
         totalBytes += newW * newH * bytesPerPixel(PIXEL_FORMAT_RGBA_8888);
     }
-    ALOGD("(Re)allocated %zu bytes of protected memory for intermediate blur surfaces (%dx%d "
-          "display)",
-          totalBytes, size.width, size.height);
+    ALOGD("(Re)allocated %zu bytes of %s memory for intermediate blur surfaces (%dx%d display)",
+          totalBytes, isProtected ? "protected" : "unprotected", size.width, size.height);
 }
 
 } // namespace skia
