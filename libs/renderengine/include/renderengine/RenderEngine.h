@@ -351,6 +351,10 @@ protected:
             const std::shared_ptr<ExternalTexture>& hdr, base::borrowed_fd&& hdrFence,
             float hdrSdrRatio, ui::Dataspace dataspace, const std::shared_ptr<ExternalTexture>& sdr,
             const std::shared_ptr<ExternalTexture>& gainmap) = 0;
+
+    // Logs high-level state that may assist debugging intentional crashes. Should be kept
+    // somewhat succinct to avoid overloading logcat.
+    virtual void logStateForCrash() {}
 };
 
 struct RenderEngineCreationArgs {

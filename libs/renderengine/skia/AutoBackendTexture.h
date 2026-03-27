@@ -105,6 +105,8 @@ public:
 
         SkColorType colorType() const { return mTexture->mBackendTexture->internalColorType(); }
 
+        std::string toString() const { return mTexture->toString(); }
+
         DISALLOW_COPY_AND_ASSIGN(LocalRef);
 
     private:
@@ -140,6 +142,8 @@ private:
 
     static void releaseSurfaceProc(SkSurface::ReleaseContext releaseContext);
     static void releaseImageProc(SkImages::ReleaseContext releaseContext);
+
+    std::string toString() const { return mBackendTexture->toString(); }
 
     std::unique_ptr<SkiaBackendTexture> mBackendTexture;
     int mUsageCount = 0;

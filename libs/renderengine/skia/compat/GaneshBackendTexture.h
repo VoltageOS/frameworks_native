@@ -42,6 +42,8 @@ public:
     sk_sp<SkSurface> makeSurface(ui::Dataspace dataspace, TextureReleaseProc releaseSurfaceProc,
                                  ReleaseContext releaseContext) override;
 
+    std::string backendDebugInfo() const override;
+
 private:
     DISALLOW_COPY_AND_ASSIGN(GaneshBackendTexture);
 

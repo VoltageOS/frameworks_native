@@ -33,6 +33,8 @@
 #include <common/trace.h>
 #include <log/log_main.h>
 
+#include <format>
+
 namespace android::renderengine::skia {
 
 GaneshBackendTexture::GaneshBackendTexture(sk_sp<GrDirectContext> grContext,
@@ -113,6 +115,15 @@ sk_sp<SkSurface> GaneshBackendTexture::makeSurface(ui::Dataspace dataspace,
         logFatalTexture("Unable to generate SkSurface.", dataspace, colorType);
     }
     return surface;
+}
+
+std::string GaneshBackendTexture::backendDebugInfo() const {
+    if (!mBackendTexture.isValid()) {
+        return "GraphiteBackendTexture(INVALID)";
+    }
+    return std::format("GaneshBackendTexture(BackendTexture(dimensions={}x{}, {}))",
+                       mBackendTexture.dimensions().width(), mBackendTexture.dimensions().height(),
+                       mBackendTexture.getLabel());
 }
 
 void GaneshBackendTexture::logFatalTexture(const char* msg, ui::Dataspace dataspace,
