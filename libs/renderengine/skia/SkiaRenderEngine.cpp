@@ -603,11 +603,8 @@ void SkiaRenderEngine::cleanupPostRender() {
     // been used after a certain amount of time. The duration is chosen based upon how long we
     // generally expect resources to remain useful for.
     if (mUnprotectedCachePolicy == CacheManagementPolicy::kClearStaleResourcesPostRender) {
-        // TODO(b/471222157): Currently, no RenderEngine implementations will encounter this.
-        // Eventually, update RenderEngine to use kClearStaleResourcesPostRender for its unprotected
-        // cache and determine the expected/optimal time duration to use.
         static constexpr std::chrono::milliseconds kUnusedDuration =
-                std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::seconds(30));
+                std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::seconds(90));
         mContext->purgeResourcesNotUsedIn(kUnusedDuration);
     }
     if (mProtectedContext &&
