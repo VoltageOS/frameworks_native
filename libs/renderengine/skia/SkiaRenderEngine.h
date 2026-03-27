@@ -28,6 +28,7 @@
 #include <include/core/SkSurface.h>
 #include <include/gpu/ganesh/GrBackendSemaphore.h>
 #include <include/gpu/ganesh/GrContextOptions.h>
+#include <include/private/SkHdrMetadata.h>
 #include <renderengine/ExternalTexture.h>
 #include <renderengine/RenderEngine.h>
 #include <sys/types.h>
@@ -214,6 +215,8 @@ private:
         const ui::Dataspace outputDataSpace;
         const ui::Dataspace fakeOutputDataspace;
         const SkRect& imageBounds;
+        std::optional<skhdr::AdaptiveGlobalToneMap> agtm;
+        ftl::Flags<ColorSpaceOptions> colorSpaceOptions;
     };
     sk_sp<SkShader> createRuntimeEffectShader(const RuntimeEffectShaderParameters&);
 

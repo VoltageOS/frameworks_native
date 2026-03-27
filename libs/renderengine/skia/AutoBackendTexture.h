@@ -19,6 +19,7 @@
 #include <SkImage.h>
 #include <SkSurface.h>
 #include <include/gpu/ganesh/GrDirectContext.h>
+#include <renderengine/ColorSpaces.h>
 #include <sys/types.h>
 #include <ui/GraphicTypes.h>
 
@@ -94,13 +95,16 @@ public:
         // Makes a new SkImage from the texture content.
         // As SkImages are immutable but buffer content is not, we create
         // a new SkImage every time.
-        sk_sp<SkImage> makeImage(ui::Dataspace dataspace, SkAlphaType alphaType) {
-            return mTexture->makeImage(dataspace, alphaType);
+        sk_sp<SkImage> makeImage(ui::Dataspace dataspace, SkAlphaType alphaType,
+                                 ftl::Flags<ColorSpaceOptions> options = ColorSpaceOptions::None) {
+            return mTexture->makeImage(dataspace, alphaType, options);
         }
 
         // Makes a new SkSurface from the texture content, if needed.
-        sk_sp<SkSurface> getOrCreateSurface(ui::Dataspace dataspace) {
-            return mTexture->getOrCreateSurface(dataspace);
+        sk_sp<SkSurface> getOrCreateSurface(
+                ui::Dataspace dataspace,
+                ftl::Flags<ColorSpaceOptions> options = ColorSpaceOptions::None) {
+            return mTexture->getOrCreateSurface(dataspace, options);
         }
 
         SkColorType colorType() const { return mTexture->mBackendTexture->internalColorType(); }
@@ -131,10 +135,13 @@ private:
     // Makes a new SkImage from the texture content.
     // As SkImages are immutable but buffer content is not, we create
     // a new SkImage every time.
-    sk_sp<SkImage> makeImage(ui::Dataspace dataspace, SkAlphaType alphaType);
+    sk_sp<SkImage> makeImage(ui::Dataspace dataspace, SkAlphaType alphaType,
+                             ftl::Flags<ColorSpaceOptions> options = ColorSpaceOptions::None);
 
     // Makes a new SkSurface from the texture content, if needed.
-    sk_sp<SkSurface> getOrCreateSurface(ui::Dataspace dataspace);
+    sk_sp<SkSurface> getOrCreateSurface(
+            ui::Dataspace dataspace,
+            ftl::Flags<ColorSpaceOptions> options = ColorSpaceOptions::None);
 
     CleanupManager& mCleanupMgr;
 

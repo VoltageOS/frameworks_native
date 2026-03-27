@@ -281,7 +281,8 @@ sk_sp<SkShader> LutShader::generateLutShader(sk_sp<SkShader> input,
 
     // de-gamma the image without changing the primaries
     return mBuilder->makeShader()->makeWithWorkingColorSpace(
-            renderengine::toSkColorSpace(srcDataspace)->makeLinearGamma());
+            renderengine::toSkColorSpace(srcDataspace, renderengine::ColorSpaceOptions::None)
+                    ->makeLinearGamma());
 }
 
 sk_sp<SkShader> LutShader::lutShader(sk_sp<SkShader>& input,
