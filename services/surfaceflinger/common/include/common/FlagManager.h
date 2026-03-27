@@ -60,6 +60,7 @@ public:
     bool bugfix_layer_caching_color_inversion_flickering() const;
     bool bugfix_resize_virtual_display_surfaces() const;
     bool bugfix_virtual_display_refresh_rate() const;
+    bool color_transform_box_shadows_and_border() const;
     bool color_transform_translation() const;
     bool configure_work_duration() const;
     bool debug_gpu_present_times() const;

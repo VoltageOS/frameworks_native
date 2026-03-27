@@ -127,6 +127,7 @@ void FlagManager::dump(std::string& result) const {
     DUMP_ACONFIG_FLAG(align_adpf_with_sf_opt_policy);
     DUMP_ACONFIG_FLAG(bugfix_virtual_display_refresh_rate);
     DUMP_ACONFIG_FLAG(color_transform_translation);
+    DUMP_ACONFIG_FLAG(color_transform_box_shadows_and_border);
     DUMP_ACONFIG_FLAG(configure_work_duration);
     DUMP_ACONFIG_FLAG(debug_gpu_present_times);
     DUMP_ACONFIG_FLAG(disable_transparent_region_hint);
@@ -317,6 +318,7 @@ FLAG_MANAGER_ACONFIG_FLAG(bugfix_layer_caching_color_inversion_flickering,
                           "debug.sf.layer_caching_color_inversion_flickering_fix");
 FLAG_MANAGER_ACONFIG_FLAG(bugfix_resize_virtual_display_surfaces, "");
 FLAG_MANAGER_ACONFIG_FLAG(bugfix_virtual_display_refresh_rate, "");
+FLAG_MANAGER_ACONFIG_FLAG(color_transform_box_shadows_and_border, "");
 FLAG_MANAGER_ACONFIG_FLAG(color_transform_translation, "");
 FLAG_MANAGER_ACONFIG_FLAG(configure_work_duration, "");
 FLAG_MANAGER_ACONFIG_FLAG(disable_transparent_region_hint,
