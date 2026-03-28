@@ -67,7 +67,14 @@ public:
 
     SkColorType internalColorType() const { return mColorType; }
 
+    std::string toString() const {
+        return std::format("isOutputBuffer={}, internalColorType={}, {}", mIsOutputBuffer,
+                           static_cast<int>(internalColorType()), backendDebugInfo().c_str());
+    }
+
 protected:
+    virtual std::string backendDebugInfo() const = 0;
+
     // Strip alpha channel from rawColorType if alphaType is opaque (note: only works for RGBA_8888)
     SkColorType colorTypeForImage(SkAlphaType alphaType) const {
         if (alphaType == kOpaque_SkAlphaType) {

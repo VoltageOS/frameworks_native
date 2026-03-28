@@ -45,6 +45,8 @@ public:
             ReleaseContext releaseContext,
             ftl::Flags<ColorSpaceOptions> options = ColorSpaceOptions::None) override;
 
+    std::string backendDebugInfo() const override;
+
 private:
     DISALLOW_COPY_AND_ASSIGN(GaneshBackendTexture);
 
