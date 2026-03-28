@@ -148,6 +148,10 @@ bool GraphiteGpuContext::isAbandonedOrDeviceLost() {
     return mContext->isDeviceLost();
 }
 
+bool GraphiteGpuContext::supportsProtectedContent() const {
+    return mContext->supportsProtectedContent();
+}
+
 void GraphiteGpuContext::setResourceCacheLimit(size_t maxResourceBytes) {
     // Graphite has a separate budget for its Context and its Recorder. For now the majority of
     // memory that Graphite will allocate will be on the Recorder and minimal amount on the Context.

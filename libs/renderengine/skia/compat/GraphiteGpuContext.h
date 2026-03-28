@@ -40,6 +40,7 @@ public:
     size_t getMaxRenderTargetSize() const override;
     size_t getMaxTextureSize() const override;
     bool isAbandonedOrDeviceLost() override;
+    bool supportsProtectedContent() const override;
 
     void setResourceCacheLimit(size_t maxResourceBytes) override;
     void purgeUnlockedScratchResources() override;

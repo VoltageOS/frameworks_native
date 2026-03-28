@@ -57,6 +57,8 @@
 #include <common/Panopticon.h>
 #include <common/ThreadStateCrashLogger.h>
 #include <common/trace.h>
+#include <ftl/small_map.h>
+#include <ftl/small_vector.h>
 #include <gui/FenceMonitor.h>
 #include <include/gpu/ganesh/GrBackendSemaphore.h>
 #include <include/gpu/ganesh/GrContextOptions.h>
@@ -601,11 +603,8 @@ void SkiaRenderEngine::cleanupPostRender() {
     // been used after a certain amount of time. The duration is chosen based upon how long we
     // generally expect resources to remain useful for.
     if (mUnprotectedCachePolicy == CacheManagementPolicy::kClearStaleResourcesPostRender) {
-        // TODO(b/471222157): Currently, no RenderEngine implementations will encounter this.
-        // Eventually, update RenderEngine to use kClearStaleResourcesPostRender for its unprotected
-        // cache and determine the expected/optimal time duration to use.
         static constexpr std::chrono::milliseconds kUnusedDuration =
-                std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::seconds(30));
+                std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::seconds(90));
         mContext->purgeResourcesNotUsedIn(kUnusedDuration);
     }
     if (mProtectedContext &&
@@ -999,15 +998,17 @@ void SkiaRenderEngine::drawLayersInternal(
                 break;
             }
         }
-        if (FlagManager::getInstance().window_blur_kawase2_preallocate_buffers() &&
-            hasBlur && mInProtectedContext && !display.physicalDisplay.isEmpty() &&
-            !mBlurFilter->isBufferPreallocated(display.physicalDisplay.getSize())) {
-            ALOGE("Allocating protected blur surfaces during draw! Preallocation failed, or "
-                  "destination size (%dx%d) is bigger than the preallocated size from the last"
-                  "active display size change",
+        if (FlagManager::getInstance().window_blur_kawase2_preallocate_buffers() && hasBlur &&
+            !display.physicalDisplay.isEmpty() &&
+            !mBlurFilter->areBuffersPreallocated(getActiveContext(),
+                                                 display.physicalDisplay.getSize())) {
+            ALOGE("Allocating %s blur surfaces during draw! Preallocation failed, or destination "
+                  "size (%dx%d) is bigger than the preallocated size from the last active display "
+                  "size change",
+                  isProtected() ? "protected" : "unprotected",
                   display.physicalDisplay.getSize().width,
                   display.physicalDisplay.getSize().height);
-            mBlurFilter->preallocateBuffer(getActiveContext(), display.physicalDisplay.getSize());
+            mBlurFilter->preallocateBuffers(getActiveContext(), display.physicalDisplay.getSize());
         }
     }
 
@@ -1084,8 +1085,6 @@ void SkiaRenderEngine::drawLayersInternal(
                 getBoundsAndClip(layer.geometry.boundaries, layer.geometry.roundedCornersCrop,
                                  layer.geometry.roundedCornersRadii);
         if (mBlurFilter && layerSamplesBehind(layer, ctModifiesAlpha)) {
-            std::unordered_map<uint32_t, sk_sp<SkImage>> cachedBlurs;
-
             // rect to be blurred in the coordinate space of blurInput
             SkRect blurRect = canvas->getTotalMatrix().mapRect(bounds.rect());
 
@@ -1136,33 +1135,72 @@ void SkiaRenderEngine::drawLayersInternal(
                     }
                 }
 
+                sk_sp<SkImage> temporaryBlurredImage = nullptr; // Might be reused by blur regions.
                 if (layer.backgroundBlurRadius > 0) {
                     SFTRACE_NAME("BackgroundBlur");
-                    auto blurredImage = mBlurFilter->generate(context, display,
-                                                              layer.backgroundBlurRadius,
-                                                              blurInput, blurRect);
-
-                    cachedBlurs[layer.backgroundBlurRadius] = blurredImage;
+                    // Result is only valid until the next call to generateTemporaryImage (for a
+                    // given BlurFilter). Safe to invalidate after all desired drawBlurRegion
+                    // invocations have been made for a particular blurred SkImage.
+                    temporaryBlurredImage =
+                            mBlurFilter->generateTemporaryImage(context, display,
+                                                                layer.backgroundBlurRadius,
+                                                                blurInput, blurRect);
 
                     mBlurFilter->drawBlurRegion(canvas, bounds, layer.backgroundBlurRadius,
-                                                layer.backgroundBlurScale, 1.0f,
-                                                blurRect, blurredImage, blurInput);
+                                                layer.backgroundBlurScale, 1.0f, blurRect,
+                                                temporaryBlurredImage, blurInput);
                 }
 
                 if (layer.blurRegions.size()) {
                     SkAutoCanvasRestore acr(canvas, true);
                     canvas->concat(getSkM44(layer.blurRegionTransform).asM33());
-                    for (auto region : layer.blurRegions) {
-                        if (cachedBlurs[region.blurRadius] == nullptr) {
-                            SFTRACE_NAME("BlurRegion");
-                            cachedBlurs[region.blurRadius] =
-                                    mBlurFilter->generate(context, display, region.blurRadius,
-                                                          blurInput, blurRect);
-                        }
 
-                        mBlurFilter->drawBlurRegion(canvas, getBlurRRect(region), region.blurRadius,
-                                                    1.0f, region.alpha, blurRect,
-                                                    cachedBlurs[region.blurRadius], blurInput);
+                    // Clustering regions by blur radius allows regions with a shared blur radius to
+                    // reuse the same result from generateTemporaryImage(...). The exact order does
+                    // not matter. Initial sizes for ftl stack-first collections were chosen
+                    // semi-arbitrarily.
+                    using BlurRegionList = ftl::SmallVector<BlurRegion, 4>;
+                    ftl::SmallMap<uint32_t, BlurRegionList, 2> regionsPerRadius;
+                    for (const BlurRegion& region : layer.blurRegions) {
+                        if (region.blurRadius > 0) {
+                            const auto& [entry, _] = regionsPerRadius.try_emplace(region.blurRadius,
+                                                                                  BlurRegionList());
+                            entry->second.push_back(region);
+                        }
+                    }
+
+                    const auto drawRegion =
+                            [this, canvas, &blurRect,
+                             &blurInput](const sk_sp<SkImage>& temporaryBlurredImage,
+                                         const BlurRegion& region) {
+                                mBlurFilter->drawBlurRegion(canvas, getBlurRRect(region),
+                                                            region.blurRadius, 1.0f, region.alpha,
+                                                            blurRect, temporaryBlurredImage,
+                                                            blurInput);
+                            };
+
+                    // Reuse existing temporaryBlurredImage from background blur for any regions
+                    // with the same blur radius.
+                    if (temporaryBlurredImage != nullptr &&
+                        regionsPerRadius.contains(layer.backgroundBlurRadius)) {
+                        for (const BlurRegion& region :
+                             regionsPerRadius.get(layer.backgroundBlurRadius)->get()) {
+                            drawRegion(temporaryBlurredImage, region);
+                        }
+                        regionsPerRadius.erase(layer.backgroundBlurRadius);
+                    }
+
+                    // Draw remaining regions for each blur radius.
+                    for (const auto& [radius, regions] : regionsPerRadius) {
+                        {
+                            SFTRACE_NAME("BlurRegion");
+                            temporaryBlurredImage =
+                                    mBlurFilter->generateTemporaryImage(context, display, radius,
+                                                                        blurInput, blurRect);
+                        }
+                        for (const BlurRegion& region : regions) {
+                            drawRegion(temporaryBlurredImage, region);
+                        }
                     }
                 }
 
@@ -1705,22 +1743,25 @@ void SkiaRenderEngine::onActiveDisplaySizeChanged(ui::Size size) {
     const int skiaCacheLimit = size.width * size.height * surfaceSizeCacheMultiplier;
     if (FlagManager::getInstance().re_powered_off_displays_inform_cache_budgets()) {
         LOG_ALWAYS_FATAL_IF(skiaCacheLimit <= 0,
-                            "Invalid skiaCacheLimit (size: %dx%d, bytesPerPixel(%d): %" PRIu32 ")",
+                            "Invalid skiaCacheLimit (size: %dx%d, bytesPerPixel(%d): %" PRIu32
+                            ")%s",
                             size.getWidth(), size.getHeight(),
                             static_cast<int>(mDefaultPixelFormat),
-                            bytesPerPixel(mDefaultPixelFormat));
+                            bytesPerPixel(mDefaultPixelFormat),
+                            size.isEmpty()
+                                    ? ". Did SurfaceFlinger fail to find the largest display?"
+                                    : "");
     }
 
     // Start by resizing the current context's cache
     getActiveContext()->setResourceCacheLimit(skiaCacheLimit);
 
-    const bool shouldPreallocateProtectedBlurBuffers =
+    const bool shouldPreallocateBlurBuffers =
             FlagManager::getInstance().window_blur_kawase2_preallocate_buffers() &&
-            supportsProtectedContent() && mBlurFilter != nullptr &&
-            !mBlurFilter->isBufferPreallocated(size);
-    // Maybe preallocate blur buffers for the protected context
-    if (mInProtectedContext && shouldPreallocateProtectedBlurBuffers) {
-        mBlurFilter->preallocateBuffer(getActiveContext(), size);
+            mBlurFilter != nullptr &&
+            !mBlurFilter->areBuffersPreallocated(getActiveContext(), size);
+    if (shouldPreallocateBlurBuffers) {
+        mBlurFilter->preallocateBuffers(getActiveContext(), size);
     }
 
     // If it is possible to switch contexts then we will repeat the same operations there
@@ -1729,9 +1770,8 @@ void SkiaRenderEngine::onActiveDisplaySizeChanged(ui::Size size) {
     if (mInProtectedContext != originalProtectedState) {
         getActiveContext()->setResourceCacheLimit(skiaCacheLimit);
 
-        // Second opportunity to preallocate blur buffers for the protected context
-        if (mInProtectedContext && shouldPreallocateProtectedBlurBuffers) {
-            mBlurFilter->preallocateBuffer(getActiveContext(), size);
+        if (shouldPreallocateBlurBuffers) {
+            mBlurFilter->preallocateBuffers(getActiveContext(), size);
         }
 
         // Reset back to the initial context that was active when this method was called
