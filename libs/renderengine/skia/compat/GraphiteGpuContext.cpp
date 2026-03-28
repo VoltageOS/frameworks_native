@@ -189,9 +189,18 @@ void GraphiteGpuContext::purgeResourcesNotUsedIn(std::chrono::milliseconds durat
     mRecorder->performDeferredCleanup(duration);
 }
 
-void GraphiteGpuContext::dumpMemoryStatistics(SkTraceMemoryDump* traceMemoryDump) const {
-    mContext->dumpMemoryStatistics(traceMemoryDump);
-    mRecorder->dumpMemoryStatistics(traceMemoryDump);
+void GraphiteGpuContext::reportStatsForEachCache(
+        const std::vector<ResourcePair>& resourceMap,
+        std::function<void(SkiaMemoryReporter& reporter, const char* label,
+                           const size_t cacheLimit)>
+                reportStats) const {
+    SkiaMemoryReporter contextReporter(resourceMap, true);
+    mContext->dumpMemoryStatistics(&contextReporter);
+    reportStats(contextReporter, "context", mContext->maxBudgetedBytes());
+
+    SkiaMemoryReporter recorderReporter(resourceMap, true);
+    mRecorder->dumpMemoryStatistics(&recorderReporter);
+    reportStats(recorderReporter, "recorder", mRecorder->maxBudgetedBytes());
 }
 
 } // namespace android::renderengine::skia

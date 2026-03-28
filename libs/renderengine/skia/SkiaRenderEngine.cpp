@@ -646,23 +646,16 @@ sk_sp<SkShader> SkiaRenderEngine::createRuntimeEffectShader(
         if (parameters.layer.luts) {
             shader = mLutShader.lutShader(shader, parameters.layer.luts,
                                           parameters.layer.sourceDataspace);
-        } else {
-            std::optional<std::vector<uint8_t>> smpte2094_50;
-            status_t err = graphicBuffer->getSmpte2094_50(&smpte2094_50);
-
-            if (err == OK && smpte2094_50) {
-                auto smpte2094_50Data =
-                        SkData::MakeWithoutCopy(smpte2094_50->data(), smpte2094_50->size());
-                skhdr::AdaptiveGlobalToneMap agtm;
-                if (agtm.parse(smpte2094_50Data.get())) {
-                    SFTRACE_NAME("AGTM");
-                    skhdr::Metadata metadata = skhdr::Metadata::MakeEmpty();
-                    metadata.setAdaptiveGlobalToneMap(agtm);
-                    shader = shader->makeWithColorFilter(metadata.makeToneMapColorFilter(
-                            std::log2(parameters.display.targetHdrSdrRatio)));
-                    usedAgtm = true;
-                }
-            }
+        } else if (parameters.agtm) {
+            SFTRACE_NAME("AGTM");
+            skhdr::Metadata metadata = skhdr::Metadata::MakeEmpty();
+            metadata.setAdaptiveGlobalToneMap(*parameters.agtm);
+            auto inputCS =
+                    toSkColorSpace(parameters.layer.sourceDataspace, parameters.colorSpaceOptions);
+            shader = shader->makeWithColorFilter(
+                    metadata.makeToneMapColorFilter(std::log2(parameters.display.targetHdrSdrRatio),
+                                                    inputCS.get()));
+            usedAgtm = true;
         }
     }
 
@@ -727,7 +720,8 @@ sk_sp<SkShader> SkiaRenderEngine::createRuntimeEffectShader(
                                                                 parameters.layer.source.buffer
                                                                         .maxLuminanceNits,
                                                                 hardwareBuffer,
-                                                                parameters.display.renderIntent);
+                                                                parameters.display.renderIntent,
+                                                                parameters.colorSpaceOptions);
     }
     if (parameters.layer.postProcessEffect &&
         parameters.layer.postProcessTarget == LayerSettings::SampleTarget::Self) {
@@ -845,19 +839,22 @@ static bool equalsWithinMargin(float expected, float value, float margin = kDefa
 }
 
 namespace {
+// Perfetto ignores \n, so this splits strings into separate ALOGD statements.
+void logEachLineOfString(const std::string& str) {
+    size_t pos = 0;
+    const size_t size = str.size();
+    while (pos < size) {
+        const size_t end = std::min(str.find("\n", pos), size);
+        ALOGD("%s", str.substr(pos, end - pos).c_str());
+        pos = end + 1;
+    }
+}
+
 template <typename T>
 void logSettings(const T& t) {
     std::stringstream stream;
     PrintTo(t, &stream);
-    auto string = stream.str();
-    size_t pos = 0;
-    // Perfetto ignores \n, so split up manually into separate ALOGD statements.
-    const size_t size = string.size();
-    while (pos < size) {
-        const size_t end = std::min(string.find("\n", pos), size);
-        ALOGD("%s", string.substr(pos, end - pos).c_str());
-        pos = end + 1;
-    }
+    logEachLineOfString(stream.str());
 }
 } // namespace
 
@@ -951,6 +948,11 @@ void SkiaRenderEngine::drawLayersInternal(
     }
     const bool ctModifiesAlpha =
             displayColorTransform && !displayColorTransform->isAlphaUnchanged();
+
+    sk_sp<SkColorFilter> shadowBoxBorderColorTransform;
+    if (FlagManager::getInstance().color_transform_box_shadows_and_border()) {
+        shadowBoxBorderColorTransform = displayColorTransform;
+    }
 
     // Find the max layer white point to determine the max luminance of the scene...
     const float maxLayerWhitePoint = std::transform_reduce(
@@ -1302,7 +1304,7 @@ void SkiaRenderEngine::drawLayersInternal(
                         layer.alpha == 1.0f;
                 mBoxShadowUtils.drawBoxShadows(canvas, preferredOriginalBounds.rect(), cornerRadius,
                                                layer.boxShadowSettings, supportsForwardPixelKill(),
-                                               opaqueContent);
+                                               opaqueContent, shadowBoxBorderColorTransform);
             }
 
             // Similar to shadows, do the rendering before the clip is applied because even when the
@@ -1319,7 +1321,8 @@ void SkiaRenderEngine::drawLayersInternal(
 
                 mBoxShadowUtils.drawBorder(canvas, outlineRect.rect(), cornerRadius,
                                            SkColor4f::FromColor(layer.borderSettings.color),
-                                           layer.borderSettings.strokeWidth);
+                                           layer.borderSettings.strokeWidth,
+                                           shadowBoxBorderColorTransform);
             }
         }
 
@@ -1367,6 +1370,24 @@ void SkiaRenderEngine::drawLayersInternal(
 
         const ui::Dataspace layerDataspace = layer.sourceDataspace;
 
+        std::optional<skhdr::AdaptiveGlobalToneMap> agtm;
+        if (layer.source.buffer.buffer) {
+            std::optional<std::vector<uint8_t>> smpte2094_50;
+            if (layer.source.buffer.buffer->getBuffer()->getSmpte2094_50(&smpte2094_50) == OK &&
+                smpte2094_50) {
+                auto smpte2094_50Data =
+                        SkData::MakeWithoutCopy(smpte2094_50->data(), smpte2094_50->size());
+                skhdr::AdaptiveGlobalToneMap parsedAgtm;
+                if (parsedAgtm.parse(smpte2094_50Data.get())) {
+                    agtm = parsedAgtm;
+                }
+            }
+        }
+
+        const ftl::Flags<ColorSpaceOptions> colorSpaceOptions = (agtm.has_value() && !layer.luts)
+                ? ColorSpaceOptions::USE_HLG_OOTF
+                : ColorSpaceOptions::None;
+
         SkPaint paint;
         if (layer.source.buffer.buffer) {
             SFTRACE_NAME("DrawImage");
@@ -1401,7 +1422,8 @@ void SkiaRenderEngine::drawLayersInternal(
                     : item.isOpaque                      ? kOpaque_SkAlphaType
                     : item.usePremultipliedAlpha         ? kPremul_SkAlphaType
                                                          : kUnpremul_SkAlphaType;
-            sk_sp<SkImage> image = imageTextureRef->makeImage(layerDataspace, alphaType);
+            sk_sp<SkImage> image =
+                    imageTextureRef->makeImage(layerDataspace, alphaType, colorSpaceOptions);
 
             auto texMatrix = getSkM44(item.textureTransform).asM33();
             // textureTansform was intended to be passed directly into a shader, so when
@@ -1433,7 +1455,8 @@ void SkiaRenderEngine::drawLayersInternal(
             if (useIsOpaqueWorkaround) {
                 shader = SkShaders::Blend(SkBlendMode::kPlus, shader,
                                           SkShaders::Color(SkColors::kBlack,
-                                                           toSkColorSpace(layerDataspace)));
+                                                           toSkColorSpace(layerDataspace,
+                                                                          colorSpaceOptions)));
             }
 
             SkRect imageBounds;
@@ -1449,6 +1472,8 @@ void SkiaRenderEngine::drawLayersInternal(
                     .outputDataSpace = display.outputDataspace,
                     .fakeOutputDataspace = fakeDataspace,
                     .imageBounds = imageBounds,
+                    .agtm = agtm,
+                    .colorSpaceOptions = colorSpaceOptions,
             }));
 
             // Turn on dithering when dimming beyond this (arbitrary) threshold...
@@ -1506,11 +1531,12 @@ void SkiaRenderEngine::drawLayersInternal(
         } else {
             SFTRACE_NAME("DrawColor");
             const auto color = layer.source.solidColor;
-            sk_sp<SkShader> shader = SkShaders::Color(SkColor4f{.fR = color.r,
-                                                                .fG = color.g,
-                                                                .fB = color.b,
-                                                                .fA = layer.alpha},
-                                                      toSkColorSpace(layerDataspace));
+            sk_sp<SkShader> shader =
+                    SkShaders::Color(SkColor4f{.fR = color.r,
+                                               .fG = color.g,
+                                               .fB = color.b,
+                                               .fA = layer.alpha},
+                                     toSkColorSpace(layerDataspace, colorSpaceOptions));
             paint.setShader(createRuntimeEffectShader(
                     RuntimeEffectShaderParameters{.shader = shader,
                                                   .layer = layer,
@@ -1520,7 +1546,9 @@ void SkiaRenderEngine::drawLayersInternal(
                                                   .layerDimmingRatio = layerDimmingRatio,
                                                   .outputDataSpace = display.outputDataspace,
                                                   .fakeOutputDataspace = fakeDataspace,
-                                                  .imageBounds = SkRect::MakeEmpty()}));
+                                                  .imageBounds = SkRect::MakeEmpty(),
+                                                  .agtm = agtm,
+                                                  .colorSpaceOptions = colorSpaceOptions}));
         }
 
         if (layer.disableBlending) {
@@ -1779,6 +1807,51 @@ void SkiaRenderEngine::onActiveDisplaySizeChanged(ui::Size size) {
     }
 }
 
+namespace {
+static void dumpGpuCaches(std::string& result, const SkiaGpuContext* context,
+                          const bool onlyTotals = false) {
+    const std::vector<ResourcePair> resourceMap = {
+            {"texture_renderbuffer", "Texture/RenderBuffer"},
+            {"texture", "Texture"},
+            {"gr_text_blob_cache", "Text"},
+            {"skia", "Other"},
+    };
+    const bool isProtected = context->supportsProtectedContent();
+    const auto dumpSkiaMemoryReporter = [&result, isProtected,
+                                         onlyTotals](SkiaMemoryReporter& reporter,
+                                                     const char* label, const size_t cacheLimit) {
+        StringAppendF(&result,
+                      "Skia's%s GPU caches (%s, %.2f MiB limit): ", isProtected ? " protected" : "",
+                      label, cacheLimit / (1024.0f * 1024.0f));
+        reporter.logTotals(result);
+        if (!onlyTotals) {
+            reporter.logOutput(result);
+            StringAppendF(&result, "Skia's%s wrapped objects (%s):\n",
+                          isProtected ? " protected" : "", label);
+            reporter.logOutput(result, true);
+        }
+    };
+
+    context->reportStatsForEachCache(resourceMap, dumpSkiaMemoryReporter);
+}
+} // namespace
+
+void SkiaRenderEngine::logStateForCrash() {
+    std::string dumpStr;
+    StringAppendF(&dumpStr, " --- RenderEngine state dump --- \n");
+    StringAppendF(&dumpStr, "Context: %s\n", mInProtectedContext ? "protected" : "unprotected");
+
+    dumpGpuCaches(dumpStr, mContext.get(), /*onlyTotals=*/true);
+    if (supportsProtectedContent()) {
+        dumpGpuCaches(dumpStr, mProtectedContext.get(), /*onlyTotals=*/true);
+    }
+
+    // May be a significant amount of data, so dump this after smaller critical state.
+    appendBackendSpecificInfoToDump(dumpStr);
+
+    logEachLineOfString(dumpStr);
+}
+
 void SkiaRenderEngine::dump(std::string& result) {
     // Dump for the specific backend (GLES or Vk)
     appendBackendSpecificInfoToDump(result);
@@ -1805,28 +1878,22 @@ void SkiaRenderEngine::dump(std::string& result) {
     };
     SkiaMemoryReporter cpuReporter(cpuResourceMap, false);
     SkGraphics::DumpMemoryStatistics(&cpuReporter);
-    StringAppendF(&result, "Skia CPU Caches: ");
+    StringAppendF(&result, "Skia's CPU caches: ");
     cpuReporter.logTotals(result);
     cpuReporter.logOutput(result);
 
     {
         std::lock_guard<std::mutex> lock(mRenderingMutex);
 
-        std::vector<ResourcePair> gpuResourceMap = {
-                {"texture_renderbuffer", "Texture/RenderBuffer"},
-                {"texture", "Texture"},
-                {"gr_text_blob_cache", "Text"},
-                {"skia", "Other"},
-        };
-        SkiaMemoryReporter gpuReporter(gpuResourceMap, true);
-        mContext->dumpMemoryStatistics(&gpuReporter);
-        StringAppendF(&result, "Skia's GPU Caches: ");
-        gpuReporter.logTotals(result);
-        gpuReporter.logOutput(result);
-        StringAppendF(&result, "Skia's Wrapped Objects:\n");
-        gpuReporter.logOutput(result, true);
+        dumpGpuCaches(result, mContext.get());
+        if (mProtectedContext) {
+            dumpGpuCaches(result, mProtectedContext.get());
+        }
 
-        StringAppendF(&result, "RenderEngine tracked buffers: %zu\n",
+        StringAppendF(&result, "\n");
+        mRuntimeEffectManager.dump(result);
+
+        StringAppendF(&result, "\nRenderEngine tracked buffers: %zu\n",
                       mGraphicBufferExternalRefs.size());
         StringAppendF(&result, "Dumping buffer ids...\n");
         for (const auto& [id, refCounts] : mGraphicBufferExternalRefs) {
@@ -1837,23 +1904,9 @@ void SkiaRenderEngine::dump(std::string& result) {
         StringAppendF(&result, "Dumping buffer ids...\n");
         // TODO(178539829): It would be nice to know which layer these are coming from and what
         // the texture sizes are.
-        for (const auto& [id, unused] : mTextureCache) {
-            StringAppendF(&result, "- 0x%" PRIx64 "\n", id);
+        for (const auto& [id, abt] : mTextureCache) {
+            StringAppendF(&result, "- 0x%" PRIx64 " (%s)\n", id, abt->toString().c_str());
         }
-        StringAppendF(&result, "\n");
-
-        SkiaMemoryReporter gpuProtectedReporter(gpuResourceMap, true);
-        if (mProtectedContext) {
-            mProtectedContext->dumpMemoryStatistics(&gpuProtectedReporter);
-        }
-        StringAppendF(&result, "Skia's GPU Protected Caches: ");
-        gpuProtectedReporter.logTotals(result);
-        gpuProtectedReporter.logOutput(result);
-        StringAppendF(&result, "Skia's Protected Wrapped Objects:\n");
-        gpuProtectedReporter.logOutput(result, true);
-
-        StringAppendF(&result, "\n");
-        mRuntimeEffectManager.dump(result);
     }
     StringAppendF(&result, "\n");
 }
