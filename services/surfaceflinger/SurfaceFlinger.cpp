@@ -9150,7 +9150,9 @@ status_t SurfaceFlinger::setDesiredDisplayModeSpecs(
             for (const auto& specs : perDisplaySpecs) {
                 const auto display =
                         FTL_FAKE_GUARD(mStateLock, getDisplayDeviceLocked(specs.displayToken));
-                mDisplayModeController.clearDesiredMode(display->getPhysicalId());
+                if (display) {
+                    mDisplayModeController.clearDesiredMode(display->getPhysicalId());
+                }
             }
         }
 
